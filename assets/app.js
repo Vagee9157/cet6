@@ -56,10 +56,10 @@
 
   /* ================= 首页 ================= */
   const SPLIT = [
-    { k: 'listen', n: '听力', w: 35, pts: 248.5, tip: '25 题，讲座 10 题占 20%。目标做对 18 题 ≈ 165 分。' },
-    { k: 'read', n: '阅读', w: 35, pts: 248.5, tip: '仔细阅读每题 2%，先做；选词填空每题 0.5%，最后做。目标 21/30 ≈ 170 分。' },
-    { k: 'write', n: '写作', w: 15, pts: 106.5, tip: '三段式 + 零低级错误，稳进 11 分档 ≈ 75 分。' },
-    { k: 'trans', n: '翻译', w: 15, pts: 106.5, tip: '意思译全、句子完整，不空着，10 分档 ≈ 70 分。' },
+    { k: 'listen', n: '听力', w: 35, pts: 248.5, tip: '25 题，讲座 10 题占 20%。冲 500 要做对 20 题 ≈ 185 分，讲座拿 8 个。' },
+    { k: 'read', n: '阅读', w: 35, pts: 248.5, tip: '仔细阅读每题 2%，先做；选词填空每题 0.5%，最后做。冲 500 要做对 23/30 ≈ 185 分，仔细阅读 9 个。' },
+    { k: 'write', n: '写作', w: 15, pts: 106.5, tip: '三段式 + 零低级错误 + 3 个加分句式，进 12 分档 ≈ 80 分。' },
+    { k: 'trans', n: '翻译', w: 15, pts: 106.5, tip: '意思译全、句子完整、长句拆短，11 分档 ≈ 75 分。' },
   ];
   let splitSel = 'read';
   function renderHome() {
@@ -75,8 +75,8 @@
     $('#home-box').innerHTML = `
       <div class="hero">
         <div class="hero-main">
-          <h1>目标 <b>425</b>，按分值分配精力</h1>
-          <p>六级满分 710，听力和阅读各占 35%。先把单题分值最高的仔细阅读和讲座练稳，写作翻译用模板保底，425 就是自然结果。</p>
+          <h1>目标 <b>500</b>，按分值分配精力</h1>
+          <p>六级满分 710，听力和阅读各占 35%。先把单题分值最高的仔细阅读和讲座练稳，写作翻译用模板保底、再靠加分句式抬一档，500 分留足了过 425 的余量。</p>
           <div class="acts"><button class="btn w" data-go="practice">${ic('i-ear')}开始练习</button><button class="btn" data-go="vocab">${ic('i-abc')}背单词</button><button class="btn" data-go="outline">${ic('i-target')}看考点</button><a class="btn" href="paper.html">${ic('i-pen')}生成模拟卷</a></div>
         </div>
         <div class="hero-side">
