@@ -61,8 +61,14 @@
     <p class="dir">Directions: For this part, you are allowed 30 minutes to translate a passage from Chinese into English. You should write your answer on Answer Sheet 2.</p>
     <p class="zh">${esc(T.zh)}</p><div class="lines short"></div>`);
   // 答题卡
-  const sheet = `<h2>Answer Sheet<small>答题卡 · 客观题</small></h2><p class="dir">用 2B 铅笔涂黑；第 1–${numbered.filter((x) => x.part === 'listen').length} 题为听力（答题卡 1），其余为阅读（答题卡 2）。</p>
-    <div class="sheet">${numbered.map((x) => `<div><span>${x.n}</span><span class="bub">${x.letters.map((l) => `<i>${l}</i>`).join('')}</span></div>`).join('')}</div>`;
+  const nListen = numbered.filter((x) => x.part === 'listen').length;
+  const row = (x) => `<div><span class="no">${x.n}</span><span class="bub">${x.letters.map((l) => `<i>${l}</i>`).join('')}</span></div>`;
+  const grp = (title, xs, wide) => xs.length ? `<h3>${title}</h3><div class="sheet${wide ? ' wide' : ''}">${xs.map(row).join('')}</div>` : '';
+  const isWide = (x) => x.letters.length > 4;
+  const sheet = `<h2>Answer Sheet<small>答题卡 · 客观题</small></h2><p class="dir">用 2B 铅笔涂黑。第 1–${nListen} 题为听力（答题卡 1），其余为阅读（答题卡 2）。</p>
+    ${grp('Part II 听力', numbered.filter((x) => x.part === 'listen'), false)}
+    ${grp('Part III Section A 选词填空 / Section B 段落匹配', numbered.filter((x) => x.part === 'read' && isWide(x)), true)}
+    ${grp('Part III Section C 仔细阅读', numbered.filter((x) => x.part === 'read' && !isWide(x)), false)}`;
   // 答案与原文
   const key = `<h2>Key<small>参考答案</small></h2><div class="key">${numbered.map((x) => `<div><b>${x.n}.</b> ${x.ans}</div>`).join('')}</div>
     <h3>解析</h3>${numbered.filter((x) => x.exp).map((x) => `<p class="exp"><b>${x.n}.</b> ${esc(x.exp)}</p>`).join('')}

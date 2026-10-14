@@ -1,6 +1,6 @@
 // 网络优先：有网永远拿最新内容，没网用上次缓存的，联网打开过一次就能离线看
-const CACHE = 'cet6-v5';
-const CORE = ["./", "index.html", "assets/style.css?v=5", "assets/data-outline.js?v=5", "assets/data-vocab.js?v=5", "assets/data-practice.js?v=5", "assets/data-listening-2.js?v=5", "assets/data-reading-2.js?v=5", "assets/data-writing-2.js?v=5", "assets/data-vocab-2.js?v=5", "assets/app.js?v=5", "manifest.json", "assets/icons/icon-192.png"];
+const CACHE = 'cet6-v6';
+const CORE = ["./", "index.html", "assets/style.css?v=6", "assets/data-outline.js?v=6", "assets/data-vocab.js?v=6", "assets/data-practice.js?v=6", "assets/data-listening-2.js?v=6", "assets/data-reading-2.js?v=6", "assets/data-writing-2.js?v=6", "assets/data-vocab-2.js?v=6", "assets/app.js?v=6", "manifest.json", "assets/icons/icon-192.png"];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));

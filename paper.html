@@ -51,7 +51,13 @@
   .key div{break-inside:avoid;margin-bottom:1mm}
   .exp{font-family:"Noto Sans SC",sans-serif;font-size:9.5pt;color:#333;margin:0 0 2mm}
   .script{white-space:pre-line;font-size:10.5pt;margin:0 0 4mm}
-  .sheet{display:grid;grid-template-columns:repeat(5,1fr);gap:2mm 6mm;font-family:"Manrope",sans-serif;font-size:10pt}
+  .sheet{display:grid;grid-template-columns:repeat(4,1fr);gap:2mm 6mm;font-family:"Manrope",sans-serif;font-size:10pt}
+  .sheet.wide{grid-template-columns:1fr}
+  .sheet .no{width:7mm;text-align:right;font-weight:800}
+  .sheet .bub{flex-wrap:nowrap}
+  .sheet+h3,h3{break-after:avoid;page-break-after:avoid}
+  .sheet{break-inside:auto}
+  .sheet>div{break-inside:avoid}
   .sheet div{display:flex;gap:2mm;align-items:center}
   .sheet .bub{display:inline-flex;gap:1.5mm}
   .sheet .bub i{width:5mm;height:3.4mm;border:1px solid var(--ink);border-radius:2mm;font-style:normal;font-size:7pt;display:grid;place-items:center}
@@ -70,6 +76,8 @@
     .opts{grid-template-columns:1fr}
     .key{columns:1}
     .sheet{grid-template-columns:repeat(2,1fr)}
+    .sheet.wide{grid-template-columns:1fr}
+    .sheet .bub{flex-wrap:wrap;row-gap:1.5mm}
     .bar b{width:100%}
   }
 </style>
@@ -85,10 +93,10 @@
   <a href="index.html">返回主站</a>
 </div>
 <div id="paper"></div>
-<script src="assets/data-practice.js?v=5"></script>
-<script src="assets/data-listening-2.js?v=5"></script>
-<script src="assets/data-reading-2.js?v=5"></script>
-<script src="assets/data-writing-2.js?v=5"></script>
-<script src="assets/paper.js?v=5"></script>
+<script src="assets/data-practice.js?v=6"></script>
+<script src="assets/data-listening-2.js?v=6"></script>
+<script src="assets/data-reading-2.js?v=6"></script>
+<script src="assets/data-writing-2.js?v=6"></script>
+<script src="assets/paper.js?v=6"></script>
 </body>
 </html>
