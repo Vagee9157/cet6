@@ -10,7 +10,9 @@
 
   // 抽题
   const W = pick(WRITING, 1)[0];
-  const conv = pick(LISTENING.filter((s) => s.type === 'conv'), 2), pas = pick(LISTENING.filter((s) => s.type === 'passage'), 2), lec = pick(LISTENING.filter((s) => s.type === 'lecture'), 3);
+  // 篇章 2 篇合计 7 题、讲座 3 篇合计 10 题，照真题题量；凑不出就退回随机
+  const pickSum = (arr, n, total) => { let best = null; for (let t = 0; t < 40; t++) { const c = pick(arr, n); const sum = c.reduce((a, s) => a + s.questions.length, 0); if (sum === total) return c; if (!best) best = c; } return best; };
+  const conv = pick(LISTENING.filter((s) => s.type === 'conv'), 2), pas = pickSum(LISTENING.filter((s) => s.type === 'passage'), 2, 7), lec = pickSum(LISTENING.filter((s) => s.type === 'lecture'), 3, 10);
   const cloze = pick(READING.cloze, 1)[0], match = pick(READING.match, 1)[0], mc = pick(READING.mc, 2);
   const T = pick(TRANSLATION, 1)[0];
   const short = (conv.length < 2 || pas.length < 2 || lec.length < 3 || mc.length < 2) ? '（题库仍在扩充，本卷听力 / 阅读题量少于真题的 25 / 30 题）' : '';

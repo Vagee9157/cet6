@@ -98,13 +98,18 @@
 
       <div class="sec-h"><span class="ico">${ic('i-book')}</span><h2>考点与策略</h2><span class="more">${st.m}/${totalPts} 已掌握</span></div>
       <div class="mod-grid">${CHAPTERS.map((c) => { const d = c.points.filter((p, i) => S.mastered[ptKey(c, i)]).length; return `<button class="mod ${MOD[c.id]}" data-go="outline" data-ch="${c.id}"><span class="ico">${c.icon}</span><b>${esc(c.name)}</b><span>${esc(c.intro)}</span><div class="bar"><i style="width:${d / c.points.length * 100}%"></i></div></button>`; }).join('')}</div>
+      ${typeof PAST !== 'undefined' && PAST.length ? `<div class="sec-h"><span class="ico m-exam">${ic('i-timer')}</span><h2>近十年真题回顾</h2><span class="more">${PAST.length} 套 · ${PAST[PAST.length - 1].y}–${PAST[0].y}</span></div>
+      <p class="lead">只收每套的作文题、翻译主题和阅读 / 听力话题（原卷受版权保护，不收原文）。看规律、对着练，比盲刷更有用。</p>
+      <button class="btn primary" data-go="past">${ic('i-timer')}打开真题索引</button>` : ''}
       <div id="outline-anchor"></div>
-      <div id="outline-box" hidden></div>`;
+      <div id="outline-box" hidden></div>
+      <div id="past-box" hidden></div>`;
     $('#home-box').onclick = (e) => {
       const sb = e.target.closest('[data-split]'); if (sb) { splitSel = sb.dataset.split; renderHome(); return; }
       const g = e.target.closest('[data-go]'); if (!g) return;
       if (g.dataset.plan && !done[g.dataset.plan]) { done[g.dataset.plan] = 1; S.plan[day] = done; save(); }
       if (g.dataset.go === 'outline') return openOutline(g.dataset.ch);
+      if (g.dataset.go === 'past') { $('#outline-box').hidden = true; renderPast(); $('#past-box').hidden = false; $('#past-box').scrollIntoView({ behavior: 'smooth' }); return; }
       if (g.dataset.go === 'practice' && g.dataset.sub) { show('practice', true); renderPracticeHome(g.dataset.sub); return; }
       show(g.dataset.go);
     };
@@ -131,6 +136,33 @@
       ${c.id === 'exam' ? `<div class="sec-h"><span class="ico m-exam">${ic('i-target')}</span><h2>关键数字</h2></div>${NUMBERS.map((g) => `<p class="lead" style="margin:8px 0 8px;font-weight:700;color:var(--ink)">${esc(g.g)}</p><div class="num-grid">${g.rows.map(([l, v]) => `<div class="num m-exam"><div class="v">${esc(v)}</div><div class="l">${esc(l)}</div></div>`).join('')}</div>`).join('')}` : ''}`;
     $('#outline-box').onclick = (e) => { const b = e.target.closest('[data-ch]'); if (b) { chSel = b.dataset.ch; renderOutline(); } };
     $('#outline-box').onchange = (e) => { const k = e.target.dataset.master; if (!k) return; if (e.target.checked) S.mastered[k] = 1; else delete S.mastered[k]; save(); renderOutline(); };
+  }
+
+  /* ---------- 近十年真题索引 ---------- */
+  let pastYear = 'all';
+  function renderPast() {
+    const list = PAST.slice().sort((a, b) => (b.y - a.y) || (b.m - a.m) || (a.set - b.set));
+    const years = [...new Set(list.map((p) => p.y))].sort((a, b) => b - a);
+    const count = (arr) => { const m = {}; arr.forEach((k) => { if (k) m[k] = (m[k] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1]); };
+    const wt = count(list.map((p) => p.writing && p.writing.type)), tt = count(list.map((p) => p.translation && p.translation.theme));
+    const bars = (rows, cls) => `<div class="q-list" style="gap:6px">${rows.map(([k, n]) => `<div class="${cls}" style="display:grid;grid-template-columns:7em 1fr auto;gap:10px;align-items:center;font-size:13.5px"><b>${esc(k)}</b><div class="bar" style="height:10px"><i style="width:${n / list.length * 100}%"></i></div><span class="tabular" style="color:var(--ink-dim);font-weight:700">${n} 套</span></div>`).join('')}</div>`;
+    const rows = list.filter((p) => pastYear === 'all' || p.y === pastYear);
+    $('#past-box').innerHTML = `
+      <div class="sec-h" style="margin-top:28px"><span class="ico m-exam">${ic('i-timer')}</span><h2>近十年真题索引</h2><span class="more">${list.length} 套</span></div>
+      <div class="pt-grid" style="margin-bottom:16px">
+        <div class="card m-write"><h3 style="font-size:15px;margin-bottom:10px">作文题型分布</h3>${bars(wt, 'm-write')}</div>
+        <div class="card m-trans"><h3 style="font-size:15px;margin-bottom:10px">翻译主题分布</h3>${bars(tt, 'm-trans')}</div>
+      </div>
+      <div class="ch-nav"><button class="chip m-exam" data-py="all" aria-pressed="${pastYear === 'all'}">全部</button>${years.map((y) => `<button class="chip m-exam" data-py="${y}" aria-pressed="${pastYear === y}">${y}</button>`).join('')}</div>
+      <div class="q-list">${rows.map((p) => `<details class="pt m-exam" style="border-left-color:var(--exam)"><summary><div class="pt-title"><span class="tag">${p.y}.${String(p.m).padStart(2, '0')} 第 ${p.set} 套</span>${p.writing ? esc(p.writing.zh) : ''}${p.sure === false ? '<span class="tag warm">待核</span>' : ''}</div><span class="caret">${ic('i-chev-r')}</span><div class="pt-tip" style="background:var(--paper-2)">翻译：${p.translation ? esc(p.translation.zh) + '（' + esc(p.translation.theme) + '）' : '—'}</div></summary>
+        <div class="pt-body"><ul>
+          ${p.writing ? `<li><b>作文</b>（${esc(p.writing.type)}）${esc(p.writing.zh)}${p.writing.en ? ` · <i style="font-family:var(--serif)">${esc(p.writing.en)}</i>` : ''}</li>` : ''}
+          ${p.reading && (p.reading.cloze || p.reading.match || (p.reading.mc && p.reading.mc.length)) ? `<li><b>阅读</b> 选词填空：${esc(p.reading.cloze || '—')}；段落匹配：${esc(p.reading.match || '—')}；仔细阅读：${(p.reading.mc || []).filter(Boolean).map(esc).join(' / ') || '—'}</li>` : ''}
+          ${p.listening && p.listening.length ? `<li><b>听力</b> ${p.listening.filter(Boolean).map(esc).join(' / ')}</li>` : ''}
+          ${p.src && p.src.length ? `<li class="note" style="font-size:12.5px;color:var(--ink-dim)">来源：${p.src.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https?:\/\//, '').split('/')[0])}</a>`).join('、')}</li>` : ''}
+        </ul></div></details>`).join('')}</div>
+      <p class="lead" style="margin-top:14px">原卷去哪儿做：学校图书馆和各大书店的正版真题集（外研社、新东方等），或各省教育考试院认可的官方练习平台。</p>`;
+    $('#past-box').onclick = (e) => { const b = e.target.closest('[data-py]'); if (b) { pastYear = b.dataset.py === 'all' ? 'all' : +b.dataset.py; renderPast(); } };
   }
 
   /* ================= 单词 ================= */
@@ -294,6 +326,47 @@
     };
   }
 
+  /* ---------- 我的真题库：文件只存本机 IndexedDB ---------- */
+  const DB = { name: 'cet6-files', store: 'files' };
+  function idb() { return new Promise((res, rej) => { const r = indexedDB.open(DB.name, 1); r.onupgradeneeded = () => r.result.createObjectStore(DB.store, { keyPath: 'id' }); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+  async function fAll() { const d = await idb(); return new Promise((res) => { const q = d.transaction(DB.store).objectStore(DB.store).getAll(); q.onsuccess = () => res(q.result.sort((a, b) => b.at - a.at)); }); }
+  async function fPut(rec) { const d = await idb(); return new Promise((res) => { const t = d.transaction(DB.store, 'readwrite'); t.objectStore(DB.store).put(rec); t.oncomplete = res; }); }
+  async function fDel(id) { const d = await idb(); return new Promise((res) => { const t = d.transaction(DB.store, 'readwrite'); t.objectStore(DB.store).delete(id); t.oncomplete = res; }); }
+  const fmtSize = (n) => n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.round(n / 1e3) + ' KB';
+  let viewing = null;
+  async function renderFiles() {
+    const box = $('#files-box'); if (!box) return;
+    if (!('indexedDB' in window)) { box.innerHTML = '<div class="empty">这个浏览器不支持本地文件库。</div>'; return; }
+    const files = await fAll();
+    const labels = (typeof PAST !== 'undefined' ? PAST : []).map((p) => `${p.y}.${String(p.m).padStart(2, '0')} 第 ${p.set} 套`);
+    box.innerHTML = `
+      <div class="card m-exam" style="margin-bottom:12px">
+        <p class="lead" style="margin:0 0 10px">把自己买的 / 学校发的真题 PDF、扫描图或文本放进来，<b>只存在这台设备的浏览器里</b>，不上传、不同步。支持 PDF / 图片 / TXT，可多选。</p>
+        <label class="btn primary" style="cursor:pointer">${ic('i-pen')}选择文件<input type="file" id="fileIn" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,application/pdf,image/*,text/plain" hidden></label>
+        <datalist id="paperLabels">${labels.map((l) => `<option value="${esc(l)}">`).join('')}</datalist>
+      </div>
+      ${viewing ? `<div class="card" style="padding:10px;margin-bottom:12px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><b style="flex:1">${esc(viewing.name)}</b><button class="btn ghost" data-fclose>${ic('i-x')}关闭</button></div>${viewing.type.startsWith('image/') ? `<img src="${viewing.url}" style="width:100%;border-radius:10px">` : viewing.type === 'text/plain' ? `<pre class="script" style="white-space:pre-wrap">${esc(viewing.text || '')}</pre>` : `<iframe src="${viewing.url}" style="width:100%;height:75vh;border:0;border-radius:10px"></iframe><p class="lead" style="margin:8px 0 0">手机上 PDF 显示不全的话，点"新窗口打开"。<a href="${viewing.url}" target="_blank" rel="noopener">新窗口打开</a></p>`}</div>` : ''}
+      ${files.length ? `<div class="q-list">${files.map((f) => `<div class="q m-exam" style="display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center">
+          <div><b>${esc(f.name)}</b><div style="font-size:12.5px;color:var(--ink-dim)">${f.type.split('/')[1] || f.type} · ${fmtSize(f.size)} · ${new Date(f.at).toLocaleDateString()}</div></div>
+          <div style="display:flex;gap:6px"><button class="btn soft" data-fopen="${f.id}">${ic('i-eye')}打开</button><button class="btn ghost" data-fdel="${f.id}">${ic('i-trash')}</button></div>
+          <input class="search" list="paperLabels" placeholder="挂到哪一套？如 2024.12 第 1 套" value="${esc(f.label || '')}" data-flabel="${f.id}" style="grid-column:1/3;padding:8px 12px;font-size:13px;box-shadow:none;background:var(--paper-2)">
+        </div>`).join('')}</div>` : `<div class="empty">${ic('i-party')}还没有导入文件。</div>`}`;
+    $('#fileIn').onchange = async (e) => {
+      for (const file of e.target.files) {
+        const rec = { id: Date.now() + '-' + Math.random().toString(36).slice(2, 7), name: file.name, type: file.type || 'application/octet-stream', size: file.size, at: Date.now(), blob: file, label: '' };
+        if (file.type === 'text/plain') rec.text = await file.text();
+        await fPut(rec);
+      }
+      renderFiles();
+    };
+    box.onclick = async (e) => {
+      const o = e.target.closest('[data-fopen]'); if (o) { const f = files.find((x) => x.id === o.dataset.fopen); if (viewing && viewing.url) URL.revokeObjectURL(viewing.url); viewing = { name: f.name, type: f.type, url: URL.createObjectURL(f.blob), text: f.text }; renderFiles(); return; }
+      if (e.target.closest('[data-fclose]')) { if (viewing && viewing.url) URL.revokeObjectURL(viewing.url); viewing = null; renderFiles(); return; }
+      const d = e.target.closest('[data-fdel]'); if (d && confirm('删除这个文件？只从本机删除。')) { await fDel(d.dataset.fdel); renderFiles(); }
+    };
+    box.onchange = async (e) => { const l = e.target.dataset.flabel; if (!l) return; const f = files.find((x) => x.id === l); f.label = e.target.value; await fPut(f); };
+  }
+
   /* ================= 我的 ================= */
   function renderMe() {
     const st = stats(); const wrongs = Object.values(S.wrong);
@@ -308,9 +381,13 @@
       </div>
       <div class="sec-h"><span class="ico m-vocab">${ic('i-abc')}</span><h2>生词本</h2>${unknownWords.length ? `<button class="more" data-go-vocab>去复习 ${ic('i-chev-r')}</button>` : ''}</div>
       ${unknownWords.length ? `<div class="vocab-list">${unknownWords.map((w) => `<div class="vw unknown"><span class="w">${esc(w.w)}</span><span class="pos">${esc(w.p)}</span><span class="cn">${esc(w.c)}</span></div>`).join('')}</div>` : `<div class="empty">${ic('i-party')}还没有生词。去"单词"页刷闪卡，点"不认识"的会收进来。</div>`}
+      <div class="sec-h"><span class="ico m-exam">${ic('i-timer')}</span><h2>我的真题库</h2><span class="more">仅本机</span></div>
+      <div id="files-box"></div>
       <div class="sec-h"><span class="ico m-read">${ic('i-x')}</span><h2>错题本</h2>${wrongs.length ? `<button class="more" data-clear>清空</button>` : ''}</div>
       ${wrongs.length ? wrongs.map((w) => `<div class="wrong-item"><div class="src">${esc(w.src)}</div><div class="q">${esc(w.q)}</div><div class="a">答案：${esc(w.a)}</div>${w.e ? `<div class="e">${esc(w.e)}</div>` : ''}</div>`).join('') : `<div class="empty">${ic('i-party')}还没有错题。</div>`}`;
+    renderFiles();
     $('#me-box').onclick = (e) => {
+      if (e.target.closest('#files-box')) return;
       if (e.target.closest('[data-go-vocab]')) { vmode = 'review'; vq = []; show('vocab'); }
       if (e.target.closest('[data-clear]') && confirm('清空错题本？')) { S.wrong = {}; save(); renderMe(); }
     };
