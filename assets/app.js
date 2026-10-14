@@ -26,6 +26,7 @@
   const VIEWS = ['home', 'vocab', 'practice', 'wt', 'me'];
   const R = { home: renderHome, vocab: renderVocab, practice: renderPracticeHome, wt: renderWT, me: renderMe };
   function show(v, keep) {
+    if (v !== 'practice' && typeof stopAudio === 'function') stopAudio();
     VIEWS.forEach((x) => { $('#view-' + x).hidden = x !== v; });
     document.querySelectorAll('nav.tabs button').forEach((b) => b.setAttribute('aria-selected', b.dataset.view === v));
     if (!keep) R[v]();
@@ -210,8 +211,61 @@
   /* ================= 听读练习 ================= */
   let psub = 'listen', cur = null;
   function setScore(id) { const s = S.sets[id]; return s ? `${s.r}/${s.t}` : ''; }
+  /* ---------- 真人感音频：预生成的神经网络语音 + 逐句时间轴（assets/data-audio.js） ---------- */
+  const HAS_AUDIO = typeof AUDIO !== 'undefined';
+  const AU = new Audio(); AU.preload = 'auto';
+  let auId = null, auUrl = null;
+  const fmt = (x) => { x = Math.max(0, Math.floor(x || 0)); return `${Math.floor(x / 60)}:${String(x % 60).padStart(2, '0')}`; };
+  const auMeta = () => (HAS_AUDIO && auId ? AUDIO[auId] : null);
+  const auEnd = () => { const m = auMeta(); return !m ? 0 : S.auMode === 'exam' ? m.dur : m.q; };
+  async function loadAudio(id) {
+    if (auId === id) return; AU.pause(); auId = id;
+    if (auUrl) { URL.revokeObjectURL(auUrl); auUrl = null; }
+    const m = AUDIO[id];
+    // 整个文件取下来再播：离线缓存能存住，拖动进度也不受网络影响
+    try { const r = await fetch(m.src); if (!r.ok) throw 0; auUrl = URL.createObjectURL(await r.blob()); if (auId === id) AU.src = auUrl; }
+    catch { if (auId === id) AU.src = m.src; }
+    AU.playbackRate = S.rate || 1;
+  }
+  function syncPlayer() {
+    const m = auMeta(); if (!m) return;
+    const b = $('#auBtn'); if (b) b.innerHTML = ic(AU.paused ? 'i-play' : 'i-pause');
+    const end = auEnd(); const tt = Math.min(AU.currentTime, end);
+    const bar = $('#auBar'); if (bar) bar.style.width = (tt / end * 100) + '%';
+    const tm = $('#auTime'); if (tm) tm.textContent = `${fmt(tt)} / ${fmt(end)}`;
+    const ttl = $('#auTtl'); if (ttl) ttl.textContent = AU.paused ? (tt > 0.5 ? '已暂停' : '点击播放录音') : (AU.currentTime >= m.q ? '题目播报中…' : '正在播放…');
+    let idx = -1; m.segs.forEach((sg, i) => { if (AU.currentTime >= sg[0] - 0.05 && AU.currentTime < sg[1] + 0.25) idx = i; });
+    document.querySelectorAll('.seg.on').forEach((e) => { if (+e.dataset.i !== idx) e.classList.remove('on'); });
+    const cur = idx >= 0 && document.querySelector(`.seg[data-i="${idx}"]`);
+    if (cur && !cur.classList.contains('on')) { cur.classList.add('on'); if (!AU.paused) cur.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+  }
+  AU.addEventListener('timeupdate', () => { const m = auMeta(); if (m && S.auMode !== 'exam' && AU.currentTime >= m.q - 0.4 && !AU.paused) { AU.pause(); } syncPlayer(); });
+  ['play', 'pause', 'ended', 'loadedmetadata'].forEach((ev) => AU.addEventListener(ev, syncPlayer));
+  function stopAudio() { AU.pause(); if (window.speechSynthesis) speechSynthesis.cancel(); }
+  function playerHTML(set) {
+    const m = HAS_AUDIO && AUDIO[set.id];
+    if (!m) return `<div class="player"><button class="play" data-play>${ic(cur.playing ? 'i-pause' : 'i-play')}</button><div class="ttl">${cur.playing ? '正在朗读…' : '点击播放录音（浏览器朗读）'}</div><div class="ctl">语速 ${[0.9, 1, 1.1, 1.2].map((r) => `<button class="chip" data-rate="${r}" aria-pressed="${(S.rate || 1) === r}">${r}×</button>`).join('')}</div><div class="note">这篇还没有录音，暂用浏览器朗读。</div></div>`;
+    return `<div class="player au"><button class="play" id="auBtn" data-au>${ic(AU.paused ? 'i-play' : 'i-pause')}</button>
+      <div class="ttl"><span id="auTtl">点击播放录音</span><span class="tm" id="auTime">0:00 / ${fmt(auEnd())}</span></div>
+      <div class="seek" data-seek><i id="auBar"></i></div>
+      <div class="ctl">语速 ${[0.9, 1, 1.1, 1.2].map((r) => `<button class="chip" data-rate="${r}" aria-pressed="${(S.rate || 1) === r}">${r}×</button>`).join('')}</div>
+      <div class="ctl">${[['text', '只听原文'], ['exam', '考试节奏（含题目播报）']].map(([k, l]) => `<button class="chip" data-aumode="${k}" aria-pressed="${(S.auMode || 'text') === k}">${l}</button>`).join('')}</div>
+      <div class="note">真题每段只放一遍。考试节奏会在原文后按真题格式播报题目、每题留 12 秒作答。交卷后可以点原文任意一句从那里重听。</div></div>`;
+  }
+  function transcriptHTML(set) {
+    const m = HAS_AUDIO && AUDIO[set.id];
+    if (!m) return `<div class="script">${esc(set.script)}</div>`;
+    const rows = []; let lastSpk = null;
+    m.segs.forEach((sg, i) => {
+      if (sg[2] === 'Q') return;
+      if (sg[2] && sg[2] !== lastSpk) { rows.push(`</p><p class="turn"><span class="spk ${sg[2] === 'M' ? 'm' : 'w'}">${sg[2] === 'M' ? '男' : '女'}</span>`); lastSpk = sg[2]; }
+      rows.push(`<span class="seg" data-i="${i}" data-t="${sg[0]}">${esc(sg[3])}</span> `);
+    });
+    return `<div class="script tr"><p>${rows.join('')}</p></div>`;
+  }
+
   function renderPracticeHome(sub) {
-    if (sub) psub = sub; cur = null; if (window.speechSynthesis) speechSynthesis.cancel(); window.scrollTo(0, 0);
+    if (sub) psub = sub; cur = null; stopAudio(); window.scrollTo(0, 0);
     const L = LISTENING, Rd = READING;
     const card = (mod, kind, s, extra) => `<button class="set ${mod}" data-open="${s.id}"><span class="kind">${kind}</span><b>${esc(s.title.replace(/^[^·]+·\s*/, ''))}</b><span class="meta">${ic('i-timer')}约 ${s.minutes} 分钟 ${extra || ''}<span class="score">${setScore(s.id)}</span></span></button>`;
     $('#practice-box').innerHTML = `
@@ -250,8 +304,9 @@
     const mcq = (qs) => `<div class="q-list">${qs.map((q, i) => { const p = ans[i]; return `<div class="q ${mod}"><div class="qt"><span class="n">${i + 1}</span><span>${esc(q.q)}</span></div><div class="opts">${q.opts.map((o, k) => { let cls = 'opt'; if (done) { if (k === q.a) cls += ' right'; else if (k === p) cls += ' wrong'; } else if (k === p) cls += ' picked'; return `<button class="${cls}" data-q="${i}" data-k="${k}" ${done ? 'disabled' : ''}><span class="k">${K[k]}</span><span>${esc(o)}</span></button>`; }).join('')}</div>${done ? `<div class="exp"><b>${p === q.a ? '✓ 答对' : '✗ 答错'}</b> · 正确答案 ${K[q.a]}。${esc(q.exp)}</div>` : ''}</div>`; }).join('')}</div>`;
     let body = '';
     if (kind === 'listen') {
-      body = `<div class="player"><button class="play" data-play>${ic(cur.playing ? 'i-pause' : 'i-play')}</button><div class="ttl">${cur.playing ? '正在朗读…' : '点击播放录音'}</div><div class="ctl">语速 ${[0.9, 1, 1.1, 1.2].map((r) => `<button class="chip" data-rate="${r}" aria-pressed="${(S.rate || 1) === r}">${r}×</button>`).join('')}</div><div class="note">真题只放一遍。建议先听一遍答题，交卷后再对着原文精听。</div></div>
-        ${done ? `<div class="sec-h"><span class="ico m-listen">${ic('i-eye')}</span><h2>原文</h2></div><div class="script">${esc(set.script)}</div>` : ''}${mcq(set.questions)}`;
+      if (HAS_AUDIO && AUDIO[set.id]) loadAudio(set.id);
+      body = `${playerHTML(set)}
+        ${done ? `<div class="sec-h"><span class="ico m-listen">${ic('i-eye')}</span><h2>原文</h2><span class="more">点句子从那里重听</span></div>${transcriptHTML(set)}` : ''}${mcq(set.questions)}`;
     } else if (kind === 'mc') {
       body = `<div class="passage">${set.text.split('\n').map((p) => `<p>${esc(p)}</p>`).join('')}</div>${mcq(set.questions)}`;
     } else if (kind === 'match') {
@@ -273,8 +328,12 @@
     $('#practice-box').innerHTML = back + resHtml + body + (done ? `<div class="submit-bar"><button class="btn primary" data-back>${ic('i-chev-l')}回到列表</button></div>` : `<div class="submit-bar"><button class="btn primary" data-submit ${answered ? '' : 'disabled'}>交卷（${answered}/${total}）</button></div>`);
     $('#practice-box').onclick = (e) => {
       if (e.target.closest('[data-back]')) return renderPracticeHome();
-      const pl = e.target.closest('[data-play]'); if (pl) { if (cur.playing) { speechSynthesis.cancel(); cur.playing = false; } else { const u = speak(set.script); cur.playing = true; if (u) u.onend = () => { cur.playing = false; const b = $('[data-play]'); if (b) { b.innerHTML = ic('i-play'); $('.player .ttl').textContent = '再听一遍'; } }; } $('[data-play]').innerHTML = ic(cur.playing ? 'i-pause' : 'i-play'); $('.player .ttl').textContent = cur.playing ? '正在朗读…' : '点击播放录音'; return; }
-      const rt = e.target.closest('[data-rate]'); if (rt) { S.rate = +rt.dataset.rate; save(); document.querySelectorAll('[data-rate]').forEach((b) => b.setAttribute('aria-pressed', +b.dataset.rate === S.rate)); return; }
+      if (e.target.closest('[data-au]')) { if (AU.paused) { if (AU.currentTime >= auEnd() - 0.6) AU.currentTime = 0; AU.play().catch(() => {}); } else AU.pause(); return; }
+      const sk = e.target.closest('[data-seek]'); if (sk) { const r = sk.getBoundingClientRect(); AU.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * auEnd(); syncPlayer(); return; }
+      const am = e.target.closest('[data-aumode]'); if (am) { S.auMode = am.dataset.aumode; save(); document.querySelectorAll('[data-aumode]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.aumode === S.auMode)); syncPlayer(); return; }
+      const sg = e.target.closest('.seg[data-t]'); if (sg) { AU.currentTime = +sg.dataset.t; AU.play().catch(() => {}); return; }
+      const pl = e.target.closest('[data-play]'); if (pl) { if (cur.playing) { speechSynthesis.cancel(); cur.playing = false; } else { const u = speak(set.script.replace(/^\s*[MW]:\s*/gm, '')); cur.playing = true; if (u) u.onend = () => { cur.playing = false; const b = $('[data-play]'); if (b) { b.innerHTML = ic('i-play'); $('.player .ttl').textContent = '再听一遍'; } }; } $('[data-play]').innerHTML = ic(cur.playing ? 'i-pause' : 'i-play'); $('.player .ttl').textContent = cur.playing ? '正在朗读…' : '点击播放录音'; return; }
+      const rt = e.target.closest('[data-rate]'); if (rt) { S.rate = +rt.dataset.rate; AU.playbackRate = S.rate; save(); document.querySelectorAll('[data-rate]').forEach((b) => b.setAttribute('aria-pressed', +b.dataset.rate === S.rate)); return; }
       if (done) return;
       const o = e.target.closest('.opt[data-q]'); if (o) { ans[+o.dataset.q] = +o.dataset.k; return renderSet(); }
       const l = e.target.closest('.letters button[data-q]'); if (l) { ans[+l.dataset.q] = l.dataset.l; return renderSet(); }
@@ -284,6 +343,7 @@
     };
     const t = $('#timer'); if (t && t0) { const s = Math.floor((Date.now() - t0) / 1000); t.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; }
     if (done) clearInterval(timerId);
+    if (kind === 'listen') syncPlayer();
   }
   function submitSet() {
     const { kind, set, ans } = cur; let r = 0; const wrongs = [];
@@ -345,11 +405,11 @@
     const labels = (typeof PAST !== 'undefined' ? PAST : []).map((p) => `${p.y}.${String(p.m).padStart(2, '0')} 第 ${p.set} 套`);
     box.innerHTML = `
       <div class="card m-exam" style="margin-bottom:12px">
-        <p class="lead" style="margin:0 0 10px">把自己买的 / 学校发的真题 PDF、扫描图或文本放进来，<b>只存在这台设备的浏览器里</b>，不上传、不同步。支持 PDF / 图片 / TXT，可多选。</p>
-        <label class="btn primary" style="cursor:pointer">${ic('i-pen')}选择文件<input type="file" id="fileIn" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,application/pdf,image/*,text/plain" hidden></label>
+        <p class="lead" style="margin:0 0 10px">把自己买的 / 学校发的真题 PDF、扫描图或文本放进来，<b>只存在这台设备的浏览器里</b>，不上传、不同步。支持 PDF / 图片 / TXT / 音频（真题听力 MP3），可多选。</p>
+        <label class="btn primary" style="cursor:pointer">${ic('i-pen')}选择文件<input type="file" id="fileIn" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.mp3,.m4a,.wav,.aac,application/pdf,image/*,text/plain,audio/*" hidden></label>
         <datalist id="paperLabels">${labels.map((l) => `<option value="${esc(l)}">`).join('')}</datalist>
       </div>
-      ${viewing ? `<div class="card" style="padding:10px;margin-bottom:12px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><b style="flex:1">${esc(viewing.name)}</b><button class="btn ghost" data-fclose>${ic('i-x')}关闭</button></div>${viewing.type.startsWith('image/') ? `<img src="${viewing.url}" style="width:100%;border-radius:10px">` : viewing.type === 'text/plain' ? `<pre class="script" style="white-space:pre-wrap">${esc(viewing.text || '')}</pre>` : `<iframe src="${viewing.url}" style="width:100%;height:75vh;border:0;border-radius:10px"></iframe><p class="lead" style="margin:8px 0 0">手机上 PDF 显示不全的话，点"新窗口打开"。<a href="${viewing.url}" target="_blank" rel="noopener">新窗口打开</a></p>`}</div>` : ''}
+      ${viewing ? `<div class="card" style="padding:10px;margin-bottom:12px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><b style="flex:1">${esc(viewing.name)}</b><button class="btn ghost" data-fclose>${ic('i-x')}关闭</button></div>${viewing.type.startsWith('audio/') ? `<audio controls src="${viewing.url}" style="width:100%"></audio>` : viewing.type.startsWith('image/') ? `<img src="${viewing.url}" style="width:100%;border-radius:10px">` : viewing.type === 'text/plain' ? `<pre class="script" style="white-space:pre-wrap">${esc(viewing.text || '')}</pre>` : `<iframe src="${viewing.url}" style="width:100%;height:75vh;border:0;border-radius:10px"></iframe><p class="lead" style="margin:8px 0 0">手机上 PDF 显示不全的话，点"新窗口打开"。<a href="${viewing.url}" target="_blank" rel="noopener">新窗口打开</a></p>`}</div>` : ''}
       ${files.length ? `<div class="q-list">${files.map((f) => `<div class="q m-exam" style="display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center">
           <div><b>${esc(f.name)}</b><div style="font-size:12.5px;color:var(--ink-dim)">${f.type.split('/')[1] || f.type} · ${fmtSize(f.size)} · ${new Date(f.at).toLocaleDateString()}</div></div>
           <div style="display:flex;gap:6px"><button class="btn soft" data-fopen="${f.id}">${ic('i-eye')}打开</button><button class="btn ghost" data-fdel="${f.id}">${ic('i-trash')}</button></div>

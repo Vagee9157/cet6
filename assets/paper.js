@@ -33,7 +33,7 @@
   // 听力
   const L1 = `<h2>Part II　Listening Comprehension<small>25 minutes · 35%</small></h2>
     <p class="dir">Directions: In this section, you will hear ${conv.length} long conversation${conv.length > 1 ? 's' : ''}, ${pas.length} passage${pas.length > 1 ? 's' : ''} and ${lec.length} recording${lec.length > 1 ? 's' : ''} of lectures or talks. Each will be played only once. After you hear a question, you must choose the best answer from the four choices marked A), B), C) and D). Then mark the corresponding letter on Answer Sheet 1 with a single line through the centre.</p>
-    <p class="lect">本站无音频：由同伴朗读卷尾"听力原文"，或在主站"听读"页用语音合成播放对应篇目。</p>
+    <p class="lect">听力录音：打开主站「听读」，按顺序播放下列篇目，选「考试节奏」即带题目播报和作答停顿：${[...conv, ...pas, ...lec].map((x, k) => `${k + 1}. ${esc(x.title.replace(/^[^·]+·\s*/, ''))}`).join('；')}。</p>
     <h3>Section A</h3>${listenBlock(conv, 'Conversation')}<h3>Section B</h3>${listenBlock(pas, 'Passage')}<h3>Section C</h3>${listenBlock(lec, 'Recording')}`;
   pages.push(L1);
   // 阅读
