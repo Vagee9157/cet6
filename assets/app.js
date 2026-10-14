@@ -383,10 +383,36 @@
       ${unknownWords.length ? `<div class="vocab-list">${unknownWords.map((w) => `<div class="vw unknown"><span class="w">${esc(w.w)}</span><span class="pos">${esc(w.p)}</span><span class="cn">${esc(w.c)}</span></div>`).join('')}</div>` : `<div class="empty">${ic('i-party')}还没有生词。去"单词"页刷闪卡，点"不认识"的会收进来。</div>`}
       <div class="sec-h"><span class="ico m-exam">${ic('i-timer')}</span><h2>我的真题库</h2><span class="more">仅本机</span></div>
       <div id="files-box"></div>
+      <div class="sec-h"><span class="ico m-vocab">${ic('i-redo')}</span><h2>数据与备份</h2></div>
+      <div class="card" style="margin-bottom:12px">
+        <p class="lead" style="margin:0 0 10px" id="storageLine">正在读取存储状态…</p>
+        <p class="lead" style="margin:0 0 12px">所有数据只在这台设备的浏览器里：换浏览器、换手机、清站点数据都会丢。把本站<b>添加到主屏幕</b>后，系统会按 App 对待，不会在长期不用时清掉。换设备前先导出备份。</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-export>${ic('i-pen')}导出备份（进度 / 生词 / 错题）</button><label class="btn" style="cursor:pointer">${ic('i-redo')}导入备份<input type="file" id="importIn" accept=".json,application/json" hidden></label></div>
+      </div>
       <div class="sec-h"><span class="ico m-read">${ic('i-x')}</span><h2>错题本</h2>${wrongs.length ? `<button class="more" data-clear>清空</button>` : ''}</div>
       ${wrongs.length ? wrongs.map((w) => `<div class="wrong-item"><div class="src">${esc(w.src)}</div><div class="q">${esc(w.q)}</div><div class="a">答案：${esc(w.a)}</div>${w.e ? `<div class="e">${esc(w.e)}</div>` : ''}</div>`).join('') : `<div class="empty">${ic('i-party')}还没有错题。</div>`}`;
     renderFiles();
+    (async () => {
+      const el = $('#storageLine'); if (!el) return;
+      try {
+        const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null;
+        const persisted = navigator.storage && navigator.storage.persisted ? await navigator.storage.persisted() : null;
+        const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+        el.innerHTML = `${est ? `已用 <b>${fmtSize(est.usage || 0)}</b>（浏览器配额约 ${fmtSize(est.quota || 0)}）· ` : ''}持久化：<b>${persisted === null ? '不支持' : persisted ? '已开启' : '未开启（添加到主屏幕后再打开一次通常会批准）'}</b> · ${standalone ? '当前以 App 方式运行' : '当前在浏览器里运行'}`;
+      } catch { el.textContent = '读不到存储状态。'; }
+    })();
+    $('#importIn').onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      try { const data = JSON.parse(await f.text()); if (!data || data.app !== 'cet6') throw 0;
+        if (!confirm(`导入 ${data.at ? new Date(data.at).toLocaleString() : ''} 的备份？会覆盖当前的进度、生词和错题。`)) return;
+        Object.assign(S, data.state); save(); location.reload();
+      } catch { alert('不是本站的备份文件。'); }
+    };
     $('#me-box').onclick = (e) => {
+      if (e.target.closest('[data-export]')) {
+        const blob = new Blob([JSON.stringify({ app: 'cet6', at: Date.now(), state: S })], { type: 'application/json' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `cet6-backup-${today()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); return;
+      }
       if (e.target.closest('#files-box')) return;
       if (e.target.closest('[data-go-vocab]')) { vmode = 'review'; vq = []; show('vocab'); }
       if (e.target.closest('[data-clear]') && confirm('清空错题本？')) { S.wrong = {}; save(); renderMe(); }
@@ -395,6 +421,7 @@
 
   /* ---------- 启动 ---------- */
   if ('speechSynthesis' in window) speechSynthesis.getVoices();
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   const start = location.hash.slice(1); show(VIEWS.includes(start) ? start : 'home');
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
