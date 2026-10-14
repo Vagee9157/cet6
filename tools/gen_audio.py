@@ -15,7 +15,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 k = Kokoro(os.path.join(HERE, 'kokoro-v1.0.onnx'), os.path.join(HERE, 'voices-v1.0.bin'))
 
 # 从站点数据里取听力（用 node 读 JS 数据）
-js = "const fs=require('fs');const s=['data-practice.js','data-listening-2.js'].map(f=>fs.readFileSync('%s/assets/'+f,'utf8')).join('\\n')+';console.log(JSON.stringify(LISTENING))';eval(s)" % ROOT
+js = "const fs=require('fs');const s=['data-practice.js','data-listening-2.js','data-listening-3.js'].map(f=>fs.readFileSync('%s/assets/'+f,'utf8')).join('\\n')+';console.log(JSON.stringify(LISTENING))';eval(s)" % ROOT
 L = json.loads(subprocess.check_output(['node', '-e', js]))
 
 FEMALE = ['af_heart', 'af_bella', 'af_nicole']

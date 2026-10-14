@@ -3,3 +3,5 @@ tools/tts86/
 tools/*.onnx
 tools/*.bin
 tools/.audio-manifest.json
+tools/tts
+tools/tts86

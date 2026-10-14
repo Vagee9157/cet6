@@ -331,3 +331,4 @@ footer.foot b{color:var(--ink-soft)}
 .seg{cursor:pointer;border-radius:5px;transition:background .15s;box-decoration-break:clone;-webkit-box-decoration-break:clone}
 .seg:hover{background:var(--paper-2)}
 .seg.on{background:var(--listen-soft);color:var(--ink);box-shadow:0 0 0 2px var(--listen-soft)}
+.submit-bar .btn:disabled{opacity:1;background:var(--paper-2);color:var(--ink-dim);box-shadow:var(--shadow)}
