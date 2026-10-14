@@ -214,7 +214,8 @@
   /* ---------- 真人感音频：预生成的神经网络语音 + 逐句时间轴（assets/data-audio.js） ---------- */
   const HAS_AUDIO = typeof AUDIO !== 'undefined';
   const REALS = typeof REAL !== 'undefined' ? REAL.filter((r) => r.questions && r.questions.length) : [];
-  const REALMAP = Object.fromEntries(REALS.map((r) => [r.id, { src: r.src, dur: r.dur, q: r.dur, segs: [], real: true }]));
+  const realSegs = (r) => { const ps = r.script.split('\n').filter(Boolean); const n = ps.map((p) => p.split(/\s+/).length); const tot = n.reduce((a, b) => a + b, 0) || 1; let acc = 0; return ps.map((p, i) => { const st = acc / tot * r.dur; acc += n[i]; return [Math.round(st * 10) / 10, Math.round(acc / tot * r.dur * 10) / 10, '', p]; }); };
+  const REALMAP = Object.fromEntries(REALS.map((r) => [r.id, { src: r.src, dur: r.dur, q: r.dur, segs: realSegs(r), real: true }]));
   const AUD = (id) => (HAS_AUDIO && AUDIO[id]) || REALMAP[id] || null;
   const AU = new Audio(); AU.preload = 'auto';
   let auId = null, auUrl = null;
@@ -262,7 +263,7 @@
   }
   function transcriptHTML(set) {
     const m = AUD(set.id);
-    if (m && m.real) return `<div class="script">${esc(set.script)}</div><p class="lead">出处：<a href="${esc(set.url)}" target="_blank" rel="noopener">VOA Learning English · ${esc(set.title)}</a>（${esc(set.date)}，公有领域）</p>`;
+    if (m && m.real) return `<div class="script tr">${m.segs.map((sg, i) => `<p><span class="seg" data-i="${i}" data-t="${sg[0]}">${esc(sg[3])}</span></p>`).join('')}</div><p class="lead">段落高亮按字数估算，位置是大致的。出处：<a href="${esc(set.url)}" target="_blank" rel="noopener">VOA Learning English · ${esc(set.title)}</a>（${esc(set.date)}，公有领域）</p>`;
     if (!m) return `<div class="script">${esc(set.script)}</div>`;
     const rows = []; let lastSpk = null;
     m.segs.forEach((sg, i) => {
@@ -319,7 +320,7 @@
     if (kind === 'listen') {
       if (AUD(set.id)) loadAudio(set.id);
       body = `${playerHTML(set)}
-        ${done ? `<div class="sec-h"><span class="ico m-listen">${ic('i-eye')}</span><h2>原文</h2><span class="more">点句子从那里重听</span></div>${transcriptHTML(set)}` : ''}${mcq(set.questions)}`;
+        ${done || cur.showTr ? `<div class="sec-h"><span class="ico m-listen">${ic('i-eye')}</span><h2>原文</h2><span class="more">点句子从那里重听</span>${done ? '' : `<button class="btn ghost" data-tr style="margin-left:8px">${ic('i-x')}收起</button>`}</div>${done ? '' : '<p class="lead">提示：先盲听做题再看原文，练习效果最好。</p>'}${transcriptHTML(set)}` : `<div class="tr-toggle"><button class="btn soft m-listen" data-tr>${ic('i-eye')}查看原文</button><span>建议先盲听做题，卡住了再打开</span></div>`}${mcq(set.questions)}`;
     } else if (kind === 'mc') {
       body = `<div class="passage">${set.text.split('\n').map((p) => `<p>${esc(p)}</p>`).join('')}</div>${mcq(set.questions)}`;
     } else if (kind === 'match') {
@@ -345,6 +346,7 @@
       const sk = e.target.closest('[data-seek]'); if (sk) { const r = sk.getBoundingClientRect(); AU.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * auEnd(); syncPlayer(); return; }
       const rr = e.target.closest('[data-rrate]'); if (rr) { S.realRate = +rr.dataset.rrate; AU.playbackRate = S.realRate; save(); document.querySelectorAll('[data-rrate]').forEach((b) => b.setAttribute('aria-pressed', +b.dataset.rrate === S.realRate)); return; }
       const am = e.target.closest('[data-aumode]'); if (am) { S.auMode = am.dataset.aumode; save(); document.querySelectorAll('[data-aumode]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.aumode === S.auMode)); syncPlayer(); return; }
+      if (e.target.closest('[data-tr]')) { cur.showTr = !cur.showTr; renderSet(); return; }
       const sg = e.target.closest('.seg[data-t]'); if (sg) { AU.currentTime = +sg.dataset.t; AU.play().catch(() => {}); return; }
       const pl = e.target.closest('[data-play]'); if (pl) { if (cur.playing) { speechSynthesis.cancel(); cur.playing = false; } else { const u = speak(set.script.replace(/^\s*[MW]:\s*/gm, '')); cur.playing = true; if (u) u.onend = () => { cur.playing = false; const b = $('[data-play]'); if (b) { b.innerHTML = ic('i-play'); $('.player .ttl').textContent = '再听一遍'; } }; } $('[data-play]').innerHTML = ic(cur.playing ? 'i-pause' : 'i-play'); $('.player .ttl').textContent = cur.playing ? '正在朗读…' : '点击播放录音'; return; }
       const rt = e.target.closest('[data-rate]'); if (rt) { S.rate = +rt.dataset.rate; AU.playbackRate = S.rate; save(); document.querySelectorAll('[data-rate]').forEach((b) => b.setAttribute('aria-pressed', +b.dataset.rate === S.rate)); return; }
