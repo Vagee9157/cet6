@@ -144,3 +144,14 @@ body { background: #d9d9de; color: var(--ink); font-family: var(--en); font-size
   #paper { padding: 8px 0 16px; }
   .page { margin-bottom: 10px; }
 }
+/* Part I 写作：单独一页、题目加框，图表作文附图（打印灰阶） */
+.wbox{border:1.2pt solid #000;padding:5mm 6mm;margin:4mm 0 0;font-size:12pt;line-height:1.7}
+.wbox p{margin:0}
+.wcharts{display:flex;gap:6mm;justify-content:center;margin-top:5mm;flex-wrap:wrap}
+.wchart{width:72mm;height:auto}
+.wchart .ch-t{font:700 10px "Tinos",serif}
+.wchart .ch-ax,.wchart .ch-v{font:9px "Tinos",serif;fill:#000}
+.wchart .ch-pv{font:700 9px "Tinos",serif;fill:#000}
+.wchart .ch-grid{stroke:#ccc;stroke-width:.6}
+.wchart .ch-c0{fill:#6b6b6b}.wchart .ch-c1{fill:#a3a3a3}.wchart .ch-c2{fill:#d4d4d4}.wchart .ch-c3{fill:#efefef;stroke:#555;stroke-width:.6}
+.wchart rect.ch-c0+text.ch-v{fill:#000}

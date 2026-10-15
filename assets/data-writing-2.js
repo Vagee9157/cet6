@@ -36,6 +36,11 @@ Therefore, when facing a mountain in life, we should turn our attention inward f
   },
   {
     id: 'w7', title: '图表类 · College students\' daily phone use',
+    // 图表作文的图：柱状图 + 饼图，由 assets/chart.js 画成 SVG（站内写作页与模拟卷共用）
+    chart: {
+      bar: { title: 'Average Daily Phone Use of College Students', unit: 'hours', data: [['2015', 2.1], ['2020', 4.3], ['2025', 6.2]] },
+      pie: { title: 'How the Time Was Spent (2025)', data: [['Short videos', 45], ['Social media', 20], ['Study', 15], ['Others', 20]] },
+    },
     prompt: 'Directions: For this part, you are allowed 30 minutes to write an essay based on the chart below. The bar chart shows the average time Chinese college students spent on mobile phones per day: 2.1 hours in 2015, 4.3 hours in 2020 and 6.2 hours in 2025. A pie chart for 2025 shows that 45% of the time went to short videos, 20% to social media, 15% to study and 20% to others. Describe the chart, explain the causes and give your comments. 150–200 words.',
     outline: ['第一段：描述数据（十年翻了近三倍；2025 年近一半时间刷短视频，学习仅 15%）', '第二段：原因两三条（手机功能集成、短视频算法留人、校园压力下的逃避）', '第三段：评价 + 建议（设定屏幕时间，强调自律而非设备本身）'],
     sample: `As is clearly shown in the chart, the time college students spend on their phones has soared over the past decade. In 2015, students used their phones for about two hours a day on average; by 2020 the figure had doubled to 4.3 hours, and in 2025 it climbed further to 6.2 hours. Notably, nearly half of that time in 2025 went to short videos, while only fifteen percent was devoted to study.

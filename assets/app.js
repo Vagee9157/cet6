@@ -428,7 +428,7 @@
     if (wsub === 'write') {
       const w = WRITING[wsel];
       body = `<div class="vocab-top">${WRITING.map((x, i) => `<button class="chip m-write" data-wsel="${i}" aria-pressed="${i === wsel}">${esc(x.title.split('·')[0].trim())}</button>`).join('')}</div>
-        <div class="prompt m-write"><div class="lab">题目</div>${esc(w.prompt)}</div>
+        <div class="prompt m-write"><div class="lab">题目</div>${esc(w.prompt)}${w.chart && window.writingChart ? window.writingChart(w.chart) : ''}</div>
         <div class="sec-h"><span class="ico m-write">${ic('i-target')}</span><h2 style="font-size:16px">提纲</h2></div>
         <div class="steps m-write">${w.outline.map((o, i) => `<div class="st"><span class="n">${i + 1}</span><span>${esc(o)}</span></div>`).join('')}</div>
         <div class="sec-h"><span class="ico m-write">${ic('i-eye')}</span><h2 style="font-size:16px">范文</h2><span class="more">高亮 = 可以抄进模板的句式</span></div>

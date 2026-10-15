@@ -475,3 +475,12 @@ footer.foot b{color:var(--ink-soft)}
 .vt.hide{display:none}
 .tag-rev{color:var(--warm,#d97706);font-weight:800}
 .vw.done{opacity:.55}
+/* 图表作文的图（站内） */
+.wcharts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px;margin-top:12px}
+.wchart{width:100%;height:auto;background:var(--paper);border-radius:12px;padding:6px}
+.wchart .ch-t{font:700 11px var(--sans,sans-serif);fill:var(--ink)}
+.wchart .ch-ax,.wchart .ch-v{font:10px var(--sans,sans-serif);fill:var(--ink-soft)}
+.wchart .ch-v{font-weight:700;fill:var(--ink)}
+.wchart .ch-pv{font:700 10px var(--sans,sans-serif);fill:#fff}
+.wchart .ch-grid{stroke:var(--line);stroke-width:.8}
+.wchart .ch-c0{fill:var(--write)}.wchart .ch-c1{fill:var(--listen)}.wchart .ch-c2{fill:var(--read,var(--brand))}.wchart .ch-c3{fill:var(--ink-dim)}

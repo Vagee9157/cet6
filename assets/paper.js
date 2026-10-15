@@ -76,9 +76,10 @@
       </div>
       ${short ? `<div class="short">${esc(short)}</div>` : ''}
     </div>`));
-    B.push(blk(partHtml(1, 'Writing', 30), { keep: true }));
+    // Part I 写作：单独起一页，题目加框放大；图表作文附图
+    B.push(blk(partHtml(1, 'Writing', 30), { keep: true, brk: true }));
     B.push(blk(`<p class="part-note">（请于开考后 30 分钟内在答题卡 1 上完成写作，之后进入听力部分）</p>`, { keep: true }));
-    B.push(blk(`<p class="dir">${esc(W.prompt).replace(/^Directions:/, '<b>Directions:</b>')}</p>`));
+    B.push(blk(`<div class="wbox"><p>${esc(W.prompt).replace(/^Directions:/, '<b>Directions:</b>')}</p>${W.chart && window.writingChart ? window.writingChart(W.chart) : ''}</div>`));
 
     // Part II 听力
     B.push(blk(partHtml(2, 'Listening Comprehension', 30), { keep: true, brk: true }));
