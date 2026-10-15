@@ -176,7 +176,28 @@
 
   /* ================= 单词 ================= */
   let vg = 0, vq = [], vi = 0, flipped = false, vmode = 'flash', vtOpen = false;
+  // 今日单词：每天随机抽 N 个新词（默认 20，可选 10/20/30）+ 到期复习词（不认识隔 1 天、模糊隔 2 天），当天固定、顺序打乱
+  const lday = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const dayDiff = (a, b) => Math.round((new Date(b) - new Date(a)) / 864e5);
+  const seeded = (str) => { let h = 2166136261; for (const c of str) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return ((h ^= h >>> 16) >>> 0) / 4294967296; }; };
+  const shufBy = (arr, rnd) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  S.vseen = S.vseen || {}; S.vsrc = S.vsrc || 'daily'; S.vnew = S.vnew || 20;
+  function dailyPlan(extra) {
+    const d = lday();
+    if (S.daily && S.daily.d === d && S.daily.n === S.vnew && !extra) return S.daily;
+    const rnd = seeded('cet6-' + d + '-' + (extra ? Date.now() : ''));
+    const due = ALLWORDS.filter((w) => { const m = S.vocab[w.id]; if (m !== 0 && m !== 1) return false; const seen = S.vseen[w.id]; return !seen || (seen < d && dayDiff(seen, d) >= (m === 0 ? 1 : 2)); })
+      .sort((a, b) => (S.vseen[a.id] || '').localeCompare(S.vseen[b.id] || '')).slice(0, 30).map((w) => w.id);
+    const keep = S.daily && S.daily.d === d ? S.daily : null;
+    const taken = new Set(keep ? [...keep.fresh, ...keep.review] : []);
+    const pool = shufBy(ALLWORDS.filter((w) => S.vocab[w.id] === undefined && !taken.has(w.id)), rnd).map((w) => w.id);
+    const fresh = keep ? [...keep.fresh, ...pool.slice(0, extra ? 10 : Math.max(0, S.vnew - keep.fresh.length))] : pool.slice(0, S.vnew);
+    const review = keep ? keep.review : due.filter((id) => !fresh.includes(id));
+    S.daily = { d, n: S.vnew, fresh, review, order: shufBy([...fresh, ...review], rnd) }; save();
+    return S.daily;
+  }
   function buildQueue() {
+    if (S.vsrc === 'daily') { const p = dailyPlan(); const d = lday(); vq = p.order.filter((id) => S.vseen[id] !== d).map((id) => ALLWORDS.find((x) => x.id === id)).filter(Boolean); vi = 0; flipped = false; return; }
     const words = VOCAB[vg].words.map((w, wi) => ALLWORDS.find((x) => x.id === vg + ':' + wi));
     const unknown = words.filter((w) => S.vocab[w.id] === 0 || S.vocab[w.id] === 1);
     const fresh = words.filter((w) => S.vocab[w.id] === undefined);
@@ -188,28 +209,39 @@
     const gDone = grp.words.filter((w, wi) => S.vocab[vg + ':' + wi] === 2).length;
     if (!vq.length || vi >= vq.length) buildQueue();
     const w = vq[vi];
+    const daily = S.vsrc === 'daily', plan = daily ? dailyPlan() : null, dd = lday();
+    const pDone = plan ? plan.order.filter((id) => S.vseen[id] === dd).length : 0, pTot = plan ? plan.order.length : 0;
     $('#vocab-box').innerHTML = `
       <div class="sec-h" style="margin-top:4px"><span class="ico m-vocab">${ic('i-abc')}</span><h2>高频词汇</h2><span class="more">认识 ${st.known} · 生词 ${st.unknown}</span></div>
-      <div class="vt m-vocab ${vtOpen ? 'open' : ''}"><button class="vt-cur" id="vtToggle" aria-expanded="${vtOpen}"><span class="vt-lab">当前主题</span><b>${esc(grp.g)}</b><span class="vt-n">${gDone}/${grp.words.length}</span><span class="vt-sw">${vtOpen ? '收起' : '切换主题'}</span>${ic('i-chev-r')}</button>
+      <div class="vsrc seg2" role="tablist"><button role="tab" data-vsrc="daily" aria-selected="${daily}">今日单词</button><button role="tab" data-vsrc="topic" aria-selected="${!daily}">按主题</button></div>
+      ${daily ? `<div class="vday card"><div class="vday-top"><div><b>今天 ${plan.fresh.length} 个新词 + ${plan.review.length} 个复习</b><span>随机抽取，当天固定；点「不认识」明天再出现，「模糊」隔一天再出现</span></div><div class="vday-n">${pDone}<small>/${pTot}</small></div></div>
+        <div class="bar"><i style="width:${pTot ? Math.round(pDone / pTot * 100) : 0}%"></i></div>
+        <div class="ctl">每日新词 ${[10, 20, 30].map((n) => `<button class="chip" data-vnew="${n}" aria-pressed="${S.vnew === n}">${n}</button>`).join('')}</div></div>` : ''}
+      <div class="vt m-vocab${daily ? ' hide' : ''} ${vtOpen ? 'open' : ''}"><button class="vt-cur" id="vtToggle" aria-expanded="${vtOpen}"><span class="vt-lab">当前主题</span><b>${esc(grp.g)}</b><span class="vt-n">${gDone}/${grp.words.length}</span><span class="vt-sw">${vtOpen ? '收起' : '切换主题'}</span>${ic('i-chev-r')}</button>
         <div class="vt-grid">${VOCAB.map((g, i) => { const d = g.words.filter((x, wi) => S.vocab[i + ':' + wi] === 2).length; return `<button class="vt-tile" data-vg="${i}" aria-pressed="${i === vg}"><span class="nm">${esc(g.g)}</span><span class="ct">${d}/${g.words.length}</span><span class="bar"><i style="width:${Math.round(d / g.words.length * 100)}%"></i></span></button>`; }).join('')}</div></div>
       <div class="flash-wrap">
-        <div class="flash-meta"><span>${esc(grp.g)} · 本组认识 ${gDone}/${grp.words.length}</span><span>${vq.length ? `${vi + 1} / ${vq.length}` : ''}<button class="chip" style="margin-left:8px" id="vmode">${vmode === 'review' ? '只刷生词' : '全部'}</button></span></div>
+        <div class="flash-meta">${daily ? `<span>${w ? `${esc(w.g)} · ${plan.review.includes(w.id) ? '<b class="tag-rev">复习</b>' : '新词'}` : ''}</span><span>${vq.length ? `剩 ${vq.length - vi}` : ''}</span>` : `<span>${esc(grp.g)} · 本组认识 ${gDone}/${grp.words.length}</span><span>${vq.length ? `${vi + 1} / ${vq.length}` : ''}<button class="chip" style="margin-left:8px" id="vmode">${vmode === 'review' ? '只刷生词' : '全部'}</button></span>`}</div>
         ${w ? `
         <div class="flash ${flipped ? 'flipped' : ''}" id="flash"><div class="inner">
           <div class="face front"><button class="spk" data-say="${esc(w.w)}" aria-label="朗读">${ic('i-vol')}</button><div class="w">${esc(w.w)}</div><span class="pos">${esc(w.p)}</span><div class="hint">${ic('i-flip')}点卡片看释义</div></div>
           <div class="face back"><div class="cn">${esc(w.c)}</div><ol class="exs">${exOf(w).map(([en, zh]) => `<li><button class="spk sm" data-say="${esc(en)}" aria-label="朗读例句">${ic('i-vol')}</button><div class="ex">${hlWord(esc(en), w.w)}</div><div class="zh">${esc(zh)}</div></li>`).join('')}</ol></div>
         </div></div>
         <div class="flash-acts"><button class="btn no" data-mark="0">${ic('i-x')}不认识</button><button class="btn so" data-mark="1">模糊</button><button class="btn ok" data-mark="2">${ic('i-check')}认识</button></div>`
-        : `<div class="empty">${ic('i-party')}这一组都认识了。换一组，或点"只刷生词"复习。</div>`}
+        : daily ? `<div class="empty">${ic('i-party')}今天的 ${pTot} 个词都过完了。<div style="margin-top:12px"><button class="btn primary" data-vmore>${ic('i-redo')}再来 10 个新词</button></div></div>` : `<div class="empty">${ic('i-party')}这一组都认识了。换一组，或点"只刷生词"复习。</div>`}
       </div>
-      <div class="sec-h"><h2 style="font-size:16px">本组单词表</h2></div>
-      <div class="vocab-list">${grp.words.map((x, wi) => { const s = S.vocab[vg + ':' + wi]; return `<div class="vw ${s === 0 || s === 1 ? 'unknown' : s === 2 ? 'known' : ''}"><span class="w">${esc(x[0])}</span><span class="pos">${esc(x[1])}</span><span class="cn">${esc(x[2])}</span></div>`; }).join('')}</div>`;
+      <div class="sec-h"><h2 style="font-size:16px">${daily ? '今日单词表' : '本组单词表'}</h2></div>
+      <div class="vocab-list">${(daily ? plan.order.map((id) => ALLWORDS.find((x) => x.id === id)).filter(Boolean).map((x) => [x.id, x.w, x.p, x.c]) : grp.words.map((x, wi) => [vg + ':' + wi, x[0], x[1], x[2]])).map(([id, ww, pp, cc]) => { const s = S.vocab[id]; return `<button class="vw ${s === 0 || s === 1 ? 'unknown' : s === 2 ? 'known' : ''}${daily && S.vseen[id] === dd ? ' done' : ''}${w && w.id === id ? ' cur' : ''}" data-vw="${id}"><span class="hd"><span class="w">${esc(ww)}</span><span class="pos">${esc(pp)}</span></span><span class="cn">${esc(cc)}</span></button>`; }).join('')}</div>`;
     $('#vocab-box').onclick = (e) => {
+      // 点单词表里的词：卡片切到这个词（不在当前队列就插到当前位置），滚回卡片
+      const vw = e.target.closest('[data-vw]'); if (vw) { const id = vw.dataset.vw; const k = vq.findIndex((x, i) => i >= vi && x.id === id); if (k === -1) vq.splice(vi, 0, ALLWORDS.find((y) => y.id === id)); else if (k > vi) { const [x] = vq.splice(k, 1); vq.splice(vi, 0, x); } flipped = false; renderVocab(); $('.flash-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+      const vs = e.target.closest('[data-vsrc]'); if (vs) { S.vsrc = vs.dataset.vsrc; save(); vq = []; renderVocab(); return; }
+      const vn = e.target.closest('[data-vnew]'); if (vn) { S.vnew = +vn.dataset.vnew; save(); vq = []; renderVocab(); return; }
+      if (e.target.closest('[data-vmore]')) { dailyPlan(true); vq = []; renderVocab(); return; }
       const g = e.target.closest('[data-vg]'); if (g) { vg = +g.dataset.vg; vq = []; vtOpen = false; renderVocab(); return; }
       if (e.target.closest('#vtToggle')) { vtOpen = !vtOpen; $('.vt').classList.toggle('open', vtOpen); e.target.closest('#vtToggle').setAttribute('aria-expanded', vtOpen); $('.vt-sw').textContent = vtOpen ? '收起' : '切换主题'; return; }
       if (e.target.closest('#vmode')) { vmode = vmode === 'review' ? 'flash' : 'review'; vq = []; renderVocab(); return; }
       const sp = e.target.closest('[data-say]'); if (sp) { e.stopPropagation(); speak(sp.dataset.say, 0.9); return; }
-      const mk = e.target.closest('[data-mark]'); if (mk) { S.vocab[w.id] = +mk.dataset.mark; save(); vi++; flipped = false; renderVocab(); return; }
+      const mk = e.target.closest('[data-mark]'); if (mk) { S.vocab[w.id] = +mk.dataset.mark; S.vseen[w.id] = lday(); save(); vi++; flipped = false; renderVocab(); return; }
       if (e.target.closest('#flash')) { flipped = !flipped; $('#flash').classList.toggle('flipped', flipped); }
     };
   }

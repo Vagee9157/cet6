@@ -7,16 +7,22 @@
   const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const K = ['A', 'B', 'C', 'D'];
   let seed = +(new URL(location.href).searchParams.get('seed')) || (Date.now() % 100000);
-  const rnd = (() => { let s = seed; return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }; })();
-  const pick = (arr, n) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a.slice(0, Math.min(n, a.length)); };
-
-  // ---------- 抽题（顺序与随机数调用保持不变：同一 seed 出同一套） ----------
-  const W = pick(WRITING, 1)[0];
-  // 篇章 2 篇合计 7 题、讲座 3 篇合计 10 题，照真题题量；凑不出就退回随机
-  const pickSum = (arr, n, total) => { let best = null; for (let t = 0; t < 40; t++) { const c = pick(arr, n); const sum = c.reduce((a, s) => a + s.questions.length, 0); if (sum === total) return c; if (!best) best = c; } return best; };
-  const conv = pick(LISTENING.filter((s) => s.type === 'conv'), 2), pas = pickSum(LISTENING.filter((s) => s.type === 'passage'), 2, 7), lec = pickSum(LISTENING.filter((s) => s.type === 'lecture'), 3, 10);
-  const cloze = pick(READING.cloze, 1)[0], match = pick(READING.match, 1)[0], mc = pick(READING.mc, 2);
-  const T = pick(TRANSLATION, 1)[0];
+  // 抽题：给定卷号确定性地抽一套。随机数用 splitmix32（先把卷号打散），相邻卷号也会抽出完全不同的题。
+  // 旧版线性同余在 JS 浮点下丢精度，卷号相近时抽出的题高度重合，「换一套」常常内容不变。
+  const draw = (sd) => {
+    let h = (sd ^ 0x9e3779b9) >>> 0;
+    const rnd = () => { h = (h + 0x9e3779b9) >>> 0; let z = h; z = Math.imul(z ^ (z >>> 16), 0x85ebca6b); z = Math.imul(z ^ (z >>> 13), 0xc2b2ae35); return ((z ^ (z >>> 16)) >>> 0) / 4294967296; };
+    const pick = (arr, n) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a.slice(0, Math.min(n, a.length)); };
+    // 篇章 2 篇合计 7 题、讲座 3 篇合计 10 题，照真题题量；凑不出就退回随机
+    const pickSum = (arr, n, total) => { let best = null; for (let t = 0; t < 40; t++) { const c = pick(arr, n); const sum = c.reduce((a, x) => a + x.questions.length, 0); if (sum === total) return c; if (!best) best = c; } return best; };
+    const W = pick(WRITING, 1)[0];
+    const conv = pick(LISTENING.filter((x) => x.type === 'conv'), 2), pas = pickSum(LISTENING.filter((x) => x.type === 'passage'), 2, 7), lec = pickSum(LISTENING.filter((x) => x.type === 'lecture'), 3, 10);
+    const cloze = pick(READING.cloze, 1)[0], match = pick(READING.match, 1)[0], mc = pick(READING.mc, 2);
+    const T = pick(TRANSLATION, 1)[0];
+    return { W, conv, pas, lec, cloze, match, mc, T };
+  };
+  const idsOf = (d) => [d.W, ...d.conv, ...d.pas, ...d.lec, d.cloze, d.match, ...d.mc, d.T].map((x) => x.id);
+  const { W, conv, pas, lec, cloze, match, mc, T } = draw(seed);
   const short = (conv.length < 2 || pas.length < 2 || lec.length < 3 || mc.length < 2) ? '题库仍在扩充，本卷听力 / 阅读题量少于真题的 25 / 30 题。' : '';
   const listenSets = [...conv, ...pas, ...lec];
 
@@ -252,7 +258,12 @@
   }
 
   ['withKey', 'withSheet', 'withStem'].forEach((id) => { document.getElementById(id).onchange = render; });
-  document.getElementById('regen').onclick = () => { location.href = 'paper.html?seed=' + (Math.floor(Math.random() * 90000) + 10000); };
+  // 换一套：试 300 个候选卷号，挑和当前这套重复篇目最少的（通常一篇不重）
+  document.getElementById('regen').onclick = () => {
+    const cur = new Set(idsOf(draw(seed))); let best = null, bestN = 1e9;
+    for (let t = 0; t < 300; t++) { const c = Math.floor(Math.random() * 90000) + 10000; if (c === seed) continue; const n = idsOf(draw(c)).filter((id) => cur.has(id)).length; if (n < bestN) { best = c; bestN = n; if (!n) break; } }
+    location.href = 'paper.html?seed=' + best;
+  };
   document.getElementById('print').onclick = () => window.print();
   window.addEventListener('resize', fit);
   render();
