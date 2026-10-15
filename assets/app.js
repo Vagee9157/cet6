@@ -66,6 +66,7 @@
   function show(v, keep) {
     if (v !== 'practice' && typeof stopAudio === 'function') stopAudio();
     if (v !== 'exam' && window.CET6Exam) window.CET6Exam.leave();
+    if (v !== 'vocab' && window.CET6Game) window.CET6Game.leave();
     VIEWS.forEach((x) => { $('#view-' + x).hidden = x !== v; });
     document.querySelectorAll('nav.tabs button').forEach((b) => b.setAttribute('aria-selected', b.dataset.view === v));
     if (!keep) R[v]();
@@ -301,7 +302,21 @@
     if (vi > 0 && vq[vi - 1] && vq[vi - 1].id === h.id) vi--; else vq.splice(Math.min(vi, vq.length), 0, wordOf(h.id));
     flipped = false; renderVocab();
   }
+  // 单词页分段控件：今日单词 / 按主题 / 生词本 / 小游戏（小游戏用 S.vgame.on，不占 S.vsrc；逻辑在 assets/vgame.js）
+  const vsegHtml = (src, wrongN, gm) => `<div class="vsrc seg2" role="tablist"><button role="tab" data-vsrc="daily" aria-selected="${!gm && src === 'daily'}">今日单词</button><button role="tab" data-vsrc="topic" aria-selected="${!gm && src === 'topic'}">按主题</button><button role="tab" data-vsrc="wrong" aria-selected="${!gm && src === 'wrong'}">生词本 ${wrongN}</button>${window.CET6Game ? `<button role="tab" data-vgame aria-selected="${gm}">小游戏</button>` : ''}</div>`;
+  function renderVgame() {
+    const st = stats(), wrongN = ALLWORDS.filter((x) => isWrong(x.id)).length;
+    $('#vocab-box').innerHTML = `
+      <div class="sec-h" style="margin-top:4px"><span class="ico m-vocab">${ic('i-abc')}</span><h2>高频词汇</h2><span class="more">认识 ${st.known} · 生词 ${st.unknown}</span></div>
+      ${vsegHtml(S.vsrc, wrongN, true)}<div id="vgame-box"></div>`;
+    $('#vocab-box').onclick = (e) => {
+      if (e.target.closest('#vgame-box')) return;
+      const vs = e.target.closest('[data-vsrc]'); if (vs) { S.vgame.on = false; S.vsrc = vs.dataset.vsrc; save(); vq = []; vhist = []; renderVocab(); }
+    };
+    window.CET6Game.render($('#vgame-box'));
+  }
   function renderVocab() {
+    if (S.vgame && S.vgame.on && window.CET6Game) { renderVgame(); return; }
     const st = stats();
     const grp = VOCAB[vg];
     const gDone = grp.words.filter((w, wi) => S.vocab[vg + ':' + wi] === 2).length;
@@ -328,7 +343,7 @@
     const listRows = daily ? plan.order.map(wordOf).filter(Boolean) : wrong ? (vq.length ? vq : ALLWORDS.filter((x) => isWrong(x.id))) : grp.words.map((x, wi) => wordOf(vg + ':' + wi));
     $('#vocab-box').innerHTML = `
       <div class="sec-h" style="margin-top:4px"><span class="ico m-vocab">${ic('i-abc')}</span><h2>高频词汇</h2><span class="more">认识 ${st.known} · 生词 ${st.unknown}</span></div>
-      <div class="vsrc seg2" role="tablist"><button role="tab" data-vsrc="daily" aria-selected="${daily}">今日单词</button><button role="tab" data-vsrc="topic" aria-selected="${src === 'topic'}">按主题</button><button role="tab" data-vsrc="wrong" aria-selected="${wrong}">生词本 ${wrongN}</button></div>
+      ${vsegHtml(src, wrongN, false)}
       ${daily ? `<div class="vday card"><div class="vday-top"><div><b>今天 ${plan.fresh.length} 个新词 + ${plan.review.length} 个复习</b><span>新词随机抽取、当天固定；「不认识」明天再出现，「模糊」隔一天，「认识」7 天、21 天后各抽查一次</span></div><div class="vday-n">${pDone}<small>/${pTot}</small></div></div>
         <div class="bar"><i style="width:${pTot ? Math.round(pDone / pTot * 100) : 0}%"></i></div>
         <div class="ctl">每日新词 ${[10, 20, 30].map((n) => `<button class="chip" data-vnew="${n}" aria-pressed="${S.vnew === n}">${n}</button>`).join('')}</div></div>` : ''}
@@ -352,6 +367,7 @@
       // 点单词表里的词：卡片切到这个词（不在当前队列就插到当前位置），滚回卡片
       const vw = e.target.closest('[data-vw]'); if (vw) { const id = vw.dataset.vw; const k = vq.findIndex((x, i) => i >= vi && x.id === id); if (k === -1) vq.splice(vi, 0, wordOf(id)); else if (k > vi) { const [x] = vq.splice(k, 1); vq.splice(vi, 0, x); } flipped = false; renderVocab(); $('.flash-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
       const vs = e.target.closest('[data-vsrc]'); if (vs) { S.vsrc = vs.dataset.vsrc; save(); vq = []; vhist = []; renderVocab(); return; }
+      if (e.target.closest('[data-vgame]')) { S.vgame = Object.assign(S.vgame || {}, { on: true }); save(); renderVocab(); return; }
       const vn = e.target.closest('[data-vnew]'); if (vn) { S.vnew = +vn.dataset.vnew; save(); vq = []; renderVocab(); return; }
       if (e.target.closest('[data-vmore]')) { dailyPlan(true); vq = []; renderVocab(); return; }
       if (e.target.closest('[data-vagain]')) { const ids = dailyPlan().order.filter(isWrong); vq = shuffle(ids.map(wordOf).filter(Boolean)); vi = 0; flipped = false; vagain = true; renderVocab(); return; }
@@ -368,6 +384,7 @@
   // 电脑键盘：空格翻面，1/2/3 = 不认识/模糊/认识，S 朗读，Z 撤销（只在单词页、焦点不在输入框时生效）
   document.addEventListener('keydown', (e) => {
     if ($('#view-vocab').hidden || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+    if (S.vgame && S.vgame.on) return; // 小游戏有自己的按键（assets/vgame.js）
     if (e.target.closest && e.target.closest('input,textarea,select,[contenteditable="true"]')) return;
     const k = e.key.toLowerCase(), fl = $('#flash');
     if (k === ' ') { if (!fl) return; e.preventDefault(); flipped = !flipped; fl.classList.toggle('flipped', flipped); return; }
@@ -1065,6 +1082,15 @@
 
   /* ---------- 给模考页（assets/exam.js）用的最小接口 ---------- */
   window.CET6 = { S, save, esc, ic, lday, today, show, findSet, marksOf, wrongsOf, recordSet, reviewSet, clozeWord, enWords, hl, AUD, stopAudio, mmss, isPhone };
+  /* ---------- 给单词小游戏（assets/vgame.js）用的接口 ---------- */
+  // 游戏标记：答错 → 不认识（今天刷过、清掉认识阶段）；答对且原来是「不认识」→ 升为「模糊」，不直接标认识
+  const gameMark = (id, ok) => {
+    const d = lday();
+    if (!ok) { S.vocab[id] = 0; S.vseen[id] = d; delete S.vstage[id]; }
+    else if (S.vocab[id] === 0) { S.vocab[id] = 1; S.vseen[id] = d; }
+    save();
+  };
+  Object.assign(window.CET6, { VOCAB, ALLWORDS, exOf, hlWord, speak, dailyPlan, isWrong, wordOf, shuffle, gameMark, renderVocab });
 
   /* ---------- 启动 ---------- */
   if ('speechSynthesis' in window) speechSynthesis.getVoices();
