@@ -150,7 +150,7 @@
         ${stat('m-read', st.setsDone, '做过的练习')}
         ${stat('m-listen', st.acc === null ? '—' : st.acc, '正确率', st.acc === null ? '' : '%')}
         ${stat('m-write', `<span id="stM">${st.m}</span>`, '考点掌握', '/' + totalPts)}
-        ${stat('m-exam', lastEx ? lastEx.total : '—', '最近模考', lastEx ? '/710' : '')}
+        ${(() => { const mm = lastEx && window.CET6Exam && window.CET6Exam.meta ? window.CET6Exam.meta(lastEx) : null; const v = mm && mm.v != null ? mm.v : lastEx ? lastEx.total : null; const cu = lastEx && lastEx.mode === 'custom'; return stat('m-exam', v != null ? Math.round(v) : '—', cu ? '最近模考（折算）' : '最近模考', lastEx ? '/710' : ''); })()}
       </div>
       <div class="hm-split">
         <div class="hm-split-h"><b>710 分怎么拆</b><small>点一段看策略</small></div>
@@ -906,8 +906,9 @@
   function wtWriteKind(type) { const t = String(type || ''); return /名言|谚语/.test(t) ? /名言/ : /图|表|漫画/.test(t) ? /图表/ : /应用|信|演讲|通知|倡议/.test(t) ? /应用文/ : /现象/.test(t) ? /现象/ : /问题|解决/.test(t) ? /问题/ : /议论|观点/; }
   function applyWtHint(h) {
     if (wtHintDone === h.at) return; wtHintDone = h.at;
-    if (h.writing) { const re = wtWriteKind(h.writing.type); const i = WRITING.findIndex((w) => re.test(w.title.split('·')[0])); if (i >= 0) wsel = i; }
-    if (h.translation) { const th = String(h.translation.theme || ''), zh = String(h.translation.zh || ''); let i = TRANSLATION.findIndex((t) => zh.includes(t.title)); if (i < 0) i = TRANSLATION.findIndex((t) => t.theme === th); if (i < 0) i = TRANSLATION.findIndex((t) => th && (th.includes(t.theme) || t.theme.includes(th) || th.includes(t.title))); if (i >= 0) tsel = i; }
+    // 先找同一套真题出的题（past 字段），没有再按文体 / 主题近似匹配
+    if (h.writing) { let i = WRITING.findIndex((w) => w.past === h.label); if (i < 0) { const re = wtWriteKind(h.writing.type); i = WRITING.findIndex((w) => re.test(w.title.split('·')[0])); } if (i >= 0) wsel = i; }
+    if (h.translation) { const th = String(h.translation.theme || ''), zh = String(h.translation.zh || ''); let i = TRANSLATION.findIndex((t) => t.past === h.label); if (i < 0) i = TRANSLATION.findIndex((t) => zh.includes(t.title)); if (i < 0) i = TRANSLATION.findIndex((t) => t.theme === th); if (i < 0) i = TRANSLATION.findIndex((t) => th && (th.includes(t.theme) || t.theme.includes(th) || th.includes(t.title))); if (i >= 0) tsel = i; }
   }
   function wtHintBar(h) {
     const parts = [h.writing && h.writing.zh ? `<span><b>作文</b> ${esc(h.writing.zh)}</span>` : '', h.translation && h.translation.zh ? `<span><b>翻译</b> ${esc(h.translation.zh)}${h.translation.theme ? `（${esc(h.translation.theme)}）` : ''}</span>` : ''].filter(Boolean);
@@ -943,7 +944,7 @@
         $('#wt-box').innerHTML = `<div class="wt-body">${hint ? wtHintBar(hint) : ''}${tabs + body}</div>`;
     clearInterval(wtTick); syncClock(); if (wtClock) wtTick = setInterval(syncClock, 1000);
     $('#wt-box').onclick = (e) => {
-      const s = e.target.closest('[data-wsub]'); if (s) { wtPick.kind = 'all'; return renderWT(s.dataset.wsub); }
+      const s = e.target.closest('[data-wsub]'); if (s) { wtPick.kind = 'all'; wtPick.src = 'all'; return renderWT(s.dataset.wsub); }
       const a = e.target.closest('[data-wsel]'); if (a) { wsel = +a.dataset.wsel; wtPick.open = false; return renderWT(); }
       const b = e.target.closest('[data-tsel]'); if (b) { tsel = +b.dataset.tsel; wtPick.open = false; return renderWT(); }
       if (e.target.closest('[data-wpick]')) { wtPick.open = !wtPick.open; return renderWT(); }

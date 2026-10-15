@@ -407,7 +407,7 @@
     box.querySelectorAll('[data-ind]').forEach((x) => { x.indeterminate = true; });
     box.onclick = (ev) => {
       const t = ev.target;
-      if (t.closest('[data-excont]')) { mode = 'exam'; render(); window.scrollTo(0, 0); return; }
+      if (t.closest('[data-excont]')) { const ee = C().S.exam; if (ee) { delete ee.paused; C().save(); } mode = 'exam'; render(); window.scrollTo(0, 0); return; }
       const qb = t.closest('[data-exquit]'); if (qb) { if (twoStep(qb, '再点一次放弃（作答会清掉）')) { stopLis(); delete C().S.exam; C().save(); nextSeed = 0; render(); } return; }
       const nb = t.closest('[data-exnew]'); if (nb) { if (!C().S.exam || twoStep(nb, '再点一次确认放弃进行中的')) newExam(+nb.dataset.exnew); return; }
       const md = t.closest('[data-exmode]'); if (md) { setPref({ mode: md.dataset.exmode }); keepY(render); return; }
@@ -457,12 +457,12 @@
       bar = `<div class="ex-bar ${p.mod}" id="exBar"><div class="ex-bar-in">
         <div class="ex-pt"><span class="ex-pno">Part ${p.no} · ${esc(tagOf(e) === '完整模考' ? '自由顺序' : tagOf(e))}</span><b>${p.n}</b></div>
         <div class="ex-cl"><span class="ex-clock" id="exClock">${lk ? '时间到' : clock(e.left[e.part])}</span><span class="ex-prog" id="exProg">总剩余 <b>${hclock(totalLeft(e))}</b></span></div>
-        <button class="btn ghost ex-pause" data-expause>${ic('i-pause')}<span>暂停并返回</span></button><button class="btn tone ex-next m-exam" data-exfin>交卷</button></div></div>`;
+        <button class="btn ghost ex-pause" data-expause>${ic('i-pause')}<span>暂停</span><span class="x">并返回</span></button><button class="btn tone ex-next m-exam" data-exfin>交卷</button></div></div>`;
     } else {
       bar = `<div class="ex-bar ${p.mod}" id="exBar"><div class="ex-bar-in">
         <div class="ex-pt"><span class="ex-pno">Part ${p.no} · ${idx.indexOf(e.part) + 1}/${idx.length}</span><b>${p.n}</b></div>
         <div class="ex-cl"><span class="ex-clock" id="exClock">${clock(e.left[e.part])}</span><span class="ex-prog" id="exProg">${progHTML(e)}</span></div>
-        <button class="btn ghost ex-pause" data-expause>${ic('i-pause')}<span>暂停并返回</span></button><button class="btn tone ex-next" data-exnext>${last ? '交卷' : '交本部分'}</button></div>
+        <button class="btn ghost ex-pause" data-expause>${ic('i-pause')}<span>暂停</span><span class="x">并返回</span></button><button class="btn tone ex-next" data-exnext>${last ? '交卷' : '交本部分'}</button></div>
         <div class="ex-steps" aria-hidden="true" style="grid-template-columns:repeat(${idx.length},1fr)">${idx.map((i) => `<i class="${i < e.part ? 'done' : i === e.part ? 'on' : ''}"></i>`).join('')}</div></div>`;
     }
     const note = e.note ? `<div class="ex-note">${ic('i-timer')}<span>${esc(e.note)}</span><button class="x" data-exnote aria-label="知道了">${ic('i-x')}</button></div>` : '';
@@ -740,5 +740,7 @@
   const flush = () => { if (window.CET6 && C().S.exam) C().save(); };
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); else lastTick = Date.now(); });
   window.addEventListener('pagehide', flush);
+  // 刷新 / 重开页面：有进行中且不是主动暂停的模考，直接回到考试界面
+  try { const S0 = JSON.parse(localStorage.getItem('cet6.v1') || '{}'); if (S0.exam && !S0.exam.paused) mode = 'exam'; } catch {}
   window.CET6Exam = { render, leave, openReport, audio: AX, preset: (seed) => { presetSeed = seed; mode = 'home'; }, meta, tagOf };
 })();

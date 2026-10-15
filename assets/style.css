@@ -1335,7 +1335,7 @@ body.ex-focus header.top,body.ex-focus nav.tabs,body.ex-focus footer.foot{displa
 body.ex-focus main{padding-top:max(10px,env(safe-area-inset-top));padding-bottom:28px}
 body.ex-focus .ex-bar{top:env(safe-area-inset-top);margin-top:0}
 .ex-pause{white-space:nowrap}
-@media (max-width:560px){.ex-pause span{display:none}.ex-pause{padding-left:12px;padding-right:12px}}
+@media (max-width:560px){.ex-pause .x{display:none}.ex-pause{padding-left:12px;padding-right:12px}}
 .ex-ptab:disabled{cursor:default;opacity:1}
 .ex-ptab.done{opacity:.6}
 .ex-side{margin:0 0 12px}
@@ -1353,3 +1353,6 @@ body.ex-focus .ex-bar{top:env(safe-area-inset-top);margin-top:0}
   .ex-side-r .chip .c{margin-left:auto}
   .ex-main .ex-rtabs{display:none}
 }
+/* 回归修复：手机上进度数字带单位、练习记录显示题型 */
+@media (max-width:519px){.hs-cell .v small{display:inline!important;font-size:11px}}
+@media (max-width:480px){.hl{grid-template-columns:auto minmax(0,1fr) auto auto}.hl-k{display:inline-block}.hl-m{display:none}}
