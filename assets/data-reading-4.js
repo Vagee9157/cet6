@@ -76,7 +76,7 @@ READING.mc.push(
    "org": "NASA",
    "url": "https://www.nasa.gov/humans-in-space/can-space-gardening-help-astronauts-cope-with-isolation/",
    "source": "NASA Human Research Program · \"Can Space Gardening Help Astronauts Cope With Isolation?\" (May 2021)",
-   "text": "It’s a maxim drilled into us at a young age: “Always eat your veggies!” For astronauts on the International Space Station, heeding this well-known advice is both essential and challenging. Health and nutrition are vital to mission objectives, but how do you ensure astronauts get fresh produce to eat when living off the planet?\nOne solution involves astronauts growing vegetables for themselves. On the station, plants such as the mizuna mustard greens seen above are grown under LED lighting and watered in plant “pillows” — special bags that contain seed and fertilizer. These plants and their pillows are housed in a unique botany facility called the Vegetable Production System, or Veggie.\nGrowing fresh vegetables in space offers benefits beyond providing a source of nutrition to crew members, explained Dr. Gioia Massa, project scientist at NASA’s Kennedy Space Center in Florida. Here on Earth, pandemic-induced isolation has led people to take up baking or gardening. Could developing a space-faring green thumb also help astronauts ease their sense of confinement and isolation? NASA’s Human Research Program, or HRP, has given Massa and her team of researchers the task of finding out.\nTo learn more, Massa’s group is asking astronauts who currently cultivate vegetables on the station to each complete a survey about their space-gardening experiences. For example, crew members who grow mizuna mustards take the survey two to three times for the month-long growth cycle of the plant.\nQuestions on the survey help gauge how space-gardening affects astronauts’ moods. For example: Was gardening engaging, demanding, or meaningful? Did it impact the passage of time, performance of mission tasks, or relationships with crew members? Did gardening enhance their connection to Earth, desire to harvest or consume the plants, or food consumption in general? How effective was gardening as a source of sensory stimulation for sight, touch, smell, and taste?\nWhen the vegetables are ready to eat, the astronauts also complete a sensory assessment. They rate the flavor, color, appearance, aroma, texture, and taste of the produce to see whether the labor over their veggies proved fruitful as a supplement to prepackaged space food.\nThus far, seven astronauts have completed the survey. Massa hopes to survey a total of 24 astronauts before the study is complete.\nInitial results show that some participants loved working with the plants during their leisure time, spending many hours caring for them during their mission, while others preferred different activities. Despite the variability, no one viewed their work with the plants as meaningless, and all valued the utility of growing plants in space.\nAstronauts’ feedback will help NASA better design food systems for future space missions. “We are learning what crops to grow to help supplement the diet, which activities should be automated or remotely operated, and which should have options for crew involvement,” explained Massa. “Different growth systems and different space missions will have different solutions to these questions.”",
+   "text": "It’s a maxim drilled into us at a young age: “Always eat your veggies!” For astronauts on the International Space Station, heeding this well-known advice is both essential and challenging. Health and nutrition are vital to mission objectives, but how do you ensure astronauts get fresh produce to eat when living off the planet?\nOne solution involves astronauts growing vegetables for themselves. On the station, plants such as the mizuna mustard greens are grown under LED lighting and watered in plant “pillows” — special bags that contain seed and fertilizer. These plants and their pillows are housed in a unique botany facility called the Vegetable Production System, or Veggie.\nGrowing fresh vegetables in space offers benefits beyond providing a source of nutrition to crew members, explained Dr. Gioia Massa, project scientist at NASA’s Kennedy Space Center in Florida. Here on Earth, pandemic-induced isolation has led people to take up baking or gardening. Could developing a space-faring green thumb also help astronauts ease their sense of confinement and isolation? NASA’s Human Research Program, or HRP, has given Massa and her team of researchers the task of finding out.\nTo learn more, Massa’s group is asking astronauts who currently cultivate vegetables on the station to each complete a survey about their space-gardening experiences. For example, crew members who grow mizuna mustards take the survey two to three times for the month-long growth cycle of the plant.\nQuestions on the survey help gauge how space-gardening affects astronauts’ moods. For example: Was gardening engaging, demanding, or meaningful? Did it impact the passage of time, performance of mission tasks, or relationships with crew members? Did gardening enhance their connection to Earth, desire to harvest or consume the plants, or food consumption in general? How effective was gardening as a source of sensory stimulation for sight, touch, smell, and taste?\nWhen the vegetables are ready to eat, the astronauts also complete a sensory assessment. They rate the flavor, color, appearance, aroma, texture, and taste of the produce to see whether the labor over their veggies proved fruitful as a supplement to prepackaged space food.\nThus far, seven astronauts have completed the survey. Massa hopes to survey a total of 24 astronauts before the study is complete.\nInitial results show that some participants loved working with the plants during their leisure time, spending many hours caring for them during their mission, while others preferred different activities. Despite the variability, no one viewed their work with the plants as meaningless, and all valued the utility of growing plants in space.\nAstronauts’ feedback will help NASA better design food systems for future space missions. “We are learning what crops to grow to help supplement the diet, which activities should be automated or remotely operated, and which should have options for crew involvement,” explained Massa. “Different growth systems and different space missions will have different solutions to these questions.”",
    "questions": [
     {
      "q": "Why does the author begin the passage with the advice \"Always eat your veggies!\"?",
@@ -738,43 +738,53 @@ READING.match.push(
    "items": [
     {
      "s": "Older people who live alone often hide the fact that they need help, because they fear being made to leave their homes.",
-     "a": "O"
+     "a": "O",
+     "exp": "定位 O 段 \"They are often reluctant to show they need help\"。hide 同义替换 reluctant to show，fear being made to leave 同义替换 fear being forced to move from their homes。"
     },
     {
      "s": "Being cut off from others is an objective physical condition, whereas loneliness is a painful personal feeling.",
-     "a": "D"
+     "a": "D",
+     "exp": "定位 D 段 \"the objective physical separation from other people\"，\"the subjective distressed feeling\"。painful personal feeling 同义替换 subjective distressed feeling。B 段未下定义。"
     },
     {
      "s": "Inflammation that loneliness may trigger becomes harmful when it continues for too long.",
-     "a": "G"
+     "a": "G",
+     "exp": "定位 G 段 \"inflammation that lasts too long increases the risk of chronic diseases\"。continues for too long 同义替换 lasts too long，harmful 对应 increases the risk。"
     },
     {
      "s": "Many older Americans who live by themselves are neither lonely nor socially isolated.",
-     "a": "B"
+     "a": "B",
+     "exp": "定位 B 段 \"many of them are not lonely or socially isolated\"。older Americans who live by themselves 对应 older adults in the United States ... live alone。D 段只是概念说明。"
     },
     {
      "s": "Contrary to a common assumption, many isolated older adults actually wish to be more involved in society.",
-     "a": "N"
+     "a": "N",
+     "exp": "定位 N 段 \"expressed a desire to be socially integrated\"。wish to be more involved in society 同义替换 desire to be socially integrated，Contrary to a common assumption 同义替换 runs against the prevailing assumption。"
     },
     {
      "s": "One researcher insists that dealing with loneliness is a responsibility everyone shares.",
-     "a": "E"
+     "a": "E",
+     "exp": "定位 E 段 \"Treating loneliness is our collective responsibility\"。One researcher 即 Stephanie Cacioppo，a responsibility everyone shares 同义替换 collective responsibility。"
     },
     {
      "s": "Home care workers are rarely trained to support people with memory problems and are too expensive for most older adults over time.",
-     "a": "O"
+     "a": "O",
+     "exp": "定位 O 段 \"Home care aides are seldom trained to support older adults with cognitive impairment\"。rarely 同义替换 seldom，memory problems 对应 cognitive impairment，too expensive 对应 fees are often too high。"
     },
     {
      "s": "Some people may be naturally less likely to feel lonely, which helps explain why being alone affects them less.",
-     "a": "I"
+     "a": "I",
+     "exp": "定位 I 段 \"not prone genetically to feeling lonely\"。naturally less likely to feel lonely 同义替换 not prone genetically，affects them less 同义替换 suffer much less。J 段讲遗传风险预测疾病。"
     },
     {
      "s": "Researchers still need to find out how big a change in loneliness is required before health measurably improves.",
-     "a": "K"
+     "a": "K",
+     "exp": "定位 K 段 \"how great a change in loneliness or social isolation is required\"。how big 同义替换 how great，health measurably improves 同义替换 a meaningful change in health。"
     },
     {
      "s": "The death of a partner, retirement or a lack of transportation can put older people at special risk of being alone.",
-     "a": "C"
+     "a": "C",
+     "exp": "定位 C 段 \"the death of a spouse or partner\"，\"lack of transportation are at particular risk\"。special risk 同义替换 particular risk，retirement 原词复现。"
     }
    ]
   },
@@ -846,43 +856,53 @@ READING.match.push(
    "items": [
     {
      "s": "Before Moseley's research, an element's atomic number merely showed its place in the table and was not linked to anything that could be measured.",
-     "a": "I"
+     "a": "I",
+     "exp": "定位 I 段 \"It was merely an element’s place in the periodic table\"。not linked to anything that could be measured 同义替换 not known to be associated with any measurable physical quantity。"
     },
     {
      "s": "The man who planned the Gallipoli campaign lost his important government post as a result of its failure.",
-     "a": "L"
+     "a": "L",
+     "exp": "定位 L 段 \"lost his job as First Lord of the Admiralty\"。The man who planned the campaign 同义替换 the battle's architect（Churchill），important government post 对应 First Lord of the Admiralty。"
     },
     {
      "s": "The author first learned how Moseley died from a book about the history of the atomic bomb.",
-     "a": "C"
+     "a": "C",
+     "exp": "定位 C 段 \"I became aware of Moseley’s death\"，\"The Making of the Atomic Bomb\"。first learned 同义替换 became aware of，a book about the history of the atomic bomb 即 Rhodes 那本书。"
     },
     {
      "s": "Moseley was told by his mother that he could serve his country with his scientific knowledge rather than by fighting.",
-     "a": "A"
+     "a": "A",
+     "exp": "定位 A 段 \"using his scientific expertise from behind the battle lines\"。scientific knowledge 同义替换 scientific expertise，rather than by fighting 对应 behind the battle lines。L 段讲二战，主语不同。"
     },
     {
      "s": "Moseley's former teacher publicly criticized the military for wasting a gifted scientist as an ordinary soldier.",
-     "a": "K"
+     "a": "K",
+     "exp": "定位 K 段 \"striking example of the misuse of scientific talent\"。former teacher 即 Rutherford，publicly criticized 对应 a letter to Nature，wasting a gifted scientist 同义替换 misuse of scientific talent。"
     },
     {
      "s": "Moseley's body was probably never identified and may lie together with hundreds of other unknown soldiers.",
-     "a": "E"
+     "a": "E",
+     "exp": "定位 E 段 \"buried there with hundreds of other unidentified soldiers\"。probably 同义替换 very likely，unknown soldiers 同义替换 unidentified soldiers。B 段只讲他阵亡的经过。"
     },
     {
      "s": "By leaving gaps in one of his graphs, Moseley correctly predicted elements that had not yet been discovered.",
-     "a": "J"
+     "a": "J",
+     "exp": "定位 J 段 \"Moseley left four vacant lines, predicting four unknown elements\"。leaving gaps 同义替换 left vacant lines，correctly 对应 After his death, these elements were discovered。"
     },
     {
      "s": "A scientist who carried on Moseley's planned research later received a Nobel Prize.",
-     "a": "M"
+     "a": "M",
+     "exp": "定位 M 段 \"followed Moseley’s planned work and technique after his death\"，后获 1924 年诺贝尔物理学奖。carried on 同义替换 followed。H 段只说同行认为他本可获奖。"
     },
     {
      "s": "Moseley was convinced that X-rays given off by each element could become a powerful means of chemical analysis.",
-     "a": "G"
+     "a": "G",
+     "exp": "定位 G 段 \"would offer science a powerful tool of chemical analysis\"。powerful means 同义替换 powerful tool，X-rays given off by each element 对应 unique X-ray wavelengths of every known element。"
     },
     {
      "s": "During the Second World War, British scientists were given work away from the front lines.",
-     "a": "L"
+     "a": "L",
+     "exp": "定位 L 段 \"the British military organization assigned scientists to behind-the-lines work\"。away from the front lines 同义替换 behind-the-lines，that war 指二战。K 段是一战时的批评。"
     }
    ]
   },
@@ -946,43 +966,53 @@ READING.match.push(
    "items": [
     {
      "s": "In winter, light-colored roofs may make buildings colder than necessary and raise the demand for heating.",
-     "a": "G"
+     "a": "G",
+     "exp": "定位 G 段 \"light roofs may cool buildings unnecessarily, increasing heating demands\"。colder than necessary 同义替换 cool buildings unnecessarily，raise the demand for heating 同义替换 increasing heating demands。"
     },
     {
      "s": "Many of the people who move to cities in the coming decades will be too poor to protect themselves from extreme heat.",
-     "a": "C"
+     "a": "C",
+     "exp": "定位 C 段 \"many new city dwellers will be desperately poor\"。too poor 同义替换 desperately poor，unable to protect themselves 对应 little access to air conditioning ... particularly vulnerable。"
     },
     {
      "s": "When heavy rain overloads a shared sewer system, untreated waste can be pushed into rivers and harbors.",
-     "a": "H"
+     "a": "H",
+     "exp": "定位 H 段 \"Heavy rains can overwhelm these systems\"，\"pushing raw sewage into waterways\"。overloads 同义替换 overwhelm，shared sewer system 对应 combined sewer，untreated waste 同义替换 raw sewage。"
     },
     {
      "s": "Air conditioning alone cannot always save cities from deadly heat waves.",
-     "a": "L"
+     "a": "L",
+     "exp": "定位 L 段 \"Can we air condition our way out of these heat waves? Not always\"。题干即对这一问句的回答。A 段躲回空调房只是作者个人经历，没有下结论。"
     },
     {
      "s": "Plants that survive extreme drought by becoming inactive would be of little more use on a roof than asphalt.",
-     "a": "K"
+     "a": "K",
+     "exp": "定位 K 段 \"they’re no better than asphalt\"。becoming inactive 同义替换 going dormant，of little more use than asphalt 同义替换 no better than asphalt。"
     },
     {
      "s": "During one severe heat wave, the researcher escaped from the countryside to his air-conditioned apartment in the city.",
-     "a": "A"
+     "a": "A",
+     "exp": "定位 A 段 \"rushed back to the city where his air-conditioned apartment awaited\"。escaped from the countryside 同义替换 left the countryside，one severe heat wave 对应 the worst heat wave he remembers。"
     },
     {
      "s": "Roofs planted with a drought-tolerant plant stayed far cooler at their peak than ordinary roofs, even without extra watering.",
-     "a": "J"
+     "a": "J",
+     "exp": "定位 J 段 \"the peak temperatures on the roofs planted with Sedum\"，\"thrived without any supplemental watering\"。ordinary roofs 同义替换 standard roofs。K 段反而认为干旱区需要浇水。"
     },
     {
      "s": "Within a few months, the researcher abandoned his earlier view that white roofs were the best option.",
-     "a": "F"
+     "a": "F",
+     "exp": "定位 F 段 \"By April 2006, however, he had changed his mind\"。Within a few months 对应 January 到 April 2006，abandoned his earlier view 同义替换 changed his mind，best option 同义替换 winning strategy。"
     },
     {
      "s": "Dirt quickly reduces the ability of white roofs in cities to reflect sunlight.",
-     "a": "G"
+     "a": "G",
+     "exp": "定位 G 段 \"in urban settings, white roofs get dirty quickly\"，\"reducing their ability to reflect sunlight\"。Dirt 对应 get dirty，quickly 原词复现。同段冬季问题是另一题。"
     },
     {
      "s": "A typical dark tar roof can become as hot as an open oven in summer.",
-     "a": "E"
+     "a": "E",
+     "exp": "定位 E 段 \"The tar beach roof—ubiquitous in cities—is an oven in the summer\"。typical dark tar roof 同义替换 tar beach roof，as hot as an open oven 对应 an oven（160 华氏度）。"
     }
    ]
   },
@@ -1050,43 +1080,53 @@ READING.match.push(
    "items": [
     {
      "s": "Although a woman helped save eleven fishermen from a sinking boat, only her husband received an official honor.",
-     "a": "J"
+     "a": "J",
+     "exp": "定位 J 段 \"Robert received an official commendation\"，\"Anna, on the other hand, received nothing\"。official honor 同义替换 official commendation。M 段的任命是后来的事，与救人无关。"
     },
     {
      "s": "One keeper couple grew thousands of fruit trees on the island and sold them to people on the mainland.",
-     "a": "H"
+     "a": "H",
+     "exp": "定位 H 段 \"planted a nursery of several thousand fruit trees on the island\"，并卖给 residents on the mainland。thousands of 同义替换 several thousand，people 同义替换 residents。"
     },
     {
      "s": "Women keepers were paid as much as men doing the same job, at a time when women could not vote in national elections.",
-     "a": "E"
+     "a": "E",
+     "exp": "定位 E 段 \"wages commensurate with men who performed the same tasks\"。paid as much as 同义替换 commensurate with，could not vote 对应 prohibited from voting。F 段讲女性守塔人的来源。"
     },
     {
      "s": "Keepers' children who were old enough for school often lived away from the island with relatives or friends.",
-     "a": "C"
+     "a": "C",
+     "exp": "定位 C 段 \"school-aged children lived off the island with relatives or friends\"。old enough for school 同义替换 school-aged，away from the island 同义替换 off the island。"
     },
     {
      "s": "For four days, a woman kept the lighthouse working and cared for three small children while her husband was lost on the lake.",
-     "a": "K"
+     "a": "K",
+     "exp": "定位 K 段 \"ensure the lighthouse beacon continued to shine while caring for three small children\"。kept the lighthouse working 同义替换 beacon continued to shine。L 段讲丈夫如何返回。"
     },
     {
      "s": "Many women became keepers after the death of husbands who had held the job before them.",
-     "a": "F"
+     "a": "F",
+     "exp": "定位 F 段 \"were the widows of former keepers\"。after the death of husbands 同义替换 widows，who had held the job before them 同义替换 former keepers。E 段讲同工同酬。"
     },
     {
      "s": "A husband and wife took turns on duty so that the island's light could be seen far out on the lake.",
-     "a": "G"
+     "a": "G",
+     "exp": "定位 G 段 \"the couple worked in shifts\"，\"seen far out into Lake Superior\"。took turns on duty 同义替换 worked in shifts，far out on the lake 对应 far out into Lake Superior。"
     },
     {
      "s": "The keeper who served longest at any single lighthouse in the area had a wife who was famous for her flowers.",
-     "a": "I"
+     "a": "I",
+     "exp": "定位 I 段 \"the longest term of any keeper at a single Apostle Islands lighthouse\"，\"a superb gardener\"。famous for her flowers 对应 one mass of flowers。"
     },
     {
      "s": "One woman described the freedom of finally having a home where she could see life.",
-     "a": "M"
+     "a": "M",
+     "exp": "定位 M 段 \"where we can see life\"。题干 freedom 对应 now we are free，a home 原词复现。L 段是她描述丈夫归来的情景，不是这句感言。"
     },
     {
      "s": "Besides tending the light, keeper families raised food for themselves and sometimes sold the extra for income.",
-     "a": "H"
+     "a": "H",
+     "exp": "定位 H 段 \"kept gardens to supply their own tables\"，\"sold produce and eggs\"。raised food for themselves 同义替换 supply their own tables，sold the extra 对应 sold produce。"
     }
    ]
   }
