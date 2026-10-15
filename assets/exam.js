@@ -236,6 +236,7 @@
       ${cont}
       <div class="card ex-start">
         <div class="ex-start-h"><div><b>${e ? '开一套新的' : '开始一套新模考'}</b><span>卷号 <code>${esc(presetSeed || nx)}</code>${presetSeed ? '（打印版带过来的）' : exams.length || e ? '（和上一套零重合）' : ''} · <a href="paper.html?seed=${encodeURIComponent(presetSeed || nx)}">打印这套</a></span></div>
+          <button class="btn ghost ex-swap" data-exswap="${esc(presetSeed || nx)}">${ic('i-redo')}换一套</button>
           <button class="btn primary" data-exnew="${esc(presetSeed || nx)}">${ic('i-clip')}${e ? '放弃进行中的，开始新模考' : '开始新模考'}</button></div>
         <div class="ex-opts">
           <label><input type="checkbox" data-exfresh ${S.drawFresh !== false ? 'checked' : ''}> 优先抽没做过的题</label>
@@ -253,6 +254,12 @@
       if (t.closest('[data-excont]')) { mode = 'exam'; render(); window.scrollTo(0, 0); return; }
       const qb = t.closest('[data-exquit]'); if (qb) { if (twoStep(qb, '再点一次放弃（作答会清掉）')) { delete C().S.exam; C().save(); nextSeed = 0; render(); } return; }
       const nb = t.closest('[data-exnew]'); if (nb) { if (!C().S.exam || twoStep(nb, '再点一次确认放弃进行中的')) newExam(+nb.dataset.exnew); return; }
+      // 换一套：随机换卷号，和当前显示的这套零重合
+      const sw = t.closest('[data-exswap]'); if (sw) {
+        const S = C().S, fresh = S.drawFresh !== false, cur = +sw.dataset.exswap;
+        const avoid = CET6Draw.paperOf(cur, S, fresh).ids;
+        getNext(); nextSeed = CET6Draw.pickSeed(avoid, S, fresh, cur) || nextSeed; presetSeed = 0; render(); return;
+      }
       if (t.closest('[data-exseed]')) {
         const v = $('#exSeed').value.trim(); const tip = $('#exTip');
         if (!/^\d{1,8}$/.test(v) || !+v) { tip.textContent = '卷号是 1–8 位数字。'; return; }
