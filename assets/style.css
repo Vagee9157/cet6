@@ -716,3 +716,9 @@ mark.loc{background:color-mix(in srgb,var(--amber) 38%,transparent);color:inheri
 .wt-hintbar .x{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;color:var(--ink-soft)}
 .wt-hintbar .x:hover{background:var(--paper)}
 .wrong-item .wq{font-weight:600;line-height:1.55}
+/* ===== 回归修复 ===== */
+/* 例句朗读按钮不压字：右侧留出按钮宽 + 偏移 + 间隙 */
+.face .exs li{padding-right:52px}
+@media (pointer:coarse){.face .exs li{padding-right:56px}}
+/* 手机交卷后的「重做 / 下一篇 / 回列表」吸底条加底色，按钮缝里不透出正文 */
+@media (max-width:719px){.submit-bar{padding:8px;margin-left:-8px;margin-right:-8px;border-radius:18px;background:color-mix(in srgb,var(--bg) 88%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}}

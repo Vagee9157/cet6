@@ -262,7 +262,9 @@
     const keep = S.daily && S.daily.d === d ? S.daily : null;
     const taken = new Set(keep ? [...keep.fresh, ...keep.review] : []);
     const pool = shufBy(ALLWORDS.filter((w) => S.vocab[w.id] === undefined && !taken.has(w.id)), rnd).map((w) => w.id);
-    const fresh = keep ? [...keep.fresh, ...pool.slice(0, extra ? 10 : Math.max(0, S.vnew - keep.fresh.length))] : pool.slice(0, S.vnew);
+    // 当天改小「每日新词」：保留已刷过的，未刷的按新数量裁掉；改大则补新词
+    const kept = keep ? (extra || S.vnew >= keep.fresh.length ? keep.fresh : (() => { const seen = keep.fresh.filter((id) => S.vseen[id] === d); return [...seen, ...keep.fresh.filter((id) => S.vseen[id] !== d)].slice(0, Math.max(S.vnew, seen.length)); })()) : [];
+    const fresh = keep ? [...kept, ...pool.slice(0, extra ? 10 : Math.max(0, S.vnew - kept.length))] : pool.slice(0, S.vnew);
     const review = keep ? keep.review : due.filter((id) => !fresh.includes(id));
     S.daily = { d, n: S.vnew, fresh, review, order: shufBy([...fresh, ...review], rnd) }; save();
     return S.daily;
