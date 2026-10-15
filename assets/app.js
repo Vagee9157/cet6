@@ -848,6 +848,7 @@
         <div class="wt-bar"><span class="lab">${isW ? '我的作文' : '我的译文'}</span><span class="wt-clock" id="wtClock"></span><button class="chip" data-wtclock="${id}">${ic('i-timer')}计时 30 分钟</button></div>
         <textarea class="wt-ta" data-wtid="${id}" rows="${isW ? 12 : 9}" spellcheck="false" autocapitalize="sentences" placeholder="${isW ? '先列提纲再动笔，在这里写 150–200 词……' : '先自己译，再对照参考译文……'}">${esc(S.wt[id] || '')}</textarea>
         <div class="wt-count" id="wtCount">${wtCountHTML(id, isW, ref)}</div>
+        ${window.CET6Grade ? `<div class="wt-grade"><button class="btn soft" data-wtgrade="${id}">${ic('i-target')}估分</button><span>规则估分：字数、切题、词汇、句式等，可复制给 AI 细评</span></div><div class="wt-gres" id="wtGrade"></div>` : ''}
       </div>`;
   }
   // 从首页真题卡点「练写作 / 练翻译」会带 S.wtHint 过来：10 分钟内有效，顶部提示这套真题的题目，并预选最接近的一篇（每个 hint 只预选一次）
@@ -906,6 +907,8 @@
       }
       // 展开范文 / 参考译文才算完成首页的「读 1 篇范文」
       const r = e.target.closest('[data-reveal]'); if (r) { reveal[r.dataset.reveal] = !reveal[r.dataset.reveal]; if (reveal[r.dataset.reveal]) { const d = lday(); S.plan[d] = Object.assign(S.plan[d] || {}, { wt: 1 }); save(); } renderWT(); if (reveal[r.dataset.reveal]) { const sm = $('#wt-box .sample'); if (sm) sm.scrollIntoView({ behavior: 'smooth', block: 'start' }); } return; }
+      // 估分：assets/grade.js 规则估分（同模考报告），结果显示在作答框下
+      const gb = e.target.closest('[data-wtgrade]'); if (gb && window.CET6Grade) { const isW = wsub === 'write', item = isW ? WRITING[wsel] : TRANSLATION[tsel], id = gb.dataset.wtgrade; window.CET6Grade.mount($('#wtGrade'), isW ? 'write' : 'trans', item, S.wt[id] || '', { aiIcon: ic('i-clip'), getText: () => S.wt[id] || '' }); return; }
       const c = e.target.closest('[data-wtclock]'); if (c) { const id = c.dataset.wtclock; wtClock = wtClock && wtClock.id === id ? null : { id, end: Date.now() + 30 * 60 * 1000 }; clearInterval(wtTick); syncClock(); if (wtClock) wtTick = setInterval(syncClock, 1000); }
     };
     $('#wt-box').oninput = (e) => {
@@ -913,6 +916,7 @@
       const had = wrote(id); S.wt[id] = e.target.value; if (!S.wt[id]) delete S.wt[id];
       const isW = wsub === 'write'; $('#wtCount').innerHTML = wtCountHTML(id, isW, isW ? 0 : enWords(TRANSLATION[tsel].en));
       if (had !== wrote(id)) { const chip = $(`#wt-box [aria-pressed="true"][data-${isW ? 'wsel' : 'tsel'}]`); if (chip) { const m = chip.querySelector('.wt-done'); if (m) m.remove(); else chip.insertAdjacentHTML('beforeend', `<span class="wt-done" title="写过">${ic('i-check')}</span>`); } }
+      const gr = $('#wtGrade'); if (gr && gr.innerHTML) gr.innerHTML = '';   // 改了作答，旧估分作废
       clearTimeout(wtSaveT); wtSaveT = setTimeout(save, 400);
     };
   }
@@ -998,7 +1002,7 @@
     const list = shown.map((h) => { const day = h.d !== lastD ? `<div class="hl-d">${esc(h.d || '更早')}</div>` : ''; lastD = h.d; const pct = h.t ? Math.round(h.r / h.t * 100) : 0;
       return `${day}<div class="hl"><span class="hl-k">${KN[h.kind] || ''}</span><span class="hl-t">${esc(String(h.title).replace(/^[^·]+·\s*/, ''))}</span><span class="hl-s ${pct >= 80 ? 'good' : pct < 60 ? 'bad' : ''}">${h.r}/${h.t}</span>${h.sec ? `<span class="hl-m">${mmss(h.sec)}</span>` : ''}<button class="chip" data-wgo="${h.id}">再做</button></div>`; }).join('');
     return `<div class="sec-h"><span class="ico m-listen">${ic('i-timer')}</span><h2>练习记录</h2><span class="more">共 ${all.length} 次${papers.length ? ` · 模拟卷 ${papers.length} 套` : ''}</span></div>
-      <div class="card hist">${exams.length ? `<div class="hl-d" style="margin-top:0">模考成绩</div><div class="ex-hist">${exams.slice(0, 5).map((x) => `<button class="ex-hrow" data-exrep="${x.ts}"><span class="ex-ht"><b>${x.total}</b><small>/710</small></span><span class="ex-hm">${esc(x.d)} · 卷号 ${esc(x.seed)}${x.self && x.self.write != null && x.self.trans != null ? '' : ' · 写译待自评'}</span>${ic('i-chev-r')}</button>`).join('')}</div>` : ''}<div class="hp-grid">${rows}</div>
+      <div class="card hist">${exams.length ? `<div class="hl-d" style="margin-top:0">模考成绩</div><div class="ex-hist">${exams.slice(0, 5).map((x) => { const m = window.CET6Exam ? window.CET6Exam.meta(x) : { v: x.total, tag: '完整模考', rate: Math.round((x.total || 0) / 7.1), custom: false }; return `<button class="ex-hrow" data-exrep="${x.ts}"><span class="ex-ht"><b>${m.v}</b><small>${m.custom ? '折算' : '/710'}</small></span><span class="ex-hm"><span class="ex-tags"><span class="ex-tag${m.custom ? ' cu' : ''}">${esc(m.tag)}</span><span>得分率 ${m.rate}%</span></span>${esc(x.d)} · 卷号 ${esc(x.seed)}</span>${ic('i-chev-r')}</button>`; }).join('')}</div>` : ''}<div class="hp-grid">${rows}</div>
         ${all.length ? `<div class="hl-list">${list}</div>${all.length > 15 ? `<div class="reveal" style="margin-top:8px"><button class="btn ghost" data-hall>${histAll ? '收起' : `显示全部 ${all.length} 条`}</button></div>` : ''}` : `<p class="lead" style="margin:12px 0 0">还没有交卷记录。去「听读」点「随机来一篇」开始吧。</p>`}
         ${papers.length ? `<div class="hl-d">生成过的模拟卷</div><div class="hl-papers">${papers.slice(0, 12).map((p) => `<a class="chip" href="paper.html?seed=${encodeURIComponent(p.seed)}">${p.mode === 'online' ? '在线' : '打印'} · 卷号 ${esc(p.seed)} · ${esc(p.d)}</a>`).join('')}</div>` : ''}</div>`;
   }

@@ -939,3 +939,99 @@ mark.loc{background:color-mix(in srgb,var(--amber) 38%,transparent);color:inheri
 .ex-qd[open]>summary>svg.i{transform:rotate(90deg)}
 .ex-qd .exp{margin:0 10px 10px;background:var(--paper);line-height:1.6}
 @media (pointer:coarse){.ex-qd>summary{min-height:44px}}
+/* ===== 模考：自由顺序 / 自选模块 / 估分 / 走势（assets/exam.js、assets/grade.js）===== */
+/* 开考设置 */
+.ex-mode{display:flex;gap:6px;margin:14px 0 10px;flex-wrap:wrap}
+.ex-mode .chip{padding:8px 16px;font-size:14px}
+.ex-mods{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px;align-items:start}
+@media (max-width:719px){.ex-mods{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ex-mg{background:var(--cs);border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.ex-ck{display:flex;align-items:center;gap:8px;min-height:36px;font-size:13.5px;color:var(--ink-soft);cursor:pointer}
+.ex-ck input{width:17px;height:17px;flex:none;accent-color:var(--c,var(--brand))}
+.ex-ckp{font-weight:800;color:var(--ink);font-size:14.5px}
+.ex-sub{display:flex;flex-direction:column;padding-left:8px;border-left:2px solid color-mix(in srgb,var(--c) 35%,transparent);margin-left:8px}
+.ex-sub .ex-ck{min-height:32px}
+.ex-est{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;background:var(--paper-2);border-radius:12px;padding:10px 12px}
+.ex-est .tx{flex:1 1 220px;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;min-width:0}
+.ex-est .tx span{font-size:12.5px;font-weight:700;color:var(--ink-dim)}
+.ex-est .tx b{font-size:18px;font-variant-numeric:tabular-nums}
+.ex-est .tx small{flex-basis:100%;font-size:12.5px;color:var(--ink-soft);line-height:1.5}
+.ex-est.none{color:var(--badt,var(--red));font-size:13.5px;font-weight:700}
+.ex-adj{display:flex;align-items:center;gap:6px}
+.ex-adj .btn{width:40px;height:40px;padding:0;font-size:18px}
+.ex-adj span{min-width:3.6em;text-align:center;font-weight:800;font-variant-numeric:tabular-nums;font-size:14px}
+.ex-go{margin-top:6px}
+.ex-go .btn{min-width:12em}
+@media (max-width:560px){.ex-go .btn{width:100%}}
+/* 模块标签 */
+.ex-tags{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--ink-dim);font-size:12px}
+.ex-tag{display:inline-block;font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--exam-soft);color:var(--ink);max-width:100%;overflow-wrap:anywhere}
+.ex-tag.cu{background:var(--paper-2);box-shadow:inset 0 0 0 1.5px var(--exam)}
+.ex-hist .ex-hm{gap:3px}
+/* 走势 */
+.ex-trend{padding:12px 14px 8px;margin-bottom:10px}
+.ex-trh{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-dim);margin-bottom:4px}
+.ex-trh b{color:var(--ink);font-size:14px;margin-right:auto}
+.ex-trh .k{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--exam);vertical-align:-1px;margin:0 3px 0 6px}
+.ex-trh .k.cu{background:var(--paper-2);box-shadow:inset 0 0 0 1.5px var(--exam)}
+.ex-trend svg{display:block;width:100%;height:auto;max-height:220px}
+.ex-trend .bar{fill:var(--exam)} .ex-trend .bar.cu{fill:var(--exam-soft);stroke:var(--exam);stroke-width:1.2}
+.ex-trend .pl{fill:none;stroke:var(--ink-dim);stroke-width:1.2;stroke-dasharray:2 3}
+.ex-trend .ax{stroke:var(--line-2);stroke-width:1}
+.ex-trend .g425,.ex-trend .g500{stroke-width:1;stroke-dasharray:4 3}
+.ex-trend .g425{stroke:var(--amber)} .ex-trend .g500{stroke:var(--ok)}
+.ex-trend text{font-family:var(--ui);font-size:9px;fill:var(--ink-dim)}
+.ex-trend .bv{font-weight:800;fill:var(--ink)}
+/* 考试中：自由顺序的部分标签 */
+.ex-ptabs{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:6px;margin-top:6px}
+.ex-ptab{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0;text-align:left;background:var(--paper);border-radius:12px;padding:6px 10px;box-shadow:var(--shadow);border:1.5px solid transparent;min-height:44px}
+.ex-ptab .t{font-size:13.5px;font-weight:800;display:flex;align-items:baseline;gap:5px;white-space:nowrap;max-width:100%;overflow:hidden}
+.ex-ptab .t i{font-style:normal;font-size:10.5px;color:var(--c);letter-spacing:.03em}
+.ex-ptab .s{display:flex;flex-wrap:wrap;column-gap:6px;font-size:11.5px;color:var(--ink-dim);font-variant-numeric:tabular-nums;white-space:nowrap;max-width:100%}
+.ex-ptab .s b{font-weight:600} .ex-ptab .s em{font-style:normal;font-weight:700;color:var(--ink-soft)}
+.ex-ptab.on{border-color:var(--c);background:var(--cs)}
+.ex-ptab.lock .s em{color:var(--badt,var(--red))}
+@media (max-width:520px){.ex-ptab{padding:5px 8px}.ex-ptab .t{font-size:12.5px}.ex-ptab .t i{display:none}.ex-ptab .s{flex-direction:column;font-size:11px;line-height:1.3}}
+.ex-lk{background:var(--red-soft)}
+.ex-lk>svg.i{color:var(--red)}
+.ex-lockd .opt,.ex-lockd .letters button,.ex-lockd .bank .chip,.ex-lockd .blank{pointer-events:none;opacity:.75}
+.ex-lockd .wt-ta{background:var(--paper-2);color:var(--ink-soft)}
+.ex-player .play:disabled{opacity:.4}
+/* 报告 */
+.ex-rtag{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.ex-raw{font-size:13.5px;color:var(--ink-soft);margin:6px 0 0}
+.ex-ag{margin-bottom:10px}
+.ex-mbar{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;font-size:13.5px;color:var(--ink-soft);margin:0 0 8px}
+.ex-mbar span{flex:1 1 240px}
+.ex-mbar b{color:var(--ink)}
+.ex-del{color:var(--badt,var(--red))}
+/* 估分面板（模考报告 + 写译页共用） */
+.gr-panel{display:flex;flex-direction:column;gap:10px}
+.gr-h{display:flex;align-items:center;gap:12px}
+.gr-sc{display:flex;align-items:baseline;gap:1px;flex:none}
+.gr-sc b{font-size:34px;font-weight:800;line-height:1;color:var(--c,var(--brand));font-variant-numeric:tabular-nums}
+.gr-sc small{font-size:13px;color:var(--ink-dim);font-weight:700}
+.gr-bd{display:flex;flex-direction:column;gap:2px;min-width:0;font-size:13px;color:var(--ink-soft)}
+.gr-bd b{font-size:14.5px;color:var(--ink)}
+.gr-flag{margin:0;font-size:13.5px;font-weight:700;color:var(--ink);background:var(--red-soft);border-radius:10px;padding:8px 10px}
+.gr-items{display:grid;gap:8px}
+.gr-it{display:grid;grid-template-columns:5em minmax(0,1fr) auto;align-items:center;gap:2px 10px}
+.gr-n{font-size:13px;font-weight:800}
+.gr-bar{height:6px;border-radius:4px;background:var(--line);overflow:hidden}
+.gr-bar i{display:block;height:100%;background:var(--c,var(--brand));border-radius:4px}
+.gr-p{font-size:12px;color:var(--ink-dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+.gr-p b{font-size:14px;color:var(--ink)}
+.gr-tip{grid-column:1/-1;font-size:12.5px;color:var(--ink-soft);line-height:1.55}
+.gr-note{margin:0;font-size:12px;color:var(--ink-dim);line-height:1.55}
+.gr-acts{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap}
+.gr-cp{font-size:12.5px;color:var(--mark-ok);font-weight:700}
+.gr-modal{position:fixed;inset:0;z-index:100;background:rgba(10,9,20,.5);display:grid;place-items:center;padding:16px}
+.gr-mbox{background:var(--paper);color:var(--ink);border-radius:var(--r-s);box-shadow:var(--shadow-2);width:min(640px,100%);max-height:calc(100dvh - 32px);display:flex;flex-direction:column;gap:8px;padding:14px}
+.gr-mh{display:flex;align-items:center;gap:10px}
+.gr-mh b{flex:1;font-size:14.5px}
+.gr-mbox textarea{flex:1;min-height:240px;width:100%;border:1.5px solid var(--line);border-radius:10px;background:var(--paper-2);color:var(--ink);font:13px/1.6 var(--ui);padding:10px;resize:vertical}
+.gr-mbox p{margin:0;font-size:12px;color:var(--ink-dim)}
+/* 写译页：估分按钮与结果 */
+.wt-grade{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;margin-top:10px}
+.wt-grade span{font-size:12.5px;color:var(--ink-dim);flex:1 1 200px}
+.wt-gres:not(:empty){margin-top:10px;background:var(--paper-2);border-radius:12px;padding:12px}
