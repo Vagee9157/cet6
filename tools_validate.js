@@ -1,7 +1,7 @@
 // 题库自检：node tools_validate.js
 const fs=require('fs'),vm=require('vm');
-const files=['assets/data-outline.js','assets/data-vocab.js','assets/data-practice.js','assets/data-listening-2.js','assets/data-reading-2.js','assets/data-writing-2.js','assets/data-vocab-2.js','assets/data-listening-3.js','assets/data-reading-3.js','assets/data-writing-3.js','assets/data-vocab-3.js'];
-const src=files.map(f=>fs.readFileSync(f,'utf8')).join('\n')+'\n;({VOCAB,LISTENING,READING,WRITING,TRANSLATION,CHAPTERS})';
+const files=['assets/data-outline.js','assets/data-vocab.js','assets/data-practice.js','assets/data-listening-2.js','assets/data-reading-2.js','assets/data-writing-2.js','assets/data-vocab-2.js','assets/data-listening-3.js','assets/data-reading-3.js','assets/data-writing-3.js','assets/data-vocab-3.js','assets/data-real.js','assets/data-vocab-ex.js'];
+const src=files.map(f=>fs.readFileSync(f,'utf8')).join('\n')+'\n;({VOCAB,LISTENING,READING,WRITING,TRANSLATION,CHAPTERS,REAL,VOCAB_EX})';
 const R=vm.runInContext(src,vm.createContext({window:{},console}));
 const errs=[];const e=(m)=>errs.push(m);
 const wc=(t)=>t.trim().split(/\s+/).length;
@@ -14,5 +14,7 @@ R.READING.mc.forEach(s=>{const w='仔细 '+s.id;uid(s.id,w);chkQ(s.questions,w,5
 R.WRITING.forEach(s=>{const w='写作 '+s.id;uid(s.id,w);if(!s.prompt||!s.sample||!s.outline||!s.notes)e(`${w}: 字段缺`);const wcnt=wc(s.sample.replace(/^Dear.*$|^Yours.*$|^Li Ming$/gm,''));if(wcnt<150||wcnt>230)e(`${w}: 范文 ${wcnt} 词，期望 150–230`)});
 R.TRANSLATION.forEach(s=>{const w='翻译 '+s.id;uid(s.id,w);const zh=(s.zh||'').replace(/[^一-龥]/g,'').length;if(zh<175||zh>210)e(`${w}: 原文 ${zh} 字，期望 180–200`);if(!s.en||!s.keys||!s.notes)e(`${w}: 字段缺`)});
 const words=new Map();R.VOCAB.forEach(g=>g.words.forEach(([w,p,c,ex])=>{if(!w||!p||!c||!ex)e(`词汇 ${g.g}: ${w} 字段缺`);const k=w.toLowerCase();if(words.has(k))e(`词汇重复: ${w}（${g.g} / ${words.get(k)}）`);else words.set(k,g.g)}));
-const L=R.LISTENING;console.log(`听力 ${L.length}（对话 ${L.filter(s=>s.type==='conv').length} / 篇章 ${L.filter(s=>s.type==='passage').length} / 讲座 ${L.filter(s=>s.type==='lecture').length}）  阅读 选词 ${R.READING.cloze.length} / 匹配 ${R.READING.match.length} / 仔细 ${R.READING.mc.length}  写作 ${R.WRITING.length}  翻译 ${R.TRANSLATION.length}  词汇 ${words.size}`);
+R.REAL.forEach(s=>{const w='真人 '+s.id;uid(s.id,w);chkQ(s.questions,w,4);if(!fs.existsSync(s.src))e(`${w}: 缺音频 ${s.src}`);if(!(s.dur>60))e(`${w}: 时长 ${s.dur}`);if(s.org){if(!['conv','lecture'].includes(s.type))e(`${w}: type`);if(!Array.isArray(s.segs)||!s.segs.length)e(`${w}: 缺 segs`);else{let p=-1;s.segs.forEach((g,i)=>{if(!(g[0]>=p&&g[1]>=g[0]&&g[1]<=s.dur+1))e(`${w}: segs[${i}] 时间 ${g[0]}–${g[1]}`);p=g[0]})}const wpm=s.words/s.dur*60;if(wpm<120||wpm>200)e(`${w}: 语速 ${wpm.toFixed(0)} 词/分`);if(s.words<450||s.words>780)e(`${w}: ${s.words} 词`)}});
+R.VOCAB.forEach(g=>g.words.forEach(([w,,,ex])=>{const x=R.VOCAB_EX[w];if(!x||x.length<2||x.length>3)e(`例句 ${w}: 应有 2–3 句`);else{if(x[0][0]!==ex)e(`例句 ${w}: 第 1 句与原例句不一致`);x.forEach(([en,zh],i)=>{if(!en||!zh)e(`例句 ${w} #${i+1}: 缺英文或中文`)})}}));
+const L=R.LISTENING;console.log(`听力 ${L.length}（对话 ${L.filter(s=>s.type==='conv').length} / 篇章 ${L.filter(s=>s.type==='passage').length} / 讲座 ${L.filter(s=>s.type==='lecture').length}）  阅读 选词 ${R.READING.cloze.length} / 匹配 ${R.READING.match.length} / 仔细 ${R.READING.mc.length}  写作 ${R.WRITING.length}  翻译 ${R.TRANSLATION.length}  词汇 ${words.size}（例句 ${Object.keys(R.VOCAB_EX).length} 词）  真人听力 ${R.REAL.length}（常速 ${R.REAL.filter(r=>r.org).length}）`);
 if(errs.length){console.log('问题',errs.length);errs.forEach(x=>console.log(' -',x));process.exit(1)}else console.log('全部通过');

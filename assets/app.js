@@ -15,6 +15,10 @@
   const ptKey = (c, i) => c.id + ':' + i;
   const totalPts = CHAPTERS.reduce((n, c) => n + c.points.length, 0);
   const ALLWORDS = VOCAB.flatMap((g, gi) => g.words.map((w, wi) => ({ id: gi + ':' + wi, g: g.g, w: w[0], p: w[1], c: w[2], e: w[3] })));
+  // 单词例句：VOCAB_EX（data-vocab-ex.js）每词 3 句带中文；缺数据时退回原例句
+  const exOf = (w) => (typeof VOCAB_EX !== 'undefined' && VOCAB_EX[w.w]) || [[w.e, '']];
+  // 高亮目标词：取第一个词的前 4–6 个字母做词干，能命中 laid/came 以外的大部分屈折形式
+  const hlWord = (html, word) => { const h = word.split(' ')[0].replace(/[^a-z]/gi, ''); const stem = h.length > 6 ? h.slice(0, h.length - 2) : h.length > 4 ? h.slice(0, 4) : h; return stem ? html.replace(new RegExp('\\b(' + stem + '[a-z]*)', 'i'), '<em>$1</em>') : html; };
 
   /* ---------- 主题 ---------- */
   const isDark = () => (S.theme ? S.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches);
@@ -171,7 +175,7 @@
   }
 
   /* ================= 单词 ================= */
-  let vg = 0, vq = [], vi = 0, flipped = false, vmode = 'flash';
+  let vg = 0, vq = [], vi = 0, flipped = false, vmode = 'flash', vtOpen = false;
   function buildQueue() {
     const words = VOCAB[vg].words.map((w, wi) => ALLWORDS.find((x) => x.id === vg + ':' + wi));
     const unknown = words.filter((w) => S.vocab[w.id] === 0 || S.vocab[w.id] === 1);
@@ -186,13 +190,14 @@
     const w = vq[vi];
     $('#vocab-box').innerHTML = `
       <div class="sec-h" style="margin-top:4px"><span class="ico m-vocab">${ic('i-abc')}</span><h2>高频词汇</h2><span class="more">认识 ${st.known} · 生词 ${st.unknown}</span></div>
-      <div class="vocab-top">${VOCAB.map((g, i) => { const d = g.words.filter((x, wi) => S.vocab[i + ':' + wi] === 2).length; return `<button class="chip m-vocab" data-vg="${i}" aria-pressed="${i === vg}"><span class="dot"></span>${esc(g.g)} <span style="opacity:.7">${d}/${g.words.length}</span></button>`; }).join('')}</div>
+      <div class="vt m-vocab ${vtOpen ? 'open' : ''}"><button class="vt-cur" id="vtToggle" aria-expanded="${vtOpen}"><span class="vt-lab">当前主题</span><b>${esc(grp.g)}</b><span class="vt-n">${gDone}/${grp.words.length}</span><span class="vt-sw">${vtOpen ? '收起' : '切换主题'}</span>${ic('i-chev-r')}</button>
+        <div class="vt-grid">${VOCAB.map((g, i) => { const d = g.words.filter((x, wi) => S.vocab[i + ':' + wi] === 2).length; return `<button class="vt-tile" data-vg="${i}" aria-pressed="${i === vg}"><span class="nm">${esc(g.g)}</span><span class="ct">${d}/${g.words.length}</span><span class="bar"><i style="width:${Math.round(d / g.words.length * 100)}%"></i></span></button>`; }).join('')}</div></div>
       <div class="flash-wrap">
         <div class="flash-meta"><span>${esc(grp.g)} · 本组认识 ${gDone}/${grp.words.length}</span><span>${vq.length ? `${vi + 1} / ${vq.length}` : ''}<button class="chip" style="margin-left:8px" id="vmode">${vmode === 'review' ? '只刷生词' : '全部'}</button></span></div>
         ${w ? `
         <div class="flash ${flipped ? 'flipped' : ''}" id="flash"><div class="inner">
           <div class="face front"><button class="spk" data-say="${esc(w.w)}" aria-label="朗读">${ic('i-vol')}</button><div class="w">${esc(w.w)}</div><span class="pos">${esc(w.p)}</span><div class="hint">${ic('i-flip')}点卡片看释义</div></div>
-          <div class="face back"><button class="spk" data-say="${esc(w.e)}" aria-label="朗读例句">${ic('i-vol')}</button><div class="cn">${esc(w.c)}</div><div class="ex">${esc(w.e).replace(new RegExp('(' + w.w.split(' ')[0].replace(/[^a-z]/gi, '') + '\\w*)', 'i'), '<em>$1</em>')}</div></div>
+          <div class="face back"><div class="cn">${esc(w.c)}</div><ol class="exs">${exOf(w).map(([en, zh]) => `<li><button class="spk sm" data-say="${esc(en)}" aria-label="朗读例句">${ic('i-vol')}</button><div class="ex">${hlWord(esc(en), w.w)}</div><div class="zh">${esc(zh)}</div></li>`).join('')}</ol></div>
         </div></div>
         <div class="flash-acts"><button class="btn no" data-mark="0">${ic('i-x')}不认识</button><button class="btn so" data-mark="1">模糊</button><button class="btn ok" data-mark="2">${ic('i-check')}认识</button></div>`
         : `<div class="empty">${ic('i-party')}这一组都认识了。换一组，或点"只刷生词"复习。</div>`}
@@ -200,7 +205,8 @@
       <div class="sec-h"><h2 style="font-size:16px">本组单词表</h2></div>
       <div class="vocab-list">${grp.words.map((x, wi) => { const s = S.vocab[vg + ':' + wi]; return `<div class="vw ${s === 0 || s === 1 ? 'unknown' : s === 2 ? 'known' : ''}"><span class="w">${esc(x[0])}</span><span class="pos">${esc(x[1])}</span><span class="cn">${esc(x[2])}</span></div>`; }).join('')}</div>`;
     $('#vocab-box').onclick = (e) => {
-      const g = e.target.closest('[data-vg]'); if (g) { vg = +g.dataset.vg; vq = []; renderVocab(); return; }
+      const g = e.target.closest('[data-vg]'); if (g) { vg = +g.dataset.vg; vq = []; vtOpen = false; renderVocab(); return; }
+      if (e.target.closest('#vtToggle')) { vtOpen = !vtOpen; $('.vt').classList.toggle('open', vtOpen); e.target.closest('#vtToggle').setAttribute('aria-expanded', vtOpen); $('.vt-sw').textContent = vtOpen ? '收起' : '切换主题'; return; }
       if (e.target.closest('#vmode')) { vmode = vmode === 'review' ? 'flash' : 'review'; vq = []; renderVocab(); return; }
       const sp = e.target.closest('[data-say]'); if (sp) { e.stopPropagation(); speak(sp.dataset.say, 0.9); return; }
       const mk = e.target.closest('[data-mark]'); if (mk) { S.vocab[w.id] = +mk.dataset.mark; save(); vi++; flipped = false; renderVocab(); return; }
@@ -214,8 +220,11 @@
   /* ---------- 真人感音频：预生成的神经网络语音 + 逐句时间轴（assets/data-audio.js） ---------- */
   const HAS_AUDIO = typeof AUDIO !== 'undefined';
   const REALS = typeof REAL !== 'undefined' ? REAL.filter((r) => r.questions && r.questions.length) : [];
-  const realSegs = (r) => { const ps = r.script.split('\n').filter(Boolean); const n = ps.map((p) => p.split(/\s+/).length); const tot = n.reduce((a, b) => a + b, 0) || 1; let acc = 0; return ps.map((p, i) => { const st = acc / tot * r.dur; acc += n[i]; return [Math.round(st * 10) / 10, Math.round(acc / tot * r.dur * 10) / 10, '', p]; }); };
-  const REALMAP = Object.fromEntries(REALS.map((r) => [r.id, { src: r.src, dur: r.dur, q: r.dur, segs: realSegs(r), real: true }]));
+  // 常速真人（NASA / NOAA 访谈，带 org 字段、逐段时间已对齐）与慢速 VOA 分开处理
+  const realSlow = (r) => !r.org;
+  const realRateOf = (m) => m.slow ? (S.realRate || 1.2) : (S.normRate || 1);
+  const realSegs = (r) => { if (r.segs) return r.segs;  const ps = r.script.split('\n').filter(Boolean); const n = ps.map((p) => p.split(/\s+/).length); const tot = n.reduce((a, b) => a + b, 0) || 1; let acc = 0; return ps.map((p, i) => { const st = acc / tot * r.dur; acc += n[i]; return [Math.round(st * 10) / 10, Math.round(acc / tot * r.dur * 10) / 10, '', p]; }); };
+  const REALMAP = Object.fromEntries(REALS.map((r) => [r.id, { src: r.src, dur: r.dur, q: r.dur, segs: realSegs(r), real: true, slow: realSlow(r) }]));
   const AUD = (id) => (HAS_AUDIO && AUDIO[id]) || REALMAP[id] || null;
   const AU = new Audio(); AU.preload = 'auto';
   let auId = null, auUrl = null;
@@ -229,7 +238,7 @@
     // 整个文件取下来再播：离线缓存能存住，拖动进度也不受网络影响
     try { const r = await fetch(m.src); if (!r.ok) throw 0; auUrl = URL.createObjectURL(await r.blob()); if (auId === id) AU.src = auUrl; }
     catch { if (auId === id) AU.src = m.src; }
-    AU.playbackRate = m.real ? (S.realRate || 1.2) : (S.rate || 1);
+    AU.playbackRate = m.real ? realRateOf(m) : (S.rate || 1);
   }
   function syncPlayer() {
     const m = auMeta(); if (!m) return;
@@ -248,11 +257,11 @@
   function stopAudio() { AU.pause(); if (window.speechSynthesis) speechSynthesis.cancel(); }
   function playerHTML(set) {
     const m = AUD(set.id);
-    if (m && m.real) { const rr = S.realRate || 1.2; return `<div class="player au"><button class="play" id="auBtn" data-au>${ic(AU.paused ? 'i-play' : 'i-pause')}</button>
+    if (m && m.real) { const rr = realRateOf(m); const rates = m.slow ? [1, 1.1, 1.2, 1.3, 1.4] : [0.8, 0.9, 1, 1.1, 1.2]; return `<div class="player au"><button class="play" id="auBtn" data-au>${ic(AU.paused ? 'i-play' : 'i-pause')}</button>
       <div class="ttl"><span id="auTtl">点击播放录音</span><span class="tm" id="auTime">0:00 / ${fmt(m.dur)}</span></div>
       <div class="seek" data-seek><i id="auBar"></i></div>
-      <div class="ctl">语速 ${[1, 1.1, 1.2, 1.3, 1.4].map((r) => `<button class="chip" data-rrate="${r}" aria-pressed="${rr === r}">${r}×</button>`).join('')}</div>
-      <div class="note">真人朗读，来自美国之音学英语频道（VOA Learning English，公有领域）。原速约每分钟 100 词，比六级慢；默认 1.2 倍接近考试语速，练熟后可调到 1.3–1.4 倍。题目是本站按六级讲座题型自编的。</div></div>`; }
+      <div class="ctl">语速 ${rates.map((r) => `<button class="chip" data-rrate="${r}" aria-pressed="${rr === r}">${r}×</button>`).join('')}</div>
+      <div class="note">${m.slow ? '真人朗读，来自美国之音学英语频道（VOA Learning English，公有领域）。原速约每分钟 100 词，比六级慢；默认 1.2 倍接近考试语速，练熟后可调到 1.3–1.4 倍。题目是本站按六级讲座题型自编的。' : `真人原声，截自${esc(set.show || set.org)}（美国政府作品，公有领域），原速约每分钟 ${Math.round(set.words / set.dur * 60)} 词，跟六级真题语速相当，建议 1.0 倍直接听。题目是本站按六级${set.type === 'lecture' ? '讲座' : '长对话'}题型自编的。`}</div></div>`; }
     if (!m) return `<div class="player"><button class="play" data-play>${ic(cur.playing ? 'i-pause' : 'i-play')}</button><div class="ttl">${cur.playing ? '正在朗读…' : '点击播放录音（浏览器朗读）'}</div><div class="ctl">语速 ${[0.9, 1, 1.1, 1.2].map((r) => `<button class="chip" data-rate="${r}" aria-pressed="${(S.rate || 1) === r}">${r}×</button>`).join('')}</div><div class="note">这篇还没有录音，暂用浏览器朗读。</div></div>`;
     return `<div class="player au"><button class="play" id="auBtn" data-au>${ic(AU.paused ? 'i-play' : 'i-pause')}</button>
       <div class="ttl"><span id="auTtl">点击播放录音</span><span class="tm" id="auTime">0:00 / ${fmt(auEnd())}</span></div>
@@ -263,7 +272,7 @@
   }
   function transcriptHTML(set) {
     const m = AUD(set.id);
-    if (m && m.real) return `<div class="script tr">${m.segs.map((sg, i) => `<p><span class="seg" data-i="${i}" data-t="${sg[0]}">${esc(sg[3])}</span></p>`).join('')}</div><p class="lead">段落高亮按字数估算，位置是大致的。出处：<a href="${esc(set.url)}" target="_blank" rel="noopener">VOA Learning English · ${esc(set.title)}</a>（${esc(set.date)}，公有领域）</p>`;
+    if (m && m.real) return `<div class="script tr">${m.segs.map((sg, i) => `<p>${sg[2] && (i === 0 || m.segs[i - 1][2] !== sg[2]) ? `<b class="who">${esc(sg[2])}</b>` : ''}<span class="seg" data-i="${i}" data-t="${sg[0]}">${esc(sg[3])}</span></p>`).join('')}</div><p class="lead">${m.slow ? '段落高亮按字数估算，位置是大致的。' : '段落时间按录音逐词对齐，点段落跳到那句重听。'}出处：<a href="${esc(set.url)}" target="_blank" rel="noopener">${m.slow ? 'VOA Learning English' : esc(set.show || set.org)} · ${esc(set.episode || set.title)}</a>（${esc(set.date)}，公有领域）</p>`;
     if (!m) return `<div class="script">${esc(set.script)}</div>`;
     const rows = []; let lastSpk = null;
     m.segs.forEach((sg, i) => {
@@ -277,15 +286,19 @@
   function renderPracticeHome(sub) {
     if (sub) psub = sub; cur = null; stopAudio(); window.scrollTo(0, 0);
     const L = LISTENING, Rd = READING;
-    const card = (mod, kind, s, extra) => `<button class="set ${mod}" data-open="${s.id}"><span class="kind">${kind}</span><b>${esc(s.title.replace(/^[^·]+·\s*/, ''))}</b><span class="meta">${ic('i-timer')}约 ${s.minutes} 分钟 ${extra || ''}<span class="score">${setScore(s.id)}</span></span></button>`;
+    const card = (mod, kind, s, extra) => `<button class="set ${mod}" data-open="${s.id}"><span class="kind">${kind}${s.org ? ` · 真实原文 ${esc(s.org)}` : ''}</span><b>${esc(s.title.replace(/^[^·]+·\s*/, ''))}</b><span class="meta">${ic('i-timer')}约 ${s.minutes} 分钟 ${extra || ''}<span class="score">${setScore(s.id)}</span></span></button>`;
     $('#practice-box').innerHTML = `
       <div class="wt-tabs"><button class="chip m-listen" data-sub="listen" aria-pressed="${psub === 'listen'}"><span class="dot"></span>听力</button><button class="chip m-read" data-sub="read" aria-pressed="${psub === 'read'}"><span class="dot"></span>阅读</button></div>
       <a class="set m-exam" href="paper.html" style="margin-bottom:14px;text-decoration:none;color:inherit;display:flex"><span class="kind">整卷模拟 · A4 可打印</span><b>一键生成一份完整六级模拟卷</b><span class="meta">写作 + 听力 + 阅读 + 翻译，附答题卡、答案和听力原文</span></a>
       ${psub === 'listen' ? `
-        <p class="lead">全部配录音：真人听力来自 VOA 真人朗读；六级题型练习用神经网络语音分角色录制，可选考试节奏。答完再对着原文精听。</p>
-        ${REALS.length ? `<div class="sec-h"><span class="ico m-listen">${ic('i-ear')}</span><h2>真人听力</h2><span class="more">VOA 真人朗读 · ${REALS.length} 篇</span></div>
-        <p class="lead">美国之音学英语频道的真人录音（公有领域），按六级讲座题型配题，适合练耳朵适应真人语音语调。</p>
-        <div class="set-grid">${REALS.map((s) => `<button class="set m-listen" data-open="${s.id}"><span class="kind">真人朗读 · VOA</span><b>${esc(s.title)}</b><span class="meta">${ic('i-timer')}${fmt(s.dur)} · 4 题<span class="score">${setScore(s.id)}</span></span></button>`).join('')}</div>
+        <p class="lead">全部配录音：真人听力是公有领域的真人原声；六级题型练习用神经网络语音分角色录制，可选考试节奏。答完再对着原文精听。</p>
+        ${REALS.some((r) => r.org) ? `<div class="sec-h"><span class="ico m-listen">${ic('i-ear')}</span><h2>常速真人听力</h2><span class="more">NASA / NOAA 访谈 · ${REALS.filter((r) => r.org).length} 篇</span></div>
+        <p class="lead">美国航天局、海洋与大气管理局自制播客里截取的真人对谈，录音棚音质、正常语速（每分钟约 150 词，跟六级真题相当），按六级长对话 / 讲座题型配题。</p>
+        <div class="set-grid">${REALS.filter((r) => r.org).map((s) => `<button class="set m-listen" data-open="${s.id}"><span class="kind">${s.type === 'lecture' ? '讲座' : '长对话'} · ${esc(s.org)}</span><b>${esc(s.title)}</b><span class="meta">${ic('i-timer')}${fmt(s.dur)} · ${s.questions.length} 题<span class="score">${setScore(s.id)}</span></span></button>`).join('')}</div>` : ''}
+        ${REALS.some(realSlow) ? `<div class="sec-h"><span class="ico m-listen">${ic('i-ear')}</span><h2>慢速真人听力</h2><span class="more">VOA 真人朗读 · ${REALS.filter(realSlow).length} 篇</span></div>
+        <p class="lead">美国之音学英语频道的真人录音（公有领域），语速偏慢，默认 1.2 倍，适合入门热身。</p>
+        <div class="set-grid">${REALS.filter(realSlow).map((s) => `<button class="set m-listen" data-open="${s.id}"><span class="kind">真人朗读 · VOA</span><b>${esc(s.title)}</b><span class="meta">${ic('i-timer')}${fmt(s.dur)} · 4 题<span class="score">${setScore(s.id)}</span></span></button>`).join('')}</div>` : ''}
+        ${REALS.length ? `
         <div class="sec-h"><span class="ico m-listen">${ic('i-ear')}</span><h2>六级题型练习</h2><span class="more">${L.length} 篇</span></div>` : ''}
         <div class="set-grid">${L.map((s) => card('m-listen', { conv: '长对话', passage: '听力篇章', lecture: '讲座 / 讲话' }[s.type], s, `· ${s.questions.length} 题`)).join('')}</div>`
       : `
@@ -335,6 +348,8 @@
         <div class="passage">${html.split('\n').map((p) => `<p>${p}</p>`).join('')}</div>
         ${done ? `<div class="q-list">${set.exp.map((e, i) => `<div class="exp"><b>${i + 1}. ${set.answers[i]}</b> ${esc(e)}</div>`).join('')}</div>` : ''}`;
     }
+    // 真实原文（美国政府机构公有领域文章）注明出处
+    if (set.url && kind !== 'listen') body += `<p class="lead src-note">原文：<a href="${esc(set.url)}" target="_blank" rel="noopener">${esc(set.source || set.org)}</a>（美国政府作品，公有领域；仅按篇幅删节，未改写句子）</p>`;
     const total = kind === 'cloze' ? set.answers.length : kind === 'match' ? set.items.length : set.questions.length;
     const answered = Object.keys(ans).length;
     let resHtml = '';
@@ -344,7 +359,7 @@
       if (e.target.closest('[data-back]')) return renderPracticeHome();
       if (e.target.closest('[data-au]')) { if (AU.paused) { if (AU.currentTime >= auEnd() - 0.6) AU.currentTime = 0; AU.play().catch(() => {}); } else AU.pause(); return; }
       const sk = e.target.closest('[data-seek]'); if (sk) { const r = sk.getBoundingClientRect(); AU.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * auEnd(); syncPlayer(); return; }
-      const rr = e.target.closest('[data-rrate]'); if (rr) { S.realRate = +rr.dataset.rrate; AU.playbackRate = S.realRate; save(); document.querySelectorAll('[data-rrate]').forEach((b) => b.setAttribute('aria-pressed', +b.dataset.rrate === S.realRate)); return; }
+      const rr = e.target.closest('[data-rrate]'); if (rr) { const v = +rr.dataset.rrate; const mm = auMeta(); if (mm && !mm.slow) S.normRate = v; else S.realRate = v; AU.playbackRate = v; save(); document.querySelectorAll('[data-rrate]').forEach((b) => b.setAttribute('aria-pressed', +b.dataset.rrate === v)); return; }
       const am = e.target.closest('[data-aumode]'); if (am) { S.auMode = am.dataset.aumode; save(); document.querySelectorAll('[data-aumode]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.aumode === S.auMode)); syncPlayer(); return; }
       if (e.target.closest('[data-tr]')) { cur.showTr = !cur.showTr; renderSet(); return; }
       const sg = e.target.closest('.seg[data-t]'); if (sg) { AU.currentTime = +sg.dataset.t; AU.play().catch(() => {}); return; }
