@@ -457,13 +457,12 @@
       bar = `<div class="ex-bar ${p.mod}" id="exBar"><div class="ex-bar-in">
         <div class="ex-pt"><span class="ex-pno">Part ${p.no} · ${esc(tagOf(e) === '完整模考' ? '自由顺序' : tagOf(e))}</span><b>${p.n}</b></div>
         <div class="ex-cl"><span class="ex-clock" id="exClock">${lk ? '时间到' : clock(e.left[e.part])}</span><span class="ex-prog" id="exProg">总剩余 <b>${hclock(totalLeft(e))}</b></span></div>
-        <button class="btn tone ex-next m-exam" data-exfin>交卷</button></div>
-        <div class="ex-ptabs" role="tablist" style="--n:${idx.length}">${idx.map((i) => { const q = PARTS[i]; return `<button class="ex-ptab ${q.mod}${i === e.part ? ' on' : ''}${e.locked[i] ? ' lock' : ''}" role="tab" data-expart="${i}" aria-selected="${i === e.part}"><span class="t"><i>${q.no}</i>${q.n}</span><span class="s">${tabStat(e, i)}</span></button>`; }).join('')}</div></div>`;
+        <button class="btn ghost ex-pause" data-expause>${ic('i-pause')}<span>暂停并返回</span></button><button class="btn tone ex-next m-exam" data-exfin>交卷</button></div></div>`;
     } else {
       bar = `<div class="ex-bar ${p.mod}" id="exBar"><div class="ex-bar-in">
         <div class="ex-pt"><span class="ex-pno">Part ${p.no} · ${idx.indexOf(e.part) + 1}/${idx.length}</span><b>${p.n}</b></div>
         <div class="ex-cl"><span class="ex-clock" id="exClock">${clock(e.left[e.part])}</span><span class="ex-prog" id="exProg">${progHTML(e)}</span></div>
-        <button class="btn tone ex-next" data-exnext>${last ? '交卷' : '交本部分'}</button></div>
+        <button class="btn ghost ex-pause" data-expause>${ic('i-pause')}<span>暂停并返回</span></button><button class="btn tone ex-next" data-exnext>${last ? '交卷' : '交本部分'}</button></div>
         <div class="ex-steps" aria-hidden="true" style="grid-template-columns:repeat(${idx.length},1fr)">${idx.map((i) => `<i class="${i < e.part ? 'done' : i === e.part ? 'on' : ''}"></i>`).join('')}</div></div>`;
     }
     const note = e.note ? `<div class="ex-note">${ic('i-timer')}<span>${esc(e.note)}</span><button class="x" data-exnote aria-label="知道了">${ic('i-x')}</button></div>` : '';
@@ -482,8 +481,12 @@
       const nxi = idx.find((i) => i > e.part);
       foot = `<div class="ex-foot"><span>${last ? '最后一部分，写完就交卷：听力、阅读自动判分，写作、翻译自动估分。' : `做完可以提前交本部分，进入 Part ${PARTS[nxi].no} ${PARTS[nxi].n}；交了不能回头改。`}</span><button class="btn tone ${p.mod}" data-exnext>${last ? '交卷' : '交本部分，进入下一部分'}${ic('i-chev-r')}</button></div>`;
     }
+    // 左侧（宽屏）/ 顶部（手机）导航：各部分 + 阅读的小节；真考顺序下只显示进度，不能点
+    const ptabs = `<div class="ex-ptabs" role="tablist" style="--n:${idx.length}">${idx.map((i) => { const q = PARTS[i]; const st = free ? '' : i < e.part ? ' done' : ''; return `<button class="ex-ptab ${q.mod}${i === e.part ? ' on' : ''}${e.locked[i] ? ' lock' : ''}${st}" role="tab" ${free ? `data-expart="${i}"` : 'disabled'} aria-selected="${i === e.part}"><span class="t"><i>${q.no}</i>${q.n}</span><span class="s">${tabStat(e, i)}</span></button>`; }).join('')}</div>`;
+    const side = `<aside class="ex-side">${ptabs}${p.k === 'read' && Pp.R.length ? `<div class="ex-side-r" id="exSideR">${rtabsHTML(e, Pp)}</div>` : ''}</aside>`;
     const box = $('#exam-box');
-    box.innerHTML = `<div class="ex-wrap ex-on ex-p-${p.k}${lk ? ' ex-lockd' : ''}">${bar}${note}${lockBar}${body}${foot}</div>`;
+    document.body.classList.add('ex-focus');
+    box.innerHTML = `<div class="ex-wrap ex-on ex-p-${p.k}${lk ? ' ex-lockd' : ''}">${bar}<div class="ex-layout">${side}<div class="ex-main">${note}${lockBar}${body}${foot}</div></div></div>`;
     box.onclick = onExamClick; box.oninput = onExamInput; box.onchange = null;
     sizeBar(); startTick();
     if (p.k === 'listen') { if (!lk && !e.lis.done && axSi !== e.lis.i && !axReplay) axLoad(e.lis.i, e.lis.t); paintLis(); }
@@ -538,10 +541,14 @@
     return `<div class="ex-col ex-lis">${player}${html}</div>`;
   }
   const clozeWord = (set, L) => C().clozeWord(set, L);
+  function rtabsHTML(e, Pp) {
+    const cur = Pp.R.find((x) => x.key === e.rsec) || Pp.R[0];
+    return `<div class="ex-rtabs">${Pp.R.map((x) => { const n = Object.keys(e.ans.R[x.key] || {}).length; return `<button class="chip m-read${n >= x.t ? ' full' : ''}" data-exrsec="${x.key}" aria-pressed="${x.key === cur.key}"><span class="s">${x.lab[0]}</span>${esc(x.lab[1])}<span class="c">${n}/${x.t}</span></button>`; }).join('')}</div>`;
+  }
   function readHTML(e, Pp) {
     const cur = Pp.R.find((x) => x.key === e.rsec) || Pp.R[0];
     const ans = e.ans.R[cur.key] || {};
-    const tabs = `<div class="ex-rtabs">${Pp.R.map((x) => { const n = Object.keys(e.ans.R[x.key] || {}).length; return `<button class="chip m-read${n >= x.t ? ' full' : ''}" data-exrsec="${x.key}" aria-pressed="${x.key === cur.key}"><span class="s">${x.lab[0]}</span>${esc(x.lab[1])}<span class="c">${n}/${x.t}</span></button>`; }).join('')}</div>`;
+    const tabs = rtabsHTML(e, Pp);
     const qb = `<p class="qb">Questions ${cur.n0}–${cur.n0 + cur.t - 1}</p>`;
     let body = '';
     if (cur.kind === 'cloze') {
@@ -568,11 +575,13 @@
   }
   function paintRead(keepY) {
     const y = window.scrollY; const box = $('#exRd'); if (!box) return;
-    box.innerHTML = readHTML(E(), P); paintClock();
+    box.innerHTML = readHTML(E(), P); const sr = $('#exSideR'); if (sr) sr.innerHTML = rtabsHTML(E(), P); paintClock();
     if (keepY) window.scrollTo(0, y);
   }
   function onExamClick(ev) {
     const t = ev.target, e = E(); if (!e) return;
+    // 暂停并返回：停表、停录音、存好作答和各部分剩余时间，回模考首页（首页点「继续上次模考」接着做）
+    if (t.closest('[data-expause]')) { leave(); e.paused = Date.now(); C().save(); mode = 'home'; render(); window.scrollTo(0, 0); return; }
     const nb = t.closest('[data-exnext]'); if (nb) {
       const k = PARTS[e.part].k, idx = selIdx(e.sel), last = idx[idx.length - 1] === e.part;
       const left = k === 'listen' ? P.nL - cntL(e) : k === 'read' ? P.nR - cntR(e) : 0;
@@ -723,11 +732,11 @@
     const S = C().S;
     if (mode === 'exam' && !S.exam) mode = 'home';
     if (mode === 'report' && !repOf(repTs)) mode = 'home';
-    if (mode !== 'exam') { clearInterval(tickId); }
+    if (mode !== 'exam') { clearInterval(tickId); document.body.classList.remove('ex-focus'); }
     if (mode === 'exam') renderExam(); else if (mode === 'report') renderReport(); else renderHome();
   }
   // 离开模考页：录音暂停、倒计时停（作答已实时保存）
-  function leave() { clearTimeout(axNextT); if (!AX.paused) AX.pause(); clearInterval(tickId); if (C() && C().S.exam) C().save(); }
+  function leave() { document.body.classList.remove('ex-focus'); clearTimeout(axNextT); if (!AX.paused) AX.pause(); clearInterval(tickId); if (C() && C().S.exam) C().save(); }
   const flush = () => { if (window.CET6 && C().S.exam) C().save(); };
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); else lastTick = Date.now(); });
   window.addEventListener('pagehide', flush);
