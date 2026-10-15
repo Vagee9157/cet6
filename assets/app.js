@@ -5,6 +5,8 @@
   const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
   const S = Object.assign({ mastered: {}, vocab: {}, sets: {}, wrong: {}, theme: '', plan: {}, rate: 1 }, load());
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} };
+  // 练习记录：每次交卷一条（同一篇多次也保留），S.rpick 记住随机抽题选的类型，S.papers 记生成过的模拟卷
+  S.hist = S.hist || []; S.rpick = S.rpick || {}; S.papers = S.papers || [];
   const $ = (s, el = document) => el.querySelector(s);
   const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ic = (n) => `<svg class="i"><use href="#${n}"/></svg>`;
@@ -492,6 +494,43 @@
     const meta = g.k === 'cet' ? `约 ${s.minutes} 分钟 · ${s.questions.length} 题` : `${fmt(s.dur)} · ${s.questions.length} 题`;
     return `<button class="set m-listen" data-open="${s.id}"><span class="kind">${kind}</span><b>${esc(g.k === 'cet' ? s.title.replace(/^[^·]+·\s*/, '') : s.title)}</b><span class="meta">${ic('i-timer')}${meta}${setTag(s.id)}</span></button>`;
   }
+  /* ---------- 随机来一篇：只抽没做过的；全做过就从得分率最低的几篇里抽 ---------- */
+  const RPICK = {
+    listen: [
+      { k: 'conv', n: '短 · 长对话', d: '约 4 分钟，两人对话 4 题', pool: () => LISTENING.filter((s) => s.type === 'conv') },
+      { k: 'passage', n: '中 · 听力篇章', d: '约 3 分钟短文 3–4 题', pool: () => LISTENING.filter((s) => s.type === 'passage') },
+      { k: 'lecture', n: '长 · 讲座', d: '约 4–5 分钟讲座 3–4 题', pool: () => LISTENING.filter((s) => s.type === 'lecture') },
+      { k: 'norm', n: '真人常速', d: 'NASA / NOAA 访谈，3–4.5 分钟', pool: () => REALS.filter((r) => r.org) },
+      { k: 'slow', n: '真人慢速', d: 'VOA 慢速朗读，热身用', pool: () => REALS.filter(realSlow) },
+      { k: 'any', n: '随便来', d: '所有听力里随机', pool: () => [...LISTENING, ...REALS] },
+    ],
+    read: [
+      { k: 'cloze', n: '短篇 · 选词填空', d: '约 250 词，15 选 10', pool: () => READING.cloze },
+      { k: 'mc', n: '中篇 · 仔细阅读', d: '约 450 词，5 题', pool: () => READING.mc },
+      { k: 'match', n: '长篇 · 段落匹配', d: '约 1300 词，10 题', pool: () => READING.match },
+      { k: 'any', n: '随便来', d: '所有阅读里随机', pool: () => [...READING.mc, ...READING.match, ...READING.cloze] },
+    ],
+  };
+  const rate = (id) => { const r = S.sets[id]; return r ? r.r / r.t : 1; };
+  function randomFrom(pool, avoid) {
+    const fresh = pool.filter((s) => !S.sets[s.id]);
+    if (fresh.length) { const c = fresh.filter((s) => s.id !== avoid); const a = c.length ? c : fresh; return { s: a[Math.floor(Math.random() * a.length)], redo: false, left: fresh.length }; }
+    const worst = pool.slice().sort((a, b) => rate(a.id) - rate(b.id)).slice(0, Math.max(3, Math.ceil(pool.length / 4))).filter((s) => s.id !== avoid);
+    return worst.length ? { s: worst[Math.floor(Math.random() * worst.length)], redo: true, left: 0 } : null;
+  }
+  function rpickHTML(area) {
+    const opts = RPICK[area], k = S.rpick[area] && opts.some((o) => o.k === S.rpick[area]) ? S.rpick[area] : opts[0].k, o = opts.find((x) => x.k === k);
+    const pool = o.pool(), done = pool.filter((s) => S.sets[s.id]).length;
+    const mod = area === 'listen' ? 'm-listen' : 'm-read';
+    return `<div class="rpick card ${mod}"><div class="rp-h">${ic('i-redo')}<b>随机来一篇</b><span>只抽没做过的，做过的自动跳过</span></div>
+      <div class="rp-opts">${opts.map((x) => `<button class="chip" data-rpk="${x.k}" aria-pressed="${x.k === k}">${esc(x.n)}</button>`).join('')}</div>
+      <div class="rp-foot"><span class="rp-d">${esc(o.d)} · 已做 <b>${done}</b>/${pool.length}${done >= pool.length && pool.length ? '（全做过了，会从得分最低的里抽）' : ''}</span><button class="btn primary" data-rpgo="${area}">${ic('i-redo')}随机来一篇</button></div></div>`;
+  }
+  function rpickGo(area) {
+    const opts = RPICK[area], k = S.rpick[area] || opts[0].k, o = opts.find((x) => x.k === k) || opts[0];
+    const r = randomFrom(o.pool(), S.rpick[area + 'Last']); if (!r) return;
+    S.rpick[area + 'Last'] = r.s.id; save(); openSet(r.s.id);
+  }
   let miniIO = null;
   function renderPracticeHome(sub, keepY) {
     if (cur && !cur.done) stashDraft();
@@ -512,14 +551,18 @@
       <a class="set m-exam" href="paper.html" style="margin-bottom:14px;text-decoration:none;color:inherit;display:flex"><span class="kind">整卷模拟 · A4 可打印</span><b>一键生成一份完整六级模拟卷</b><span class="meta">写作 + 听力 + 阅读 + 翻译，附答题卡、答案和听力原文</span></a>
       ${psub === 'listen' ? `
         <p class="lead">全部配录音：六级题型练习用神经网络语音分角色录制，另有 NASA / NOAA / VOA 的真人原声。答完再对着原文精听。</p>
+        ${rpickHTML('listen')}
         ${listen}`
       : `
         <p class="lead">仔细阅读分最高先做；段落匹配找定位词；选词填空最后兜底。标「真实原文」的是美国政府机构的公有领域文章，只按篇幅删节。</p>
+        ${rpickHTML('read')}
         ${rsec('仔细阅读', `每题 2% · ${Rd.mc.length} 篇`)}<div class="set-grid">${Rd.mc.map((s) => rcard(s, '仔细阅读', '5 题')).join('')}</div>
         ${rsec('长篇阅读（段落匹配）', `每题 1% · ${Rd.match.length} 篇`)}<div class="set-grid">${Rd.match.map((s) => rcard(s, '段落匹配', '10 题')).join('')}</div>
         ${rsec('选词填空', `15 选 10 · 每题 0.5% · ${Rd.cloze.length} 篇`)}<div class="set-grid">${Rd.cloze.map((s) => rcard(s, '选词填空', '10 空')).join('')}</div>`}`;
     box.onclick = (e) => {
       const t = e.target.closest('[data-sub]'); if (t) return renderPracticeHome(t.dataset.sub);
+      const rk = e.target.closest('[data-rpk]'); if (rk) { S.rpick[psub] = rk.dataset.rpk; save(); const y = window.scrollY; renderPracticeHome(); window.scrollTo(0, y); return; }
+      const rg = e.target.closest('[data-rpgo]'); if (rg) return rpickGo(rg.dataset.rpgo);
       const o = e.target.closest('[data-open]'); if (o) openSet(o.dataset.open);
     };
     jumpTop(keepY ? listY[psub] : 0);
@@ -563,6 +606,7 @@
   }
   function recordSet(id, r, t, wrongs, rights, sec) {
     S.sets[id] = { r, t, at: today(), d: lday(), sec };
+    const f = findSet(id); if (f) { S.hist.push({ id, kind: f.kind, title: f.set.title, r, t, sec, d: lday(), ts: Date.now() }); if (S.hist.length > 600) S.hist = S.hist.slice(-600); }
     rights.forEach((k) => { delete S.wrong[k]; }); wrongs.forEach((w) => { S.wrong[w.key] = w; });
     delete S.drafts[id]; save();
   }
@@ -829,13 +873,20 @@
         <div class="reveal"><button class="btn tone m-trans" data-reveal="${t.id}" aria-expanded="${shown}">${ic('i-eye')}${shown ? '收起参考译文' : '对照参考译文'}</button></div>
         ${shown ? `<div class="sample m-trans">${esc(t.en)}</div><div class="notes m-trans">${t.notes.map((n) => `<div class="nt">${ic('i-bulb')}<span>${esc(n)}</span></div>`).join('')}</div>` : ''}`;
     }
-    $('#wt-box').innerHTML = `<div class="wt-body">${hint ? wtHintBar(hint) : ''}${tabs + body}</div>`;
+    const list = wsub === 'write' ? WRITING : TRANSLATION, left = list.filter((x) => !wrote(x.id)).length;
+    const rnd = `<div class="wt-rand"><button class="btn tone ${wsub === 'write' ? 'm-write' : 'm-trans'}" data-wrand>${ic('i-redo')}随机一题</button><span>${left ? `没写过的还有 ${left} 题，只从这里抽` : '都写过了，随机抽一题再练'}</span></div>`;
+    $('#wt-box').innerHTML = `<div class="wt-body">${hint ? wtHintBar(hint) : ''}${tabs + rnd + body}</div>`;
     clearInterval(wtTick); syncClock(); if (wtClock) wtTick = setInterval(syncClock, 1000);
     $('#wt-box').onclick = (e) => {
       const s = e.target.closest('[data-wsub]'); if (s) return renderWT(s.dataset.wsub);
       const a = e.target.closest('[data-wsel]'); if (a) { wsel = +a.dataset.wsel; return renderWT(); }
       const b = e.target.closest('[data-tsel]'); if (b) { tsel = +b.dataset.tsel; return renderWT(); }
       if (e.target.closest('[data-hintx]')) { delete S.wtHint; save(); return renderWT(); }
+      if (e.target.closest('[data-wrand]')) {
+        const isW = wsub === 'write', list = isW ? WRITING : TRANSLATION, curI = isW ? wsel : tsel;
+        let idx = list.map((x, i) => i).filter((i) => !wrote(list[i].id) && i !== curI); if (!idx.length) idx = list.map((x, i) => i).filter((i) => i !== curI);
+        const i = idx[Math.floor(Math.random() * idx.length)]; if (isW) wsel = i; else tsel = i; return renderWT();
+      }
       // 展开范文 / 参考译文才算完成首页的「读 1 篇范文」
       const r = e.target.closest('[data-reveal]'); if (r) { reveal[r.dataset.reveal] = !reveal[r.dataset.reveal]; if (reveal[r.dataset.reveal]) { const d = lday(); S.plan[d] = Object.assign(S.plan[d] || {}, { wt: 1 }); save(); } renderWT(); if (reveal[r.dataset.reveal]) { const sm = $('#wt-box .sample'); if (sm) sm.scrollIntoView({ behavior: 'smooth', block: 'start' }); } return; }
       const c = e.target.closest('[data-wtclock]'); if (c) { const id = c.dataset.wtclock; wtClock = wtClock && wtClock.id === id ? null : { id, end: Date.now() + 30 * 60 * 1000 }; clearInterval(wtTick); syncClock(); if (wtClock) wtTick = setInterval(syncClock, 1000); }
@@ -911,6 +962,28 @@
   let meVocabAll = false;
   // 从别处直接打开某套题：切到听读 tab（对应听力 / 阅读子页），再打开这一套
   function goSet(id) { const f = findSet(id); if (!f) return false; psub = f.kind === 'listen' ? 'listen' : 'read'; show('practice'); openSet(id); return true; }
+  // 练习记录：各类型进度 + 按日期倒序的交卷记录（旧数据没有 S.hist 时用 S.sets 补一条）
+  let histAll = false;
+  function histHTML() {
+    const rows = [
+      ['六级题型听力', 'm-listen', LISTENING], ['真人常速听力', 'm-listen', REALS.filter((r) => r.org)], ['真人慢速听力', 'm-listen', REALS.filter(realSlow)],
+      ['仔细阅读', 'm-read', READING.mc], ['段落匹配', 'm-read', READING.match], ['选词填空', 'm-read', READING.cloze],
+      ['作文', 'm-write', WRITING], ['翻译', 'm-trans', TRANSLATION],
+    ].map(([n, m, list]) => { const dn = list.filter((x) => (m === 'm-write' || m === 'm-trans') ? wrote(x.id) : S.sets[x.id]).length; return `<div class="hp ${m}"><span class="hp-n">${n}</span><span class="bar"><i style="width:${list.length ? Math.round(dn / list.length * 100) : 0}%"></i></span><span class="hp-v">${dn}/${list.length}</span></div>`; }).join('');
+    const seen = new Set(S.hist.map((h) => h.id));
+    const legacy = Object.entries(S.sets).filter(([id]) => !seen.has(id)).map(([id, r]) => { const f = findSet(id); return f && { id, kind: f.kind, title: f.set.title, r: r.r, t: r.t, sec: r.sec, d: r.d || r.at || '', ts: 0 }; }).filter(Boolean);
+    const all = [...legacy, ...S.hist].sort((a, b) => (b.d || '').localeCompare(a.d || '') || b.ts - a.ts);
+    const papers = S.papers.slice().reverse();
+    const KN = { listen: '听力', mc: '仔细阅读', match: '段落匹配', cloze: '选词填空' };
+    const shown = histAll ? all : all.slice(0, 15);
+    let lastD = '';
+    const list = shown.map((h) => { const day = h.d !== lastD ? `<div class="hl-d">${esc(h.d || '更早')}</div>` : ''; lastD = h.d; const pct = h.t ? Math.round(h.r / h.t * 100) : 0;
+      return `${day}<div class="hl"><span class="hl-k">${KN[h.kind] || ''}</span><span class="hl-t">${esc(String(h.title).replace(/^[^·]+·\s*/, ''))}</span><span class="hl-s ${pct >= 80 ? 'good' : pct < 60 ? 'bad' : ''}">${h.r}/${h.t}</span>${h.sec ? `<span class="hl-m">${mmss(h.sec)}</span>` : ''}<button class="chip" data-wgo="${h.id}">再做</button></div>`; }).join('');
+    return `<div class="sec-h"><span class="ico m-listen">${ic('i-timer')}</span><h2>练习记录</h2><span class="more">共 ${all.length} 次${papers.length ? ` · 模拟卷 ${papers.length} 套` : ''}</span></div>
+      <div class="card hist"><div class="hp-grid">${rows}</div>
+        ${all.length ? `<div class="hl-list">${list}</div>${all.length > 15 ? `<div class="reveal" style="margin-top:8px"><button class="btn ghost" data-hall>${histAll ? '收起' : `显示全部 ${all.length} 条`}</button></div>` : ''}` : `<p class="lead" style="margin:12px 0 0">还没有交卷记录。去「听读」点「随机来一篇」开始吧。</p>`}
+        ${papers.length ? `<div class="hl-d">生成过的模拟卷</div><div class="hl-papers">${papers.slice(0, 12).map((p) => `<a class="chip" href="paper.html?seed=${encodeURIComponent(p.seed)}">卷号 ${esc(p.seed)} · ${esc(p.d)}</a>`).join('')}</div>` : ''}</div>`;
+  }
   function renderMe() {
     const st = stats(); const wrongs = Object.values(S.wrong).reverse(); // 新的在前（按加入顺序倒序）
     const unknownWords = ALLWORDS.filter((w) => S.vocab[w.id] === 0 || S.vocab[w.id] === 1);
@@ -927,6 +1000,7 @@
       </div>
       <div class="sec-h"><span class="ico m-read">${ic('i-x')}</span><h2>错题本</h2>${wrongs.length ? `<button class="more" data-clear>清空</button>` : ''}</div>
       ${wrongs.length ? groups.map(([k, xs]) => `<div class="wrong-grp"><div class="wg-h">${WK[k]}<span>${xs.length}</span></div>${xs.map(wrongHTML).join('')}</div>`).join('') : `<div class="empty">${ic('i-party')}还没有错题。</div>`}
+      ${histHTML()}
       <div class="sec-h"><span class="ico m-vocab">${ic('i-abc')}</span><h2>生词本</h2>${unknownWords.length ? `<button class="more" data-go-vocab>去复习 ${ic('i-chev-r')}</button>` : ''}</div>
       ${unknownWords.length ? `<div class="me-vtags">${vShow.map((w) => `<div class="mv"><b>${esc(w.w)}</b><span>${esc(w.c)}</span></div>`).join('')}</div>
         ${unknownWords.length > VN ? `<div class="reveal" style="margin-top:10px"><button class="btn ghost" data-vall>${meVocabAll ? '收起' : `展开全部 ${unknownWords.length} 个`}</button></div>` : ''}` : `<div class="empty">${ic('i-party')}还没有生词。去"单词"页刷闪卡，点"不认识"的会收进来。</div>`}
@@ -965,6 +1039,7 @@
       if (e.target.closest('[data-clear]') && confirm('清空错题本？')) { S.wrong = {}; save(); renderMe(); }
       const wg = e.target.closest('[data-wgo]'); if (wg) { goSet(wg.dataset.wgo); return; }
       const wd = e.target.closest('[data-wdel]'); if (wd) { delete S.wrong[wd.dataset.wdel]; save(); const y = window.scrollY; renderMe(); window.scrollTo(0, y); return; }
+      if (e.target.closest('[data-hall]')) { histAll = !histAll; const y = window.scrollY; renderMe(); window.scrollTo(0, y); return; }
       if (e.target.closest('[data-vall]')) { meVocabAll = !meVocabAll; const y = window.scrollY; renderMe(); window.scrollTo(0, y); }
     };
   }

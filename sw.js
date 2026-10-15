@@ -1,6 +1,6 @@
 // 网络优先：有网永远拿最新内容，没网用上次缓存的，联网打开过一次就能离线看
-const CACHE = 'cet6-v16';
-const CORE = ["./", "index.html", "assets/style.css?v=16", "assets/data-outline.js?v=16", "assets/data-vocab.js?v=16", "assets/data-practice.js?v=16", "assets/data-listening-2.js?v=16", "assets/data-listening-3.js?v=16", "assets/data-reading-2.js?v=16", "assets/data-reading-3.js?v=16", "assets/data-reading-4.js?v=16", "assets/data-writing-2.js?v=16", "assets/data-writing-3.js?v=16", "assets/data-vocab-2.js?v=16", "assets/data-vocab-3.js?v=16", "assets/data-vocab-ex.js?v=16", "assets/data-pastpapers.js?v=16", "assets/data-audio.js?v=16", "assets/data-real.js?v=16", "assets/chart.js?v=16", "assets/app.js?v=16", "paper.html", "assets/paper.js?v=16", "assets/paper.css?v=16", "manifest.json", "assets/icons/icon-192.png"];
+const CACHE = 'cet6-v17';
+const CORE = ["./", "index.html", "assets/style.css?v=17", "assets/data-outline.js?v=17", "assets/data-vocab.js?v=17", "assets/data-practice.js?v=17", "assets/data-listening-2.js?v=17", "assets/data-listening-3.js?v=17", "assets/data-reading-2.js?v=17", "assets/data-reading-3.js?v=17", "assets/data-reading-4.js?v=17", "assets/data-writing-2.js?v=17", "assets/data-writing-3.js?v=17", "assets/data-vocab-2.js?v=17", "assets/data-vocab-3.js?v=17", "assets/data-vocab-ex.js?v=17", "assets/data-pastpapers.js?v=17", "assets/data-audio.js?v=17", "assets/data-real.js?v=17", "assets/chart.js?v=17", "assets/app.js?v=17", "paper.html", "assets/paper.js?v=17", "assets/paper.css?v=17", "manifest.json", "assets/icons/icon-192.png"];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));
