@@ -101,8 +101,8 @@
     { k: 'write', n: '写作', w: 15, pts: 106.5, tip: '三段式 + 零低级错误 + 3 个加分句式，进 12 分档 ≈ 80 分。' },
     { k: 'trans', n: '翻译', w: 15, pts: 106.5, tip: '意思译全、句子完整、长句拆短，11 分档 ≈ 75 分。' },
   ];
-  let splitSel = 'read';
-  const splitInfo = (sp) => `<div class="k">${sp.pts}</div><div><b>${sp.n}</b> 满分 ${sp.pts} 分</div><div>${sp.tip}</div>`;
+  let splitSel = '';
+  const splitInfo = (sp) => `<b>${sp.n} · ${sp.pts} 分</b><span>${sp.tip}</span>`;
   // 今天的四件事：按真实行为判定完成，点卡片只负责跳转
   // 单词 = 今日队列刷完；听力 / 阅读 = 当天有该类型交卷记录（S.sets[id].d，旧记录退回 at）；范文 = 当天展开过「对照范文 / 参考译文」（写译页打点 S.plan[日期].wt）
   function planStatus() {
@@ -114,51 +114,60 @@
   const chDone = (c) => c.points.filter((p, i) => S.mastered[ptKey(c, i)]).length;
   function renderHome() {
     const st = stats(); const ps = planStatus();
+    // 四件事：标题一行 + 进度一行，长说明去掉
     const plan = [
-      { id: 'vocab', mod: 'vocab', t: `背 ${S.vnew} 个新词 + 复习`, s: ps.vocab ? '今日单词已刷完' : `今日单词 ${ps.vDone}/${ps.vTot}，生词隔天再刷`, view: 'vocab' },
-      { id: 'listen', mod: 'listen', t: '做 1 篇听力', s: '长对话或讲座，交卷后对着原文精听', view: 'practice', sub: 'listen' },
-      { id: 'read', mod: 'read', t: '做 1 篇阅读', s: '仔细阅读优先，12 分钟计时，错题看解析', view: 'practice', sub: 'read' },
-      { id: 'wt', mod: 'write', t: '读 1 篇范文', s: '打开写译页，把高亮句抄进自己的模板', view: 'wt' },
+      { id: 'vocab', mod: 'vocab', t: `背 ${S.vnew} 个新词 + 复习`, p: ps.vTot ? `${ps.vDone}/${ps.vTot}` : '今日无词', f: ps.vTot ? ps.vDone / ps.vTot : 1, view: 'vocab' },
+      { id: 'listen', mod: 'listen', t: '做 1 篇听力', p: ps.listen ? '1/1' : '0/1', f: ps.listen ? 1 : 0, view: 'practice', sub: 'listen' },
+      { id: 'read', mod: 'read', t: '做 1 篇阅读', p: ps.read ? '1/1' : '0/1', f: ps.read ? 1 : 0, view: 'practice', sub: 'read' },
+      { id: 'wt', mod: 'write', t: '读 1 篇范文', p: ps.wt ? '1/1' : '0/1', f: ps.wt ? 1 : 0, view: 'wt' },
     ];
     const nDone = plan.filter((p) => ps[p.id]).length;
+    const next = plan.find((p) => !ps[p.id]);
+    const exams = Array.isArray(S.exams) ? S.exams : [];
+    const lastEx = exams.length ? exams[exams.length - 1] : null;
     const sp = SPLIT.find((s) => s.k === splitSel);
-    const wide = matchMedia('(min-width:720px)').matches;
+    const stat = (cls, v, l, unit) => `<div class="hs-cell ${cls}"><div class="v">${v}${unit ? `<small>${unit}</small>` : ''}</div><div class="l">${l}</div></div>`;
     $('#home-box').innerHTML = `
-      <div class="hero">
-        <div class="hero-main">
+      <section class="hm-hero">
+        <div class="hm-hero-tx">
           <h1>目标 <b>500</b>，按分值分配精力</h1>
-          <p>六级满分 710，听力和阅读各占 35%。先把单题分值最高的仔细阅读和讲座练稳，写作翻译用模板保底、再靠加分句式抬一档，500 分留足了过 425 的余量。</p>
-          <div class="acts"><button class="btn w" data-go="practice">${ic('i-ear')}开始练习</button><button class="btn" data-go="vocab">${ic('i-abc')}背单词</button><button class="btn" data-go="outline">${ic('i-target')}看考点</button><button class="btn" data-go="exam">${ic('i-clip')}在线模考</button><a class="btn" href="paper.html">${ic('i-pen')}打印模拟卷</a></div>
+          <p>先练稳仔细阅读和讲座，写作翻译用模板保底。</p>
         </div>
-        <div class="hero-side">
-          <div class="stat-tiles">
-            <div class="tile m-vocab"><div class="v">${st.known}<small>/ ${ALLWORDS.length}</small></div><div class="l">认识的词</div></div>
-            <div class="tile m-read"><div class="v">${st.setsDone}</div><div class="l">做过的练习</div></div>
-            <div class="tile m-listen"><div class="v">${st.acc === null ? '—' : st.acc + '<small>%</small>'}</div><div class="l">正确率</div></div>
-          </div>
-          <details class="score-split"${wide ? ' open' : ''}>
-            <summary><h3>${ic('i-target')}710 分怎么拆<small>点一段看策略</small><span class="caret">${ic('i-chev-r')}</span></h3></summary>
-            <div class="split-bar">${SPLIT.map((s) => `<button class="${MOD[s.k]}" style="--w:${s.w}" data-split="${s.k}" aria-pressed="${s.k === splitSel}">${s.n} ${s.w}%</button>`).join('')}</div>
-            <div class="split-info ${MOD[sp.k]}">${splitInfo(sp)}</div>
-          </details>
+        <div class="hm-hero-acts">
+          ${next ? `<button class="btn w" data-go="${next.view}" data-plan="${next.id}" data-sub="${next.sub || ''}">${ic('i-flame')}继续今天的任务</button>` : `<button class="btn w" data-go="practice">${ic('i-ear')}开始练习</button>`}
+          <button class="btn" data-go="exam">${ic('i-clip')}在线模考</button>
         </div>
-        <div class="home-plan">
-          <div class="sec-h"><span class="ico m-exam">${ic('i-flame')}</span><h2>今天的四件事</h2><span class="more">${nDone}/4 完成</span></div>
-          <div class="plan">${plan.map((p, i) => `<button class="card ${MOD[p.mod]} ${ps[p.id] ? 'done' : ''}" data-plan="${p.id}" data-go="${p.view}" data-sub="${p.sub || ''}"><span class="n">${ps[p.id] ? ic('i-check') : i + 1}</span><span><b>${esc(p.t)}</b><span>${esc(p.s)}</span></span></button>`).join('')}</div>
-        </div>
+        <div class="hm-quick"><span>快捷入口</span><button data-go="vocab">${ic('i-abc')}背单词</button><button data-go="outline">${ic('i-target')}看考点</button><a href="paper.html">${ic('i-pen')}打印模拟卷</a></div>
+      </section>
+
+      <div class="sec-h hm-h"><span class="ico m-exam">${ic('i-flame')}</span><h2>今天的四件事</h2><span class="more">${nDone}/4 完成</span></div>
+      <div class="hm-plan">${plan.map((p, i) => `<button class="hm-task ${MOD[p.mod]} ${ps[p.id] ? 'done' : ''}" data-plan="${p.id}" data-go="${p.view}" data-sub="${p.sub || ''}"><span class="n">${ps[p.id] ? ic('i-check') : i + 1}</span><b>${esc(p.t)}</b><span class="pg"><span class="bar"><i style="width:${Math.round(p.f * 100)}%"></i></span><span class="tx">${ps[p.id] ? '已完成' : esc(p.p)}</span></span></button>`).join('')}</div>
+
+      <div class="sec-h hm-h"><span class="ico m-read">${ic('i-target')}</span><h2>我的进度</h2></div>
+      <div class="hm-stats">
+        ${stat('m-vocab', st.known, '认识的词', '/' + ALLWORDS.length)}
+        ${stat('m-read', st.setsDone, '做过的练习')}
+        ${stat('m-listen', st.acc === null ? '—' : st.acc, '正确率', st.acc === null ? '' : '%')}
+        ${stat('m-write', `<span id="stM">${st.m}</span>`, '考点掌握', '/' + totalPts)}
+        ${stat('m-exam', lastEx ? lastEx.total : '—', '最近模考', lastEx ? '/710' : '')}
+      </div>
+      <div class="hm-split">
+        <div class="hm-split-h"><b>710 分怎么拆</b><small>点一段看策略</small></div>
+        <div class="split-bar">${SPLIT.map((s) => `<button class="${MOD[s.k]}" style="--w:${s.w}" data-split="${s.k}" aria-pressed="${s.k === splitSel}">${s.n}<span class="pct"> ${s.w}%</span></button>`).join('')}</div>
+        <div class="hm-split-info ${sp ? MOD[sp.k] : ''}"${sp ? '' : ' hidden'}>${sp ? splitInfo(sp) : ''}</div>
       </div>
 
-      <div class="sec-h"><span class="ico">${ic('i-book')}</span><h2>考点与策略</h2><span class="more" id="ptCount">${st.m}/${totalPts} 已掌握</span></div>
-      <div class="mod-grid">${CHAPTERS.map((c) => `<button class="mod ${MOD[c.id]}" data-go="outline" data-ch="${c.id}"><span class="ico">${c.icon}</span><b>${esc(c.name)}</b><span>${esc(c.intro)}</span><div class="bar"><i data-chbar="${c.id}" style="width:${chDone(c) / c.points.length * 100}%"></i></div></button>`).join('')}</div>
-      ${typeof PAST !== 'undefined' && PAST.length ? `<div class="sec-h"><span class="ico m-exam">${ic('i-timer')}</span><h2>近十年真题回顾</h2><span class="more">${PAST.length} 套 · ${PAST[PAST.length - 1].y}–${PAST[0].y}</span></div>
-      <p class="lead">只收每套的作文题、翻译主题和阅读 / 听力话题（原卷受版权保护，不收原文）。看规律、对着练，比盲刷更有用。</p>
-      <button class="btn primary" data-go="past">${ic('i-timer')}打开真题索引</button>` : ''}
+      <div class="sec-h hm-h"><span class="ico">${ic('i-book')}</span><h2>考点与策略</h2><span class="more" id="ptCount">${st.m}/${totalPts} 已掌握</span></div>
+      <div class="hm-mods">${CHAPTERS.map((c) => `<button class="hm-mod ${MOD[c.id]}" data-go="outline" data-ch="${c.id}"><span class="ico">${c.icon}</span><b>${esc(c.name)}</b><span class="d">${esc(c.intro)}</span><span class="pg"><span class="bar"><i data-chbar="${c.id}" style="width:${chDone(c) / c.points.length * 100}%"></i></span><span class="tx" data-chct="${c.id}">${chDone(c)}/${c.points.length}</span></span></button>`).join('')}</div>
+      ${typeof PAST !== 'undefined' && PAST.length ? `<div class="sec-h hm-h"><span class="ico m-exam">${ic('i-timer')}</span><h2>近十年真题回顾</h2><span class="more">${PAST.length} 套 · ${PAST[PAST.length - 1].y}–${PAST[0].y}</span></div>
+      <div class="hm-past"><p>作文题、翻译主题和阅读 / 听力话题索引，看规律、对着练。</p><button class="btn primary" data-go="past">${ic('i-timer')}打开真题索引</button></div>` : ''}
       <div id="outline-anchor"></div>
       <div id="outline-box" hidden></div>
       <div id="past-box" hidden></div>`;
     $('#home-box').onclick = (e) => {
       // 分值条：只换说明，不重绘整页（手机上折叠面板保持展开）
-      const sb = e.target.closest('[data-split]'); if (sb) { splitSel = sb.dataset.split; const s2 = SPLIT.find((s) => s.k === splitSel); document.querySelectorAll('[data-split]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.split === splitSel)); const info = $('.split-info'); info.className = 'split-info ' + MOD[s2.k]; info.innerHTML = splitInfo(s2); return; }
+      // 再点同一段收起说明
+      const sb = e.target.closest('[data-split]'); if (sb) { splitSel = splitSel === sb.dataset.split ? '' : sb.dataset.split; const s2 = SPLIT.find((s) => s.k === splitSel); document.querySelectorAll('[data-split]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.split === splitSel)); const info = $('.hm-split-info'); info.hidden = !s2; info.className = 'hm-split-info ' + (s2 ? MOD[s2.k] : ''); info.innerHTML = s2 ? splitInfo(s2) : ''; return; }
       const g = e.target.closest('[data-go]'); if (!g) return;
       if (g.dataset.plan === 'vocab' && S.vsrc !== 'daily') { S.vsrc = 'daily'; save(); vq = []; }
       if (g.dataset.go === 'outline') return openOutline(g.dataset.ch);
@@ -198,6 +207,8 @@
       const cc = $('#chCount'); if (cc) cc.textContent = `${chDone(c)}/${c.points.length} 已掌握`;
       const pc = $('#ptCount'); if (pc) pc.textContent = `${stats().m}/${totalPts} 已掌握`;
       const bar = document.querySelector(`[data-chbar="${c.id}"]`); if (bar) bar.style.width = chDone(c) / c.points.length * 100 + '%';
+      const ct = document.querySelector(`[data-chct="${c.id}"]`); if (ct) ct.textContent = `${chDone(c)}/${c.points.length}`;
+      const sm = $('#stM'); if (sm) sm.textContent = stats().m;
     };
   }
 

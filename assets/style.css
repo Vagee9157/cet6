@@ -1035,3 +1035,106 @@ mark.loc{background:color-mix(in srgb,var(--amber) 38%,transparent);color:inheri
 .wt-grade{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;margin-top:10px}
 .wt-grade span{font-size:12.5px;color:var(--ink-dim);flex:1 1 200px}
 .wt-gres:not(:empty){margin-top:10px;background:var(--paper-2);border-radius:12px;padding:12px}
+
+
+/* ===== 首页重排 ===== */
+/* 统一节奏：区块间距 28px、卡片圆角 --r-s、内边距 16px、标题 18px；栅格等宽等高 */
+#home-box{--hm-gap:12px}
+#home-box .hm-h{margin:28px 0 12px}
+#home-box .hm-h h2{font-size:18px}
+#home-box .hm-h .ico{width:30px;height:30px;font-size:16px}
+/* hero：一句标题 + 一句副标题，主次两个按钮，其他入口收进一行小链接 */
+.hm-hero{border-radius:var(--r);padding:24px;color:#fff;background:linear-gradient(135deg,#6d5df5 0%,#4f46e5 55%,#3b2fb8 100%);box-shadow:0 14px 36px rgba(79,70,229,.24);display:grid;grid-template-columns:1fr;gap:16px;margin-top:4px}
+.hm-hero h1{font-size:clamp(22px,3.2vw,30px);line-height:1.25;margin:0 0 6px}
+.hm-hero h1 b{font-size:1.35em;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+.hm-hero p{margin:0;color:rgba(255,255,255,.86);font-size:14.5px}
+.hm-hero-acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hm-hero-acts .btn{background:rgba(255,255,255,.14);color:#fff;box-shadow:none;border:1px solid rgba(255,255,255,.28);min-height:44px}
+.hm-hero-acts .btn.w{background:#fff;color:#3730a3;border-color:#fff}
+.hm-quick{display:flex;align-items:center;flex-wrap:wrap;gap:4px 6px;padding-top:12px;border-top:1px solid rgba(255,255,255,.18);font-size:13px}
+.hm-quick>span{color:rgba(255,255,255,.66);font-weight:600;margin-right:4px}
+.hm-quick button,.hm-quick a{display:inline-flex;align-items:center;gap:5px;color:#fff;font-weight:700;font-size:13px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.1);text-decoration:none;min-height:32px}
+.hm-quick button:hover,.hm-quick a:hover{background:rgba(255,255,255,.2)}
+@media (pointer:coarse){.hm-quick button,.hm-quick a{min-height:40px}}
+@media (min-width:720px){
+  .hm-hero{grid-template-columns:minmax(0,1fr) auto;align-items:center;padding:28px 32px;column-gap:32px}
+  .hm-hero-acts{display:flex}
+  .hm-hero-acts .btn{padding:11px 20px}
+  .hm-quick{grid-column:1/-1}
+}
+/* 四件事：等宽等高四宫格；手机 2 列 */
+.hm-plan{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--hm-gap)}
+@media (min-width:960px){.hm-plan{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.hm-task{text-align:left;background:var(--paper);border-radius:var(--r-s);box-shadow:var(--shadow);padding:16px;display:grid;grid-template-rows:auto 1fr auto;gap:10px;min-height:132px;border:1.5px solid transparent;transition:transform .15s,box-shadow .15s}
+.hm-task:hover{transform:translateY(-2px);box-shadow:var(--shadow-2)}
+.hm-task .n{width:30px;height:30px;border-radius:9px;background:var(--cs);color:var(--c);display:grid;place-items:center;font-weight:800;font-size:14px}
+.hm-task b{font-size:15px;line-height:1.35;color:var(--ink)}
+.hm-task.done{border-color:color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok-soft) 55%,var(--paper))}
+.hm-task.done .n{background:var(--ok);color:#fff}
+.hm-task.done b{color:var(--ink-soft)}
+.pg{display:flex;align-items:center;gap:10px;min-width:0}
+.pg .bar{flex:1;height:6px}
+.pg .tx{font-size:12.5px;font-weight:700;color:var(--ink-dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+.hm-task.done .pg .tx{color:var(--ok)}
+.hm-task.done .bar i{background:var(--ok)}
+/* 我的进度：一条等宽统计条 */
+.hm-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));background:var(--paper);border-radius:var(--r-s);box-shadow:var(--shadow)}
+.hs-cell{padding:16px 8px;text-align:center;min-width:0}
+.hs-cell+.hs-cell{border-left:1px solid var(--line)}
+.hs-cell .v{font-size:24px;font-weight:800;letter-spacing:-.02em;line-height:1.15;color:var(--c);font-variant-numeric:tabular-nums;white-space:nowrap}
+.hs-cell .v small{font-size:12.5px;font-weight:600;color:var(--ink-dim);margin-left:1px}
+.hs-cell .l{font-size:12.5px;font-weight:600;color:var(--ink-dim);margin-top:4px;white-space:nowrap}
+@media (max-width:519px){
+  .hs-cell{padding:14px 2px}
+  .hs-cell .v{font-size:19px}
+  .hs-cell .v small{display:none}
+  .hs-cell .l{font-size:11.5px}
+}
+/* 710 分怎么拆：通栏，说明点开才显示 */
+.hm-split{margin-top:var(--hm-gap);background:var(--paper);border-radius:var(--r-s);box-shadow:var(--shadow);padding:16px;display:grid;gap:12px}
+.hm-split-h{display:flex;align-items:baseline;gap:10px}
+.hm-split-h b{font-size:15px}
+.hm-split-h small{margin-left:auto;font-size:12.5px;font-weight:600;color:var(--ink-dim)}
+.hm-split .split-bar{min-height:40px}
+.hm-split .split-bar button[aria-pressed="true"]{outline:3px solid var(--ink);outline-offset:-3px}
+.hm-split-info{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;font-size:13.5px;color:var(--ink-soft);padding:10px 12px;border-radius:var(--r-xs);background:var(--cs)}
+.hm-split-info[hidden]{display:none}
+.hm-split-info b{color:var(--c);font-weight:800;white-space:nowrap}
+@media (max-width:519px){.hm-split .split-bar button{font-size:12px}}
+/* 考点与策略：等高卡片，去装饰圆，描述限 2 行，进度统一贴底 */
+.hm-mods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--hm-gap)}
+@media (min-width:960px){.hm-mods{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.hm-mod{text-align:left;background:var(--paper);border-radius:var(--r-s);box-shadow:var(--shadow);padding:16px;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto 1fr auto;column-gap:12px;row-gap:8px;align-items:center;transition:transform .15s,box-shadow .15s}
+.hm-mod:hover{transform:translateY(-2px);box-shadow:var(--shadow-2)}
+.hm-mod .ico{width:36px;height:36px;border-radius:10px;background:var(--cs);color:var(--c);display:grid;place-items:center;font-size:18px}
+.hm-mod b{font-size:15.5px;min-width:0}
+.hm-mod .d{grid-column:1/-1;align-self:start;font-size:13px;line-height:1.55;color:var(--ink-mute);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:calc(2 * 1.55em)}
+.hm-mod .pg{grid-column:1/-1}
+@media (max-width:519px){
+  .hm-mods{grid-template-columns:1fr}
+  .hm-mod .d{min-height:0}
+  .hm-task{min-height:118px;padding:14px}
+  .hm-task b{font-size:14.5px}
+}
+/* 真题回顾：一张卡，说明一行 + 按钮 */
+.hm-past{background:var(--paper);border-radius:var(--r-s);box-shadow:var(--shadow);padding:16px;display:flex;align-items:center;gap:12px 16px;flex-wrap:wrap}
+.hm-past p{margin:0;flex:1 1 260px;font-size:14px;color:var(--ink-soft)}
+@media (max-width:519px){.hm-past .btn{width:100%}}
+/* 首页重排：四件事卡片序号与标题同一行，进度贴底 */
+.hm-task{grid-template-columns:auto minmax(0,1fr);grid-template-rows:1fr auto;column-gap:12px;row-gap:14px;align-items:center;min-height:0}
+.hm-task .pg{grid-column:1/-1}
+@media (max-width:519px){
+  .hm-task{grid-template-columns:1fr;grid-template-rows:auto 1fr auto;row-gap:10px;min-height:0}
+  .hm-task .pg{grid-column:auto}
+  .hm-quick>span{display:none}
+  .hm-quick{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .hm-quick button,.hm-quick a{justify-content:center;padding:6px 4px;white-space:nowrap;font-size:12.5px}
+  .hm-split .split-bar .pct{display:none}
+  .hm-hero{padding:20px}
+}
+.hm-split .split-bar .pct{margin-left:.3em}
+.hm-split .split-bar button[aria-pressed="true"]{outline:2px solid rgba(255,255,255,.9);outline-offset:-5px;filter:none}
+/* 首页重排：深色模式分值条底色变浅，文字改深色保证对比 */
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .hm-split .split-bar button{color:#12111c}:root:not([data-theme="light"]) .hm-split .split-bar button[aria-pressed="true"]{outline-color:rgba(18,17,28,.85)}}
+:root[data-theme="dark"] .hm-split .split-bar button{color:#12111c}
+:root[data-theme="dark"] .hm-split .split-bar button[aria-pressed="true"]{outline-color:rgba(18,17,28,.85)}
