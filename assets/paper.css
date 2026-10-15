@@ -155,3 +155,54 @@ body { background: #d9d9de; color: var(--ink); font-family: var(--en); font-size
 .wchart .ch-grid{stroke:#ccc;stroke-width:.6}
 .wchart .ch-c0{fill:#6b6b6b}.wchart .ch-c1{fill:#a3a3a3}.wchart .ch-c2{fill:#d4d4d4}.wchart .ch-c3{fill:#efefef;stroke:#555;stroke-width:.6}
 .wchart rect.ch-c0+text.ch-v{fill:#000}
+
+/* ===== 答题卡写作区刻度 / 听力篇目链接 / 答案页：分值换算、提纲、评分档、关键词 ===== */
+.slink { color: inherit; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
+.lines.ticks div { position: relative; }
+.lines .tk { position: absolute; right: -6.5mm; width: 6mm; bottom: .5mm; font-family: var(--en); font-size: 6.5pt; color: var(--dim); line-height: 1; text-align: left; }
+.cardsec.write .lines.ticks { margin-right: 6.5mm; overflow: visible; }
+.cardsec.write { overflow: hidden; }
+.kol { margin: 0 0 1.5mm; padding-left: 6mm; font-family: var(--zh); font-size: 9.5pt; line-height: 1.6; }
+table.rub, table.score { width: 100%; border-collapse: collapse; font-family: var(--zh); font-size: 9pt; margin: 0 0 1.5mm; }
+table.rub th, table.rub td, table.score th, table.score td { border: .3mm solid #000; padding: .8mm 1.6mm; text-align: left; vertical-align: top; line-height: 1.45; }
+table.rub td:nth-child(-n+2), table.rub th:nth-child(-n+2) { white-space: nowrap; }
+table.score td, table.score th { text-align: center; white-space: nowrap; }
+table.score td.blankc { min-width: 18mm; color: var(--dim); }
+table.score tr.tot td { font-weight: 700; }
+.kkeys { display: grid; grid-template-columns: 1fr 1fr; gap: .6mm 6mm; font-size: 9.5pt; margin-bottom: 1.5mm; }
+.kkeys .zh { font-family: var(--zh); font-weight: 700; margin-right: 2mm; }
+@media print { .slink { text-decoration: none; } }
+
+/* ===== 手机（≤719px）：工具条不固定、两行以内；A4 页按屏宽流式排版（分页仍按 A4 计算，打印不受影响） ===== */
+@media screen and (max-width: 719px) {
+  .bar { position: static; padding: 8px 12px; gap: 6px 8px; font-size: 12.5px; }
+  .bar b { width: auto; margin-right: auto; }
+  .bar button, .bar a { padding: 5px 9px; border-radius: 8px; }
+  .bar label { order: 5; font-weight: 500; gap: 4px; }
+  .bar .lg, .bar .st { display: none; }
+  .bar > span:not(.st) { order: 6; }
+  #paper:not(.measuring) { padding: 8px 8px 16px; }
+  #paper:not(.measuring) .page { width: auto; height: auto; overflow: visible; margin: 0 0 10px; border-radius: 6px; }
+  #paper:not(.measuring) .page .body { position: static; height: auto; overflow: visible; padding: 16px 14px 4px; }
+  #paper:not(.measuring) .page .pf { position: static; padding: 6px 0 12px; font-size: 11px; color: #666; }
+  #paper:not(.measuring) .page .ph { position: static; margin: 0 14px; padding-top: 10px; }
+  #paper:not(.measuring) .part { grid-template-columns: auto 1fr auto; gap: 2mm; font-size: 12pt; }
+  #paper:not(.measuring) .opts.c4 { grid-template-columns: 1fr 1fr; }
+  #paper:not(.measuring) .opts.c2 { grid-template-columns: 1fr; }
+  #paper:not(.measuring) .card { height: auto; }
+  #paper:not(.measuring) .card .hd { grid-template-columns: 1fr; }
+  #paper:not(.measuring) .card .hd .row { flex-wrap: wrap; white-space: normal; }
+  #paper:not(.measuring) .bgrid { flex-wrap: wrap; justify-content: flex-start; gap: 3mm 5mm !important; }
+  #paper:not(.measuring) .lines { flex: none; }
+  #paper:not(.measuring) .lines:not(.ticks) div:nth-child(n+17) { display: none; }
+  #paper:not(.measuring) .ktab { grid-template-columns: repeat(5, 1fr); }
+  #paper:not(.measuring) table.score { font-size: 8pt; }
+  #paper:not(.measuring) table.score th, #paper:not(.measuring) table.score td { padding: .6mm 1mm; white-space: normal; }
+  #paper:not(.measuring) table.score td.blankc { min-width: 0; }
+  #paper:not(.measuring) .kkeys { grid-template-columns: 1fr; }
+  #paper:not(.measuring) .wbox { padding: 4mm; font-size: 11pt; }
+  #paper:not(.measuring) .cv-title { font-size: 20pt; letter-spacing: .2em; margin-right: -.2em; }
+}
+/* 答题卡 1：写作区要放得下 200 词（≥ 20 行），行距收到 6.6mm、准考证号涂卡格压扁一点腾空间 */
+.lines.ticks div { height: 6.6mm; }
+.card .zkz td { height: 2.7mm; line-height: 2.7mm; }

@@ -44,11 +44,11 @@
 
   // ---------- 连续题号 ----------
   let n = 0; const num = () => ++n;
-  const numbered = []; // {n, ans, part, exp, letters}
+  const numbered = []; // {n, ans, part, sec, exp, letters}；sec = conv / pas / lec / cloze / match / mc，用于答案页的分值换算
   const listenQs = []; // 听力：每题对应的篇目与题干（放进教师用原文）
-  const mcItems = (qs, part, withStem) => qs.map((q) => {
+  const mcItems = (qs, part, withStem, sec) => qs.map((q) => {
     const i = num();
-    numbered.push({ n: i, ans: K[q.a], part, exp: q.exp, letters: K });
+    numbered.push({ n: i, ans: K[q.a], part, sec, exp: q.exp, letters: K });
     if (part === 'listen') listenQs.push({ n: i, q: q.q });
     const stem = (part === 'read' || withStem) ? `<div class="stem">${esc(q.q)}</div>` : '';
     return blk(`<div class="q"><span class="qn">${i}.</span><div>${stem}${optsHtml(q.opts)}</div></div>`);
@@ -83,25 +83,26 @@
 
     // Part II 听力
     B.push(blk(partHtml(2, 'Listening Comprehension', 30), { keep: true, brk: true }));
-    B.push(blk(`<div class="note">录音：本站「听读」按顺序播放 ${listenSets.map((x, k) => `${k + 1}. ${esc(cleanTitle(x.title))}`).join('；')}。</div>`, { keep: true }));
-    const listenSec = (sets, sec, dir, label) => {
+    // 篇目做成链接：点了回主站直接打开这一套（index.html#set=<id>，由 app.js 启动时识别）
+    B.push(blk(`<div class="note">录音：本站「听读」按顺序播放 ${listenSets.map((x, k) => `<a class="slink" href="index.html#set=${encodeURIComponent(x.id)}" target="_blank" rel="noopener">${k + 1}. ${esc(cleanTitle(x.title))}</a>`).join('；')}。</div>`, { keep: true }));
+    const listenSec = (sets, sec, dir, label, key) => {
       if (!sets.length) return;
       B.push(blk(`<div class="sec">Section ${sec}</div>`, { keep: true }));
       B.push(blk(dirHtml(dir), { keep: true }));
       sets.forEach((s) => {
         const a = n + 1, b = n + s.questions.length;
         B.push(blk(`<p class="qb">Questions ${a} ${b > a ? `to ${b} are` : 'is'} based on the ${label} you have just heard.</p>`, { keep: true }));
-        B.push(...mcItems(s.questions, 'listen', withStem));
+        B.push(...mcItems(s.questions, 'listen', withStem, key));
       });
     };
-    listenSec(conv, 'A', `In this section, you will hear ${plural(conv.length, 'long conversation')}. At the end of each conversation, you will hear ${qCountPhrase(conv)} questions. Both the conversation and the questions will be spoken only once. After you hear a question, you must choose the best answer from the four choices marked A), B), C) and D). Then mark the corresponding letter on Answer Sheet 1 with a single line through the centre.`, 'conversation');
-    listenSec(pas, 'B', `In this section, you will hear ${plural(pas.length, 'passage')}. At the end of each passage, you will hear ${qCountPhrase(pas)} questions. Both the passage and the questions will be spoken only once. After you hear a question, you must choose the best answer from the four choices marked A), B), C) and D). Then mark the corresponding letter on Answer Sheet 1 with a single line through the centre.`, 'passage');
-    listenSec(lec, 'C', `In this section, you will hear ${plural(lec.length, 'recording')} of lectures or talks followed by ${qCountPhrase(lec)} questions. The recordings will be played only once. After you hear a question, you must choose the best answer from the four choices marked A), B), C) and D). Then mark the corresponding letter on Answer Sheet 1 with a single line through the centre.`, 'recording');
+    listenSec(conv, 'A', `In this section, you will hear ${plural(conv.length, 'long conversation')}. At the end of each conversation, you will hear ${qCountPhrase(conv)} questions. Both the conversation and the questions will be spoken only once. After you hear a question, you must choose the best answer from the four choices marked A), B), C) and D). Then mark the corresponding letter on Answer Sheet 1 with a single line through the centre.`, 'conversation', 'conv');
+    listenSec(pas, 'B', `In this section, you will hear ${plural(pas.length, 'passage')}. At the end of each passage, you will hear ${qCountPhrase(pas)} questions. Both the passage and the questions will be spoken only once. After you hear a question, you must choose the best answer from the four choices marked A), B), C) and D). Then mark the corresponding letter on Answer Sheet 1 with a single line through the centre.`, 'passage', 'pas');
+    listenSec(lec, 'C', `In this section, you will hear ${plural(lec.length, 'recording')} of lectures or talks followed by ${qCountPhrase(lec)} questions. The recordings will be played only once. After you hear a question, you must choose the best answer from the four choices marked A), B), C) and D). Then mark the corresponding letter on Answer Sheet 1 with a single line through the centre.`, 'recording', 'lec');
 
     // Part III 阅读 · Section A 选词填空
     B.push(blk(partHtml(3, 'Reading Comprehension', 40), { keep: true, brk: true }));
     const clozeNums = cloze.answers.map(() => num());
-    cloze.answers.forEach((a, i) => numbered.push({ n: clozeNums[i], ans: a, part: 'read', exp: cloze.exp[i], letters: cloze.bank.map((b) => b[0]) }));
+    cloze.answers.forEach((a, i) => numbered.push({ n: clozeNums[i], ans: a, part: 'read', sec: 'cloze', exp: cloze.exp[i], letters: cloze.bank.map((b) => b[0]) }));
     B.push(blk(`<div class="sec">Section A</div>`, { keep: true }));
     B.push(blk(dirHtml(`In this section, there is a passage with ${word(clozeNums.length)} blanks. You are required to select one word for each blank from a list of choices given in a word bank following the passage. Read the passage through carefully before making your choices. Each choice in the bank is identified by a letter. Please mark the corresponding letter for each item on Answer Sheet 2 with a single line through the centre. You may not use any of the words in the bank more than once.`), { keep: true }));
     B.push(blk(`<p class="qb">Questions ${clozeNums[0]} to ${clozeNums[clozeNums.length - 1]} are based on the following passage.</p>`, { keep: true }));
@@ -111,7 +112,8 @@
 
     // Section B 段落匹配
     const mNums = match.items.map(() => num());
-    match.items.forEach((it, i) => numbered.push({ n: mNums[i], ans: it.a, part: 'read', exp: '', letters: match.paras.map(([l]) => l) }));
+    // 段落匹配解析：题库有 exp 就用，没有就给定位段
+    match.items.forEach((it, i) => numbered.push({ n: mNums[i], ans: it.a, part: 'read', sec: 'match', exp: it.exp || `定位：${it.a} 段`, letters: match.paras.map(([l]) => l) }));
     B.push(blk(`<div class="sec">Section B</div>`, { keep: true }));
     B.push(blk(dirHtml(`In this section, you are going to read a passage with ${word(mNums.length)} statements attached to it. Each statement contains information given in one of the paragraphs. Identify the paragraph from which the information is derived. You may choose a paragraph more than once. Each paragraph is marked with a letter. Answer the questions by marking the corresponding letter on Answer Sheet 2.`), { keep: true }));
     match.paras.forEach(([l, p]) => B.push(blk(`<p class="pp lab"><span class="pl">${esc(l)})</span>${esc(p)}</p>`)));
@@ -124,11 +126,11 @@
       B.push(blk(`<div class="sec">Passage ${['One', 'Two', 'Three'][i]}</div>`, { keep: true }));
       B.push(blk(`<p class="qb">Questions ${n + 1} to ${n + s.questions.length} are based on the following passage.</p>`, { keep: true }));
       s.text.split('\n').filter((p) => p.trim()).forEach((p) => B.push(blk(`<p class="pp">${esc(p)}</p>`)));
-      B.push(...mcItems(s.questions, 'read'));
+      B.push(...mcItems(s.questions, 'read', false, 'mc'));
     });
 
     // Part IV 翻译
-    B.push(blk(partHtml(4, 'Translation', 30), { keep: true }));
+    B.push(blk(partHtml(4, 'Translation', 30), { keep: true, brk: true })); // 翻译单独成页
     B.push(blk(dirHtml('For this part, you are allowed 30 minutes to translate a passage from Chinese into English. You should write your answer on Answer Sheet 2.'), { keep: true }));
     T.zh.split('\n').filter((p) => p.trim()).forEach((p) => B.push(blk(`<p class="zh">${esc(p)}</p>`)));
     return B;
@@ -146,7 +148,8 @@
       <div class="tips"><b>注意事项</b>：1. 用 2B 铅笔填涂，正确填涂示例<span class="mark"></span>，每题只涂一个选项；2. 写作、翻译用黑色签字笔在规定区域内作答，超出区域无效；3. 保持卡面整洁，不得折叠、不得使用涂改液。</div>
     </div>${grid ? zkzGrid() : `<div class="zkz" style="align-self:end;font-family:var(--zh);font-size:8pt;text-align:right">缺考标记 □<br>（考生禁填）</div>`}</div>`;
 
-  const LINES = `<div class="lines">${'<div></div>'.repeat(40)}</div>`; // 实线横格，多出的被裁掉
+  // 实线横格，放不下的被裁掉。写作区按每行约 10 词，在第 5/10/15/20 行旁标 50/100/150/200 词参考刻度
+  const lines = (n, ticks) => `<div class="lines${ticks ? ' ticks' : ''}">${Array.from({ length: n }, (_, i) => `<div>${ticks && (i + 1) % 5 === 0 ? `<span class="tk">${(i + 1) * 10}</span>` : ''}</div>`).join('')}</div>`;
   function cards() {
     const L = numbered.filter((x) => x.part === 'listen');
     const R = numbered.filter((x) => x.part === 'read');
@@ -155,7 +158,7 @@
     const RC = R.filter((x) => x.letters.length <= 4);
     const card1 = `<div class="card">${cardHead(1, 'Answer Sheet 1 · 写作与听力理解', true)}
       <div class="cardsec write"><div class="cs">Part I　Writing<small>（30 分钟，在下列横线上作答）</small></div>
-        <p class="prompt">${esc(W.prompt).replace(/^Directions:/, '<b>Directions:</b>')}</p>${LINES}</div>
+        <p class="prompt">${esc(W.prompt).replace(/^Directions:/, '<b>Directions:</b>')}</p>${lines(22, true)}</div>
       ${L.length ? `<div class="cardsec" style="margin-bottom:0"><div class="cs">Part II　Listening Comprehension<small>（听力选择题，2B 铅笔填涂）</small></div><div class="bgrid">${bcols(L, 5)}</div></div>` : ''}
     </div>`;
     const card2 = `<div class="card">${cardHead(2, 'Answer Sheet 2 · 阅读理解与翻译', false)}
@@ -166,12 +169,36 @@
         </div>
         ${RC.length ? `<div class="bgrid" style="justify-content:flex-start;gap:12mm;margin-top:2mm"><div class="bcol"><div class="lab">Section C</div>${RC.slice(0, Math.ceil(RC.length / 2)).map(brow).join('')}</div><div class="bcol"><div class="lab">&nbsp;</div>${RC.slice(Math.ceil(RC.length / 2)).map(brow).join('')}</div></div>` : ''}
       </div>
-      <div class="cardsec write" style="margin-bottom:0"><div class="cs">Part IV　Translation<small>（30 分钟，将试题册上的中文段落译成英文）</small></div>${LINES}</div>
+      <div class="cardsec write" style="margin-bottom:0"><div class="cs">Part IV　Translation<small>（30 分钟，将试题册上的中文段落译成英文）</small></div>${lines(30)}</div>
     </div>`;
     return [card1, card2];
   }
 
   // ---------- 教师用答案页 ----------
+  // 710 分换算：分值占比照 data-outline「卷面结构与分值」（听力 长对话 8% / 篇章 7% / 讲座 20%，阅读 选词 5% / 匹配 10% / 仔细 20%，写作、翻译各 15%）
+  // 按真题题量折成每题分值：710 × 占比 ÷ 题数；写作、翻译 15 分制档分 × 7.1（106.5 ÷ 15）
+  const SEC_PTS = [
+    ['conv', '听力', '长对话', 7.1], ['pas', '听力', '听力篇章', 7.1], ['lec', '听力', '讲座 / 讲话', 14.2],
+    ['cloze', '阅读', '选词填空', 3.55], ['match', '阅读', '段落匹配', 7.1], ['mc', '阅读', '仔细阅读', 14.2],
+  ];
+  const W_BANDS = [
+    ['14 分档', '13–15', '切题；思想表达清楚，文字通顺、连贯，基本无语言错误，仅有个别小错'],
+    ['11 分档', '10–12', '切题；思想表达清楚，文字较连贯，但有少量语言错误'],
+    ['8 分档', '7–9', '基本切题；有些地方表达不够清楚，文字勉强连贯；语言错误相当多，其中有一些严重错误'],
+    ['5 分档', '4–6', '基本切题；表达思想不清楚，连贯性差；有较多严重语言错误'],
+    ['2 分档', '1–3', '条理不清，思路紊乱；语言支离破碎，或大部分句子有错且多为严重错误'],
+  ];
+  const fmtPt = (v) => String(+v.toFixed(2));
+  function scoreTable() {
+    let full = 0;
+    const rows = SEC_PTS.map(([k, part, name, pt]) => { const c = numbered.filter((x) => x.sec === k).length; if (!c) return ''; full += c * pt; return `<tr><td>${part}</td><td>${name}</td><td>${c}</td><td>${fmtPt(pt)}</td><td>${fmtPt(c * pt)}</td><td class="blankc">对 ____ 题</td><td class="blankc"></td></tr>`; }).join('');
+    full += 106.5 * 2;
+    return `<table class="score"><tr><th>部分</th><th>题型</th><th>题数</th><th>每题分值</th><th>满分</th><th>自评</th><th>得分</th></tr>${rows}
+      <tr><td>写作</td><td>短文写作</td><td>1</td><td>档分 × 7.1</td><td>106.5</td><td class="blankc">____ / 15</td><td class="blankc"></td></tr>
+      <tr><td>翻译</td><td>汉译英</td><td>1</td><td>档分 × 7.1</td><td>106.5</td><td class="blankc">____ / 15</td><td class="blankc"></td></tr>
+      <tr class="tot"><td colspan="4">合计</td><td>${fmtPt(full)}</td><td></td><td class="blankc"></td></tr></table>
+      <p class="exp" style="padding-left:0;text-indent:0">算法：自评总分 ≈ 7.1 ×（长对话 + 篇章 + 段落匹配 答对题数）+ 14.2 ×（讲座 + 仔细阅读 答对题数）+ 3.55 × 选词填空答对题数 + 7.1 ×（写作档分 + 翻译档分）。听力、阅读各满分 248.5，写作、翻译各 106.5。正式成绩是常模参照、等值换算后的报道分，这里只是估算；425 是多数单位的认可线，本站目标 500。${full < 709.9 ? '本卷题量少于真题，满分按实际题数计。' : ''}</p>`;
+  }
   function keyBlocks() {
     const B = [];
     B.push(blk(`<div class="kband"><b>教师用 · 答案页</b><div>参考答案 / 解析 / 写作范文 / 翻译参考译文 / 听力原文。打印考试用卷时可在工具条取消勾选「附答案与听力原文」，或只打印前面的试题册和答题卡页码。</div></div>`, { keep: true }));
@@ -180,17 +207,28 @@
     const L = numbered.filter((x) => x.part === 'listen'), R = numbered.filter((x) => x.part === 'read');
     if (L.length) { B.push(blk(`<div class="kh3">Part II　Listening Comprehension（${L[0].n}–${L[L.length - 1].n}）</div>`, { keep: true })); B.push(blk(tab(L))); }
     if (R.length) { B.push(blk(`<div class="kh3">Part III　Reading Comprehension（${R[0].n}–${R[R.length - 1].n}）</div>`, { keep: true })); B.push(blk(tab(R))); }
+    B.push(blk(`<div class="kh">二、710 分换算（自评总分）</div>`, { keep: true }));
+    B.push(blk(scoreTable()));
     const ex = numbered.filter((x) => x.exp);
     if (ex.length) {
-      B.push(blk(`<div class="kh">二、答案解析</div>`, { keep: true }));
+      B.push(blk(`<div class="kh">三、答案解析</div>`, { keep: true }));
       ex.forEach((x) => B.push(blk(`<p class="exp"><b>${x.n}. ${esc(x.ans)}</b>　${esc(x.exp)}</p>`)));
     }
-    B.push(blk(`<div class="kh">三、写作范文</div>`, { keep: true }));
+    B.push(blk(`<div class="kh">四、写作：提纲 / 范文 / 评分档次</div>`, { keep: true }));
     B.push(blk(`<p class="kh3" style="font-weight:400">${esc(cleanTitle(W.title))}</p>`, { keep: true }));
+    if (W.outline && W.outline.length) { B.push(blk(`<div class="kh3">提纲</div>`, { keep: true })); B.push(blk(`<ol class="kol">${W.outline.map((o) => `<li>${esc(o)}</li>`).join('')}</ol>`)); }
+    B.push(blk(`<div class="kh3">范文</div>`, { keep: true }));
     W.sample.split('\n').filter((p) => p.trim()).forEach((p) => B.push(blk(`<p class="ref">${esc(p)}</p>`)));
-    B.push(blk(`<div class="kh">四、翻译参考译文</div>`, { keep: true }));
+    B.push(blk(`<div class="kh3">评分档次（15 分制，按总体印象给分；得分 × 7.1 折成 710 分制）</div>`, { keep: true }));
+    B.push(blk(`<table class="rub"><tr><th>档</th><th>分</th><th>特征</th></tr>${W_BANDS.map(([b, r, t]) => `<tr><td>${b}</td><td>${r}</td><td>${esc(t)}</td></tr>`).join('')}</table><p class="exp" style="padding-left:0;text-indent:0">先定档，再按语言质量在档内加减 1 分；少于 120 词酌情扣分；白卷、只写与题目无关内容或只抄题目得 0 分。</p>`));
+    B.push(blk(`<div class="kh">五、翻译：参考译文 / 关键词</div>`, { keep: true }));
     T.en.split('\n').filter((p) => p.trim()).forEach((p) => B.push(blk(`<p class="ref">${esc(p)}</p>`)));
-    B.push(blk(`<div class="kh">五、听力原文（Listening Scripts）</div>`, { keep: true }));
+    if (T.keys && T.keys.length) {
+      B.push(blk(`<div class="kh3">关键词</div>`, { keep: true }));
+      B.push(blk(`<div class="kkeys">${T.keys.map((k) => { const m = k.match(/^(.*?)\s+([A-Za-z(].*)$/); return m ? `<div><span class="zh">${esc(m[1])}</span>${esc(m[2])}</div>` : `<div>${esc(k)}</div>`; }).join('')}</div>`));
+    }
+    B.push(blk(`<p class="exp" style="padding-left:0;text-indent:0;margin-top:1.5mm">翻译同样按 15 分制定档：13–15 准确流畅、基本无错；10–12 基本达意、无重大错误；7–9 勉强达意、错误较多；4–6 仅译出小部分意思。</p>`));
+    B.push(blk(`<div class="kh">六、听力原文（Listening Scripts）</div>`, { keep: true }));
     let qi = 0;
     listenSets.forEach((s, i) => {
       const sec = i < conv.length ? 'Section A' : i < conv.length + pas.length ? 'Section B' : 'Section C';
@@ -233,9 +271,12 @@
     return pages;
   }
 
+  // 手机（≤719px）上不整体缩放：CSS 把 A4 页改成按屏宽流式排版；分页仍按 A4 计算（排版时临时加 .measuring 强制 A4），打印照旧精确分页
+  const narrow = () => matchMedia('screen and (max-width: 719px)').matches;
   function fit() {
     const pw = 210 * 96 / 25.4;
     const w = document.documentElement.clientWidth;
+    if (narrow()) { root.style.zoom = ''; return; }
     const z = Math.min(1, (w - 16) / pw);
     root.style.zoom = z < 0.999 ? z.toFixed(4) : '';
   }
@@ -246,11 +287,13 @@
     const withStem = document.getElementById('withStem').checked;
     root.style.zoom = '';
     root.innerHTML = '';
+    root.classList.add('measuring');
     const bk = flow(booklet(withStem), 'exam');
     bk.forEach((p, i) => { p.pf.textContent = `六级 · 第 ${i + 1} 页（共 ${bk.length} 页）`; });
     let total = bk.length;
     if (withSheet) cards().forEach((h, i) => { const p = newPage('sheet'); p.body.innerHTML = h; p.pf.textContent = `答题卡 ${i + 1}　·　试卷代号 ${seed}`; total++; });
     if (withKey) { const kp = flow(keyBlocks(), 'key'); kp.forEach((p, i) => { p.pf.textContent = `教师用 · 答案页 第 ${i + 1} 页（共 ${kp.length} 页）`; }); total += kp.length; }
+    root.classList.remove('measuring');
     document.getElementById('seedLab').textContent = seed;
     document.getElementById('stat').textContent = `试题册 ${bk.length} 页${withSheet ? ' + 答题卡 2 页' : ''}${withKey ? ` + 教师用答案页 ${total - bk.length - (withSheet ? 2 : 0)} 页` : ''}，共 ${total} 张 A4。`;
     history.replaceState(null, '', '?seed=' + seed);

@@ -149,6 +149,8 @@ Regulation is now being discussed in several countries, but the most promising c
 const WRITING = [
   {
     id: 'w1', title: '议论文 · Why do people choose to live in big cities?',
+    tag: '议论文·大城市', // 切换条上显示的短名
+    hl: ['From my perspective, the answer lies in', 'To begin with', 'whereas his counterpart', 'What is more', 'Admittedly', 'Only by weighing both sides carefully can we'], // 范文高亮：可迁移的模板句（范文原文片段）
     prompt: 'Directions: For this part, you are allowed 30 minutes to write an essay on why people choose to live in big cities despite the high cost. You should write at least 150 words but no more than 200 words.',
     outline: ['第一段：现象 + 观点（尽管成本高，大城市仍吸引人）', '第二段：理由一 机会多（工作、教育）+ 例子；理由二 资源与便利（医疗、文化、交通）', '第三段：承认代价，重申选择合理，建议理性权衡'],
     sample: `Nowadays, an increasing number of young people are flocking to big cities such as Beijing and Shanghai, even though rent and living costs there are notoriously high. Why are they willing to pay such a price? From my perspective, the answer lies in opportunity and convenience.
@@ -160,6 +162,8 @@ Admittedly, the cost of urban living is a heavy burden, and the pressure can be 
   },
   {
     id: 'w2', title: '名言类 · "Beauty of the soul is the essential beauty."',
+    tag: '名言·心灵之美', // 切换条上显示的短名
+    hl: ['conveys a profound message', 'I could not agree more with this view', 'There is no denying that', 'by contrast', 'It was their kindness, courage and sense of responsibility that moved people', 'Only when we are beautiful inside can we'], // 范文高亮：可迁移的模板句（范文原文片段）
     prompt: 'Directions: Write an essay commenting on the saying "Beauty of the soul is the essential beauty." You can cite examples to illustrate your point. 150–200 words.',
     outline: ['第一段：解释名言含义，表明赞同', '第二段：论证——外在美短暂，内在美持久；举例（如志愿者、普通人的善举）', '第三段：呼吁重视修养而非只关注外表'],
     sample: `The saying "Beauty of the soul is the essential beauty" conveys a profound message: what truly makes a person beautiful is not appearance but character. I could not agree more with this view.
@@ -171,6 +175,8 @@ Therefore, instead of spending hours in front of the mirror, we should devote mo
   },
   {
     id: 'w3', title: '应用文 · 写一封建议信',
+    tag: '应用文·建议信', // 切换条上显示的短名
+    hl: ['I am writing to offer some suggestions regarding', 'First of all, I would suggest', 'it would be worthwhile to', 'I believe these changes would benefit', 'I look forward to your reply'], // 范文高亮：可迁移的模板句（范文原文片段）
     prompt: 'Directions: Suppose your university is planning to improve its library services. Write a letter to the library director offering your suggestions. 150–200 words. Do not sign your own name; use "Li Ming" instead.',
     outline: ['称呼 Dear Sir or Madam / Dear Mr. Director', '第一段：自我介绍 + 写信目的', '第二段：两到三条建议，每条一句理由', '第三段：感谢 + 期待回复；落款 Yours sincerely, Li Ming'],
     sample: `Dear Sir or Madam,
@@ -192,7 +198,7 @@ const TRANSLATION = [
     id: 't1', title: '中国茶文化', theme: '文化',
     zh: '茶是中国人日常生活中不可缺少的饮品。中国是茶的故乡，饮茶的历史可以追溯到三千多年前。茶不仅是一种饮料，更承载着丰富的文化内涵。古代文人常常以茶会友，吟诗作画。唐代的陆羽撰写了世界上第一部茶学专著《茶经》，对后世影响深远。如今，茶馆遍布中国的大街小巷，成为人们休闲交流的重要场所。目前，中国的茶叶产量和茶园面积均居世界首位。随着中国与世界交往的加深，茶文化也传播到了世界各地，越来越多的外国人开始了解并喜爱中国茶。',
     en: `Tea is an indispensable drink in the daily life of the Chinese people. China is the homeland of tea, and the history of tea drinking can be traced back more than three thousand years. Tea is not merely a beverage; it also carries rich cultural connotations. In ancient times, scholars often gathered over tea to compose poems and paint. In the Tang Dynasty, Lu Yu wrote The Classic of Tea, the world's first book devoted to tea, which had a profound influence on later generations. Today, teahouses can be found in streets and lanes across China and have become important places for people to relax and socialize. At present, China ranks first in the world in both tea output and the area of its tea plantations. As China's exchanges with the rest of the world deepen, tea culture has spread to every corner of the globe, and an increasing number of foreigners are beginning to understand and love Chinese tea.`,
-    keys: ['不可缺少的 indispensable / essential', '追溯到 be traced back to', '承载文化内涵 carry cultural connotations', '以茶会友 gather over tea（直译 make friends through tea 也可）', '遍布大街小巷 can be found in streets and lanes / everywhere', '随着……加深 as ... deepen(s)', '唐代 the Tang Dynasty', '《茶经》 The Classic of Tea', '对后世影响深远 have a profound influence on later generations', '居世界首位 rank first in the world'],
+    keys: ['不可缺少的 indispensable / essential', '追溯到 be traced back to', '承载文化内涵 carry cultural connotations', '以茶会友 gather over tea / make friends through tea', '遍布大街小巷 can be found in streets and lanes / everywhere', '随着……加深 as ... deepen(s)', '唐代 the Tang Dynasty', '《茶经》 The Classic of Tea', '对后世影响深远 have a profound influence on later generations', '居世界首位 rank first in the world'],
     notes: ['"不仅……更……"用 not merely ... ; it also ... 拆成两个分句最稳。', '"古代文人"译 scholars in ancient times 即可，不必纠结 literati。', '最后一句很长，按逗号拆成两个并列句，用 and 连接。'],
   },
   {

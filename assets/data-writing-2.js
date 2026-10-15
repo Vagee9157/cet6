@@ -3,6 +3,8 @@
 WRITING.push(
   {
     id: 'w4', title: '议论文 · Is it wise to pursue a hobby seriously?',
+    tag: '议论文·认真对待爱好', // 切换条上显示的短名
+    hl: ['This raises a question', 'In my view, the answer is a definite yes', 'Not only does a serious hobby sharpen our abilities, but it also', 'There is no denying that', 'Were it to take over all our time, it would', 'as long as balance is kept'], // 范文高亮：可迁移的模板句（范文原文片段）
     prompt: 'Directions: For this part, you are allowed 30 minutes to write an essay on the question "Is it wise to pursue a hobby seriously?" You should state your view and give reasons. You should write at least 150 words but no more than 200 words.',
     outline: ['第一段：现象（越来越多年轻人投入大量时间在爱好上）+ 设问 + 明确立场', '第二段：理由一 培养课堂学不到的能力（耐心、自律）；理由二 调节心理压力；理由三 结交朋友', '第三段：让步（不能挤占主业）+ 重申只要平衡就是明智投资'],
     sample: `In recent years, more and more young people have taken up hobbies such as photography, running or playing the guitar, and some even devote years to them. This raises a question: is it wise to pursue a hobby seriously? In my view, the answer is a definite yes.
@@ -14,6 +16,8 @@ There is no denying that a hobby should never crowd out our main responsibilitie
   },
   {
     id: 'w5', title: '议论文 · The importance of lifelong learning',
+    tag: '议论文·终身学习', // 切换条上显示的短名
+    hl: ['It is therefore widely agreed that', 'has become a necessity rather than a choice', 'First and foremost', 'It is adaptability, not a single qualification, that', 'Admittedly', 'Only by treating learning as a lifelong habit can we'], // 范文高亮：可迁移的模板句（范文原文片段）
     prompt: 'Directions: For this part, you are allowed 30 minutes to write an essay on the importance of lifelong learning in a rapidly changing world. You should write at least 150 words but no more than 200 words.',
     outline: ['第一段：背景（技术更新快，大学知识易过时）+ 观点（终身学习是必需而非选择）', '第二段：理由一 保持职场竞争力（新职业例子 + 强调句）；理由二 丰富生活、保持好奇心（祖父学英语的例子）', '第三段：让步（在职学习不易）+ 条件已成熟 + 倒装句收尾'],
     sample: `With technology advancing at a dizzying speed, the knowledge acquired at university can become outdated within a few years. It is therefore widely agreed that learning should not end with a diploma. Lifelong learning, in my opinion, has become a necessity rather than a choice.
@@ -25,6 +29,8 @@ Admittedly, finding time to study while working full-time is far from easy. Yet 
   },
   {
     id: 'w6', title: '名言类 · "It is not the mountain we conquer but ourselves."',
+    tag: '名言·征服自我', // 切换条上显示的短名
+    hl: ['reminds us that', 'I find this idea both wise and inspiring', 'Had she merely memorized the textbook, she would have learned little', 'The same holds true for', 'whereas the way we respond to them', 'Only after we have conquered ourselves can'], // 范文高亮：可迁移的模板句（范文原文片段）
     prompt: 'Directions: Write an essay commenting on the saying "It is not the mountain we conquer but ourselves." You can cite examples to illustrate your point. 150–200 words.',
     outline: ['第一段：解释名言（真正的胜利来自克服自身的恐惧、懒惰和怀疑）+ 表态', '第二段：举例论证（备考学生的内在障碍）+ 虚拟语气对比 + 推广到运动员、创业者', '第三段：启示：面对困难先向内看；倒装句收尾'],
     sample: `The saying "It is not the mountain we conquer but ourselves" reminds us that the real victory in any challenge lies within. The mountain is only a mirror; what we truly overcome are our own fear, laziness and doubt. I find this idea both wise and inspiring.
@@ -36,6 +42,8 @@ Therefore, when facing a mountain in life, we should turn our attention inward f
   },
   {
     id: 'w7', title: '图表类 · College students\' daily phone use',
+    tag: '图表·手机使用时长', // 切换条上显示的短名
+    hl: ['As is clearly shown in the chart', 'the figure had doubled to', 'Several factors account for this striking change', 'Equally important is', 'Were students to set clear limits on screen time, they would', 'It is self-discipline, rather than the device itself, that'], // 范文高亮：可迁移的模板句（范文原文片段）
     // 图表作文的图：柱状图 + 饼图，由 assets/chart.js 画成 SVG（站内写作页与模拟卷共用）
     chart: {
       bar: { title: 'Average Daily Phone Use of College Students', unit: 'hours', data: [['2015', 2.1], ['2020', 4.3], ['2025', 6.2]] },
@@ -52,6 +60,8 @@ There is no denying that phones bring convenience, but spending six hours a day 
   },
   {
     id: 'w8', title: '应用文 · 新生欢迎会演讲稿',
+    tag: '应用文·新生欢迎演讲', // 切换条上显示的短名
+    hl: ['It is my great honor to stand here', 'on behalf of the senior students', 'allow me to share three pieces of advice', 'Not until I began a research project in my second year did I realize', 'Were you to spend four years only in the dormitory, you would', 'is not a finish line but a starting point'], // 范文高亮：可迁移的模板句（范文原文片段）
     prompt: 'Directions: Suppose you are invited to deliver a speech at the orientation for freshmen on how to make the most of university life. Write the speech in 150–200 words. Do not sign your own name; use "Li Ming" instead.',
     outline: ['称呼 Dear freshmen / Good morning, everyone', '第一段：表示荣幸 + 自我身份（学长）+ 引出三条建议', '第二段：三条建议（用好图书馆实验室 / 走出舒适区 / 照顾身体和友谊），每条配一句理由或例子', '第三段：升华（大学是起点不是终点）+ 祝愿 + Thank you；落款 Li Ming'],
     sample: `Dear freshmen,
