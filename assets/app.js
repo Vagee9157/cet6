@@ -9,7 +9,7 @@
   const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ic = (n) => `<svg class="i"><use href="#${n}"/></svg>`;
   const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
-  const today = () => new Date().toISOString().slice(0, 10);
+  const today = () => lday(); // 本地日期（lday 定义在单词区，运行时才调用）
   const CHMAP = Object.fromEntries(CHAPTERS.map((c) => [c.id, c]));
   const MOD = { exam: 'm-exam', listen: 'm-listen', read: 'm-read', write: 'm-write', trans: 'm-trans', vocab: 'm-vocab' };
   const ptKey = (c, i) => c.id + ':' + i;
@@ -17,8 +17,39 @@
   const ALLWORDS = VOCAB.flatMap((g, gi) => g.words.map((w, wi) => ({ id: gi + ':' + wi, g: g.g, w: w[0], p: w[1], c: w[2], e: w[3] })));
   // 单词例句：VOCAB_EX（data-vocab-ex.js）每词 3 句带中文；缺数据时退回原例句
   const exOf = (w) => (typeof VOCAB_EX !== 'undefined' && VOCAB_EX[w.w]) || [[w.e, '']];
-  // 高亮目标词：取第一个词的前 4–6 个字母做词干，能命中 laid/came 以外的大部分屈折形式
-  const hlWord = (html, word) => { const h = word.split(' ')[0].replace(/[^a-z]/gi, ''); const stem = h.length > 6 ? h.slice(0, h.length - 2) : h.length > 4 ? h.slice(0, 4) : h; return stem ? html.replace(new RegExp('\\b(' + stem + '[a-z]*)', 'i'), '<em>$1</em>') : html; };
+  // 高亮目标词：易混词按 " / " 拆开逐个高亮；短语去掉开头的 be，逐词匹配、词间允许夹 1–2 个词（take sth into account）；
+  // 动词首词按规则变形 + 不规则变形表（came / ran / laid …）匹配；单词先精确匹配词形，找不到再退回词干
+  const IRR = { come: 'came', run: 'ran', go: 'went|gone|goes', wear: 'wore|worn', bring: 'brought', take: 'took|taken', give: 'gave|given', make: 'made', have: 'had|has|having', hold: 'held', keep: 'kept', lay: 'laid', lie: 'lay|lain|lying', seek: 'sought', bear: 'bore|borne|born', get: 'got|gotten', stand: 'stood', find: 'found', think: 'thought', catch: 'caught', teach: 'taught', buy: 'bought', fight: 'fought', sell: 'sold', tell: 'told', say: 'said', pay: 'paid', mean: 'meant', send: 'sent', spend: 'spent', build: 'built', lend: 'lent', lose: 'lost', leave: 'left', feel: 'felt', deal: 'dealt', dwell: 'dwelt', meet: 'met', lead: 'led', feed: 'fed', flee: 'fled', win: 'won', hang: 'hung', bind: 'bound', strike: 'struck', stick: 'stuck', rise: 'rose|risen', arise: 'arose|arisen', write: 'wrote|written', drive: 'drove|driven', ride: 'rode|ridden', break: 'broke|broken', speak: 'spoke|spoken', choose: 'chose|chosen', freeze: 'froze|frozen', steal: 'stole|stolen', forget: 'forgot|forgotten', fall: 'fell|fallen', grow: 'grew|grown', know: 'knew|known', throw: 'threw|thrown', draw: 'drew|drawn', withdraw: 'withdrew|withdrawn', see: 'saw|seen', foresee: 'foresaw|foreseen', begin: 'began|begun', drink: 'drank|drunk', sink: 'sank|sunk', shrink: 'shrank|shrunk', swim: 'swam|swum', eat: 'ate|eaten', hide: 'hid|hidden', forbid: 'forbade|forbidden', shake: 'shook|shaken', undertake: 'undertook|undertaken', overcome: 'overcame', become: 'became', understand: 'understood', withstand: 'withstood', undergo: 'underwent|undergone', strive: 'strove|striven', light: 'lit', shed: 'shed', put: 'put', set: 'set', cut: 'cut', let: 'let', spread: 'spread', cast: 'cast', cost: 'cost', hurt: 'hurt', quit: 'quit', split: 'split', upset: 'upset', burst: 'burst' };
+  const FUNC = new Set(['a', 'an', 'the', 'of', 'to', 'in', 'on', 'at', 'by', 'for', 'with', 'from', 'up', 'out', 'off', 'down', 'into', 'about', 'and', 'or', 'as', 'it', 'sb', 'sth', 'one', "one's", 'oneself']);
+  const reEsc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // 规则变形：-s/-es/-ed/-ing；去 e；y→i；重读闭音节双写（run→running, drop→dropped）
+  const inflRe = (w) => {
+    const l = w.toLowerCase(), e = reEsc(w), alts = [];
+    if (IRR[l]) alts.push(IRR[l]);
+    if (/[^aeiou]y$/.test(l)) alts.push(reEsc(w.slice(0, -1)) + '(?:y|ies|ied|ying)');
+    else if (/e$/.test(l)) alts.push(reEsc(w.slice(0, -1)) + '(?:e|es|ed|ing)');
+    else { alts.push(e + '(?:s|es|ed|ing)?'); if (/[^aeiou][aeiou][bdgklmnprt]$/.test(l)) alts.push(e + w.slice(-1) + '(?:ed|ing)'); }
+    return '(?:' + alts.join('|') + ')';
+  };
+  const tokRe = (t, i, n) => { if (FUNC.has(t.toLowerCase()) || /\d/.test(t)) return reEsc(t); if (i === 0) return inflRe(t); if (i === n - 1) return reEsc(t) + '(?:s|es)?'; return reEsc(t); };
+  // 只替换第一处、跳过已高亮的 <em>
+  const hlOnce = (html, src) => { let hit = false; const out = html.replace(new RegExp('(<em>[\\s\\S]*?</em>)|' + src, 'gi'), (m, skip, ...g) => { if (skip || hit) return m; hit = true; const caps = g.slice(0, -2); return caps.length ? caps.map((c, k) => (k % 2 ? c : `<em>${c}</em>`)).join('').replace(/<\/em>(\s+)<em>/g, '$1') : `<em>${m}</em>`; }); return hit ? out : null; };
+  const hlOne = (html, word, exactOnly) => {
+    const toks = word.trim().split(/\s+/); if (toks.length > 1 && toks[0].toLowerCase() === 'be') toks.shift();
+    if (toks.length > 1) {
+      const GAP = '((?:\\s+[^\\s<]+){0,2}?\\s+)';
+      const src = '\\b' + toks.map((t, i) => '(' + tokRe(t, i, toks.length) + ')').join(GAP) + '\\b';
+      const r = hlOnce(html, src); if (r) return r;
+      const main = toks.filter((t) => !FUNC.has(t.toLowerCase())).sort((a, b) => b.length - a.length)[0];
+      return main ? hlOne(html, main) : html;
+    }
+    const t = toks[0]; if (!t) return html;
+    if (/-/.test(t)) return hlOnce(html, '\\b' + reEsc(t) + '[a-z]*') || html;
+    const exact = hlOnce(html, '\\b' + inflRe(t) + '\\b'); if (exact || exactOnly) return exact || html;
+    const h = t.replace(/[^a-z]/gi, ''); const stem = h.length > 6 ? h.slice(0, h.length - 2) : h.length > 4 ? h.slice(0, 4) : h;
+    return (stem && hlOnce(html, '\\b' + stem + '[a-z]*')) || html;
+  };
+  const hlWord = (html, word) => { const parts = word.split(/\s+\/\s+/); if (parts.length < 2) return hlOne(html, word); const h = parts.reduce((x, p) => hlOne(x, p, true), html); return h !== html ? h : parts.reduce((x, p) => hlOne(x, p), html); };
 
   /* ---------- 主题 ---------- */
   const isDark = () => (S.theme ? S.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches);
@@ -33,6 +64,7 @@
     if (v !== 'practice' && typeof stopAudio === 'function') stopAudio();
     VIEWS.forEach((x) => { $('#view-' + x).hidden = x !== v; });
     document.querySelectorAll('nav.tabs button').forEach((b) => b.setAttribute('aria-selected', b.dataset.view === v));
+    if (v === 'wt') { const d = lday(); (S.plan[d] = S.plan[d] || {}).wt = 1; save(); } // 首页「读 1 篇范文」打点
     if (!keep) R[v]();
     if (location.hash.slice(1) !== v) history.replaceState(null, '', '#' + v);
     window.scrollTo(0, 0);
@@ -43,7 +75,7 @@
   /* ---------- 统计 ---------- */
   function stats() {
     const known = Object.values(S.vocab).filter((v) => v === 2).length;
-    const unknown = Object.values(S.vocab).filter((v) => v === 0).length;
+    const unknown = Object.values(S.vocab).filter((v) => v === 0 || v === 1).length; // 生词 = 不认识 + 模糊，与生词本同口径
     const seen = Object.keys(S.vocab).length;
     const setsDone = Object.keys(S.sets).length;
     const m = Object.keys(S.mastered).length;
@@ -67,16 +99,27 @@
     { k: 'trans', n: '翻译', w: 15, pts: 106.5, tip: '意思译全、句子完整、长句拆短，11 分档 ≈ 75 分。' },
   ];
   let splitSel = 'read';
+  const splitInfo = (sp) => `<div class="k">${sp.pts}</div><div><b>${sp.n}</b> 满分 ${sp.pts} 分</div><div>${sp.tip}</div>`;
+  // 今天的四件事：按真实行为判定完成，点卡片只负责跳转
+  // 单词 = 今日队列刷完；听力 / 阅读 = 当天有该类型交卷记录（S.sets[id].d，旧记录退回 at）；范文 = 当天打开过写译页（show('wt') 打点 S.plan[日期].wt）
+  function planStatus() {
+    const d = lday(), p = dailyPlan();
+    const kinds = new Set(Object.entries(S.sets).filter(([, s]) => s && (s.d || s.at) === d).map(([id]) => { const f = findSet(id); return f ? (f.kind === 'listen' ? 'listen' : 'read') : ''; }));
+    const vDone = p.order.filter((id) => S.vseen[id] === d).length;
+    return { vDone, vTot: p.order.length, vocab: p.order.length > 0 && vDone >= p.order.length, listen: kinds.has('listen'), read: kinds.has('read'), wt: !!(S.plan[d] && S.plan[d].wt) };
+  }
+  const chDone = (c) => c.points.filter((p, i) => S.mastered[ptKey(c, i)]).length;
   function renderHome() {
-    const st = stats();
+    const st = stats(); const ps = planStatus();
     const plan = [
-      { id: 'vocab', mod: 'vocab', t: '背 40 个高频词', s: '闪卡模式，不认识的进生词本', view: 'vocab' },
-      { id: 'listen', mod: 'listen', t: '做 1 篇听力', s: '长对话或讲座，答完看原文精听', view: 'practice', sub: 'listen' },
-      { id: 'read', mod: 'read', t: '做 1 篇仔细阅读', s: '12 分钟计时，错题看解析', view: 'practice', sub: 'read' },
-      { id: 'wt', mod: 'write', t: '读 1 篇范文', s: '把高亮句抄进自己的模板', view: 'wt' },
+      { id: 'vocab', mod: 'vocab', t: `背 ${S.vnew} 个新词 + 复习`, s: ps.vocab ? '今日单词已刷完' : `今日单词 ${ps.vDone}/${ps.vTot}，生词隔天再刷`, view: 'vocab' },
+      { id: 'listen', mod: 'listen', t: '做 1 篇听力', s: '长对话或讲座，交卷后对着原文精听', view: 'practice', sub: 'listen' },
+      { id: 'read', mod: 'read', t: '做 1 篇阅读', s: '仔细阅读优先，12 分钟计时，错题看解析', view: 'practice', sub: 'read' },
+      { id: 'wt', mod: 'write', t: '读 1 篇范文', s: '打开写译页，把高亮句抄进自己的模板', view: 'wt' },
     ];
-    const day = today(); const done = S.plan[day] || {};
+    const nDone = plan.filter((p) => ps[p.id]).length;
     const sp = SPLIT.find((s) => s.k === splitSel);
+    const wide = matchMedia('(min-width:720px)').matches;
     $('#home-box').innerHTML = `
       <div class="hero">
         <div class="hero-main">
@@ -90,19 +133,20 @@
             <div class="tile m-read"><div class="v">${st.setsDone}</div><div class="l">做过的练习</div></div>
             <div class="tile m-listen"><div class="v">${st.acc === null ? '—' : st.acc + '<small>%</small>'}</div><div class="l">正确率</div></div>
           </div>
-          <div class="score-split">
-            <h3>${ic('i-target')}710 分怎么拆<small>点一段看策略</small></h3>
+          <details class="score-split"${wide ? ' open' : ''}>
+            <summary><h3>${ic('i-target')}710 分怎么拆<small>点一段看策略</small><span class="caret">${ic('i-chev-r')}</span></h3></summary>
             <div class="split-bar">${SPLIT.map((s) => `<button class="${MOD[s.k]}" style="--w:${s.w}" data-split="${s.k}" aria-pressed="${s.k === splitSel}">${s.n} ${s.w}%</button>`).join('')}</div>
-            <div class="split-info ${MOD[sp.k]}"><div class="k">${sp.pts}</div><div><b>${sp.n}</b> 满分 ${sp.pts} 分</div><div>${sp.tip}</div></div>
-          </div>
+            <div class="split-info ${MOD[sp.k]}">${splitInfo(sp)}</div>
+          </details>
+        </div>
+        <div class="home-plan">
+          <div class="sec-h"><span class="ico m-exam">${ic('i-flame')}</span><h2>今天的四件事</h2><span class="more">${nDone}/4 完成</span></div>
+          <div class="plan">${plan.map((p, i) => `<button class="card ${MOD[p.mod]} ${ps[p.id] ? 'done' : ''}" data-plan="${p.id}" data-go="${p.view}" data-sub="${p.sub || ''}"><span class="n">${ps[p.id] ? ic('i-check') : i + 1}</span><span><b>${esc(p.t)}</b><span>${esc(p.s)}</span></span></button>`).join('')}</div>
         </div>
       </div>
 
-      <div class="sec-h"><span class="ico m-exam">${ic('i-flame')}</span><h2>今天的四件事</h2><span class="more">${Object.keys(done).length}/4 完成</span></div>
-      <div class="plan">${plan.map((p, i) => `<button class="card ${MOD[p.mod]} ${done[p.id] ? 'done' : ''}" data-plan="${p.id}" data-go="${p.view}" data-sub="${p.sub || ''}"><span class="n">${done[p.id] ? ic('i-check') : i + 1}</span><span><b>${p.t}</b><span>${p.s}</span></span></button>`).join('')}</div>
-
-      <div class="sec-h"><span class="ico">${ic('i-book')}</span><h2>考点与策略</h2><span class="more">${st.m}/${totalPts} 已掌握</span></div>
-      <div class="mod-grid">${CHAPTERS.map((c) => { const d = c.points.filter((p, i) => S.mastered[ptKey(c, i)]).length; return `<button class="mod ${MOD[c.id]}" data-go="outline" data-ch="${c.id}"><span class="ico">${c.icon}</span><b>${esc(c.name)}</b><span>${esc(c.intro)}</span><div class="bar"><i style="width:${d / c.points.length * 100}%"></i></div></button>`; }).join('')}</div>
+      <div class="sec-h"><span class="ico">${ic('i-book')}</span><h2>考点与策略</h2><span class="more" id="ptCount">${st.m}/${totalPts} 已掌握</span></div>
+      <div class="mod-grid">${CHAPTERS.map((c) => `<button class="mod ${MOD[c.id]}" data-go="outline" data-ch="${c.id}"><span class="ico">${c.icon}</span><b>${esc(c.name)}</b><span>${esc(c.intro)}</span><div class="bar"><i data-chbar="${c.id}" style="width:${chDone(c) / c.points.length * 100}%"></i></div></button>`).join('')}</div>
       ${typeof PAST !== 'undefined' && PAST.length ? `<div class="sec-h"><span class="ico m-exam">${ic('i-timer')}</span><h2>近十年真题回顾</h2><span class="more">${PAST.length} 套 · ${PAST[PAST.length - 1].y}–${PAST[0].y}</span></div>
       <p class="lead">只收每套的作文题、翻译主题和阅读 / 听力话题（原卷受版权保护，不收原文）。看规律、对着练，比盲刷更有用。</p>
       <button class="btn primary" data-go="past">${ic('i-timer')}打开真题索引</button>` : ''}
@@ -110,9 +154,10 @@
       <div id="outline-box" hidden></div>
       <div id="past-box" hidden></div>`;
     $('#home-box').onclick = (e) => {
-      const sb = e.target.closest('[data-split]'); if (sb) { splitSel = sb.dataset.split; renderHome(); return; }
+      // 分值条：只换说明，不重绘整页（手机上折叠面板保持展开）
+      const sb = e.target.closest('[data-split]'); if (sb) { splitSel = sb.dataset.split; const s2 = SPLIT.find((s) => s.k === splitSel); document.querySelectorAll('[data-split]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.split === splitSel)); const info = $('.split-info'); info.className = 'split-info ' + MOD[s2.k]; info.innerHTML = splitInfo(s2); return; }
       const g = e.target.closest('[data-go]'); if (!g) return;
-      if (g.dataset.plan && !done[g.dataset.plan]) { done[g.dataset.plan] = 1; S.plan[day] = done; save(); }
+      if (g.dataset.plan === 'vocab' && S.vsrc !== 'daily') { S.vsrc = 'daily'; save(); vq = []; }
       if (g.dataset.go === 'outline') return openOutline(g.dataset.ch);
       if (g.dataset.go === 'past') { $('#outline-box').hidden = true; renderPast(); $('#past-box').hidden = false; $('#past-box').scrollIntoView({ behavior: 'smooth' }); return; }
       if (g.dataset.go === 'practice' && g.dataset.sub) { show('practice', true); renderPracticeHome(g.dataset.sub); return; }
@@ -124,33 +169,44 @@
   let chSel = 'exam';
   function openOutline(ch) {
     if (ch) chSel = ch;
-    const box = $('#outline-box'); box.hidden = false; renderOutline();
+    const box = $('#outline-box'); box.hidden = false; $('#past-box').hidden = true; renderOutline();
     $('#outline-anchor').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+  const MASTER_TAG = `<span class="tag mst" style="--cs:var(--ok-soft);--c:var(--ok)">${ic('i-check')}已掌握</span>`;
   function renderOutline() {
     const c = CHMAP[chSel];
     $('#outline-box').innerHTML = `
-      <div class="sec-h" style="margin-top:28px"><span class="ico ${MOD[c.id]}">${c.icon}</span><h2>${esc(c.name)}</h2></div>
+      <div class="sec-h" style="margin-top:28px"><span class="ico ${MOD[c.id]}">${c.icon}</span><h2>${esc(c.name)}</h2><span class="more" id="chCount">${chDone(c)}/${c.points.length} 已掌握</span></div>
       <div class="ch-nav">${CHAPTERS.map((x) => `<button class="chip ${MOD[x.id]}" data-ch="${x.id}" aria-pressed="${x.id === chSel}"><span class="dot"></span>${esc(x.name)}</button>`).join('')}</div>
       <p class="lead">${esc(c.intro)}</p>
       <div class="pt-grid">${c.points.map((p, i) => { const k = ptKey(c, i), m = !!S.mastered[k]; return `
         <details class="pt ${MOD[c.id]}" data-k="${k}">
-          <summary><div class="pt-title">${esc(p.t)} ${p.hot === 2 ? '<span class="tag hot">必考</span>' : p.hot === 1 ? '<span class="tag warm">常考</span>' : ''}${m ? `<span class="tag" style="--cs:var(--ok-soft);--c:var(--ok)">${ic('i-check')}已掌握</span>` : ''}</div><span class="caret">${ic('i-chev-r')}</span><div class="pt-tip">${esc(p.tip)}</div></summary>
+          <summary><div class="pt-title">${esc(p.t)} ${p.hot === 2 ? '<span class="tag hot">必考</span>' : p.hot === 1 ? '<span class="tag warm">常考</span>' : ''}${m ? MASTER_TAG : ''}</div><span class="caret">${ic('i-chev-r')}</span><div class="pt-tip">${esc(p.tip)}</div></summary>
           <div class="pt-body"><div class="tbl-scroll">${p.body}</div><div class="pt-foot"><label class="master"><input type="checkbox" data-master="${k}" ${m ? 'checked' : ''}> 这条我记住了</label></div></div>
         </details>`; }).join('')}</div>
       ${c.id === 'exam' ? `<div class="sec-h"><span class="ico m-exam">${ic('i-target')}</span><h2>关键数字</h2></div>${NUMBERS.map((g) => `<p class="lead" style="margin:8px 0 8px;font-weight:700;color:var(--ink)">${esc(g.g)}</p><div class="num-grid">${g.rows.map(([l, v]) => `<div class="num m-exam"><div class="v">${esc(v)}</div><div class="l">${esc(l)}</div></div>`).join('')}</div>`).join('')}` : ''}`;
     $('#outline-box').onclick = (e) => { const b = e.target.closest('[data-ch]'); if (b) { chSel = b.dataset.ch; renderOutline(); } };
-    $('#outline-box').onchange = (e) => { const k = e.target.dataset.master; if (!k) return; if (e.target.checked) S.mastered[k] = 1; else delete S.mastered[k]; save(); renderOutline(); };
+    // 勾「这条我记住了」：只局部更新标签和进度数字，不重绘、不收起其他卡片、不跳滚动
+    $('#outline-box').onchange = (e) => {
+      const k = e.target.dataset.master; if (!k) return;
+      if (e.target.checked) S.mastered[k] = 1; else delete S.mastered[k]; save();
+      const tt = e.target.closest('details.pt').querySelector('.pt-title'), tg = tt.querySelector('.tag.mst');
+      if (e.target.checked && !tg) tt.insertAdjacentHTML('beforeend', MASTER_TAG); else if (!e.target.checked && tg) tg.remove();
+      const cc = $('#chCount'); if (cc) cc.textContent = `${chDone(c)}/${c.points.length} 已掌握`;
+      const pc = $('#ptCount'); if (pc) pc.textContent = `${stats().m}/${totalPts} 已掌握`;
+      const bar = document.querySelector(`[data-chbar="${c.id}"]`); if (bar) bar.style.width = chDone(c) / c.points.length * 100 + '%';
+    };
   }
 
   /* ---------- 近十年真题索引 ---------- */
   let pastYear = 'all';
+  const pastKey = (p) => `${p.y}-${p.m}-${p.set}`;
   function renderPast() {
     const list = PAST.slice().sort((a, b) => (b.y - a.y) || (b.m - a.m) || (a.set - b.set));
     const years = [...new Set(list.map((p) => p.y))].sort((a, b) => b - a);
     const count = (arr) => { const m = {}; arr.forEach((k) => { if (k) m[k] = (m[k] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1]); };
     const wt = count(list.map((p) => p.writing && p.writing.type)), tt = count(list.map((p) => p.translation && p.translation.theme));
-    const bars = (rows, cls) => `<div class="q-list" style="gap:6px">${rows.map(([k, n]) => `<div class="${cls}" style="display:grid;grid-template-columns:5.5em 1fr 3.4em;gap:10px;align-items:center;font-size:13.5px"><b>${esc(k)}</b><div class="bar" style="height:10px"><i style="width:${n / list.length * 100}%"></i></div><span class="tabular" style="color:var(--ink-dim);font-weight:700;text-align:right">${n} 套</span></div>`).join('')}</div>`;
+    const bars = (rows, cls) => `<div class="q-list" style="gap:6px">${rows.map(([k, n]) => `<div class="${cls} dist-row"><b>${esc(k)}</b><div class="bar" style="height:10px"><i style="width:${n / list.length * 100}%"></i></div><span class="tabular">${n} 套</span></div>`).join('')}</div>`;
     const rows = list.filter((p) => pastYear === 'all' || p.y === pastYear);
     $('#past-box').innerHTML = `
       <div class="sec-h" style="margin-top:28px"><span class="ico m-exam">${ic('i-timer')}</span><h2>近十年真题索引</h2><span class="more">${list.length} 套</span></div>
@@ -164,29 +220,45 @@
           ${p.writing ? `<li><b>作文</b>（${esc(p.writing.type)}）${esc(p.writing.zh)}${p.writing.en ? ` · <i style="font-family:var(--serif)">${esc(p.writing.en)}</i>` : ''}</li>` : ''}
           ${p.reading && (p.reading.cloze || p.reading.match || (p.reading.mc && p.reading.mc.length)) ? `<li><b>阅读</b> 选词填空：${esc(p.reading.cloze || '—')}；段落匹配：${esc(p.reading.match || '—')}；仔细阅读：${(p.reading.mc || []).filter(Boolean).map(esc).join(' / ') || '—'}</li>` : ''}
           ${p.listening && p.listening.length ? `<li><b>听力</b> ${p.listening.filter(Boolean).map(esc).join(' / ')}</li>` : ''}
-          <li class="btn-row"><button class="btn soft m-write" data-pgo="write" style="margin:4px 6px 0 0">${ic('i-pen')}练写作</button><button class="btn soft m-trans" data-pgo="trans" style="margin-top:4px">${ic('i-swap')}练翻译</button></li>
-          ${p.src && p.src.length ? `<li class="note" style="font-size:12.5px;color:var(--ink-dim)">来源：${p.src.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https?:\/\//, '').split('/')[0])}</a>`).join('、')}</li>` : ''}
+          <li class="btn-row"><button class="btn soft m-write" data-pgo="write" data-pk="${pastKey(p)}" style="margin:4px 6px 0 0">${ic('i-pen')}练写作</button><button class="btn soft m-trans" data-pgo="trans" data-pk="${pastKey(p)}" style="margin-top:4px">${ic('i-swap')}练翻译</button></li>
+          ${p.src && p.src.length ? `<li class="note" style="font-size:12.5px;color:var(--ink-mute)">来源：${p.src.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https?:\/\//, '').split('/')[0])}</a>`).join('、')}</li>` : ''}
         </ul></div></details>`).join('')}</div>
       <p class="lead" style="margin-top:14px">原卷去哪儿做：学校图书馆和各大书店的正版真题集（外研社、新东方等），或各省教育考试院认可的官方练习平台。</p>`;
     $('#past-box').onclick = (e) => {
       const b = e.target.closest('[data-py]'); if (b) { pastYear = b.dataset.py === 'all' ? 'all' : +b.dataset.py; renderPast(); return; }
-      const g = e.target.closest('[data-pgo]'); if (g) { show('wt', true); renderWT(g.dataset.pgo); }
+      // 练写作 / 练翻译：把这套题的作文题和翻译主题交给写译页（S.wtHint），由写译页显示提示并优先选同题型 / 同主题范文
+      const g = e.target.closest('[data-pgo]'); if (g) {
+        const p = PAST.find((x) => pastKey(x) === g.dataset.pk);
+        if (p) { S.wtHint = { sub: g.dataset.pgo, label: `${p.y}.${String(p.m).padStart(2, '0')} 第 ${p.set} 套`, writing: p.writing ? { type: p.writing.type || '', zh: p.writing.zh || '', en: p.writing.en || '' } : null, translation: p.translation ? { theme: p.translation.theme || '', zh: p.translation.zh || '' } : null, at: Date.now() }; save(); }
+        show('wt', true); renderWT(g.dataset.pgo);
+      }
     };
   }
 
   /* ================= 单词 ================= */
-  let vg = 0, vq = [], vi = 0, flipped = false, vmode = 'flash', vtOpen = false;
-  // 今日单词：每天随机抽 N 个新词（默认 20，可选 10/20/30）+ 到期复习词（不认识隔 1 天、模糊隔 2 天），当天固定、顺序打乱
+  let vg = 0, vq = [], vi = 0, flipped = false, vmode = 'flash', vtOpen = false, vagain = false, vhist = [];
+  // 今日单词：每天随机抽 N 个新词（默认 20，可选 10/20/30）+ 到期复习词，当天固定、顺序打乱
   const lday = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const dayDiff = (a, b) => Math.round((new Date(b) - new Date(a)) / 864e5);
   const seeded = (str) => { let h = 2166136261; for (const c of str) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return ((h ^= h >>> 16) >>> 0) / 4294967296; }; };
   const shufBy = (arr, rnd) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-  S.vseen = S.vseen || {}; S.vsrc = S.vsrc || 'daily'; S.vnew = S.vnew || 20;
+  S.vseen = S.vseen || {}; S.vsrc = S.vsrc || 'daily'; S.vnew = S.vnew || 20; S.vstage = S.vstage || {};
+  const isWrong = (id) => S.vocab[id] === 0 || S.vocab[id] === 1;
+  const wordOf = (id) => ALLWORDS.find((x) => x.id === id);
+  // 到期规则：不认识隔 1 天、模糊隔 2 天；认识的按 S.vstage（连续认识次数）第 1 次后 7 天、第 2 次后 21 天再抽查，第 3 次认识后不再出现
+  // 旧数据只有 S.vseen 没有 S.vstage：按第 1 次认识算（7 天后抽查一次）
+  const KNOWN_GAP = [0, 7, 21];
+  function isDue(id, d) {
+    const m = S.vocab[id], seen = S.vseen[id];
+    if (m === 0 || m === 1) return !seen || (seen < d && dayDiff(seen, d) >= (m === 0 ? 1 : 2));
+    if (m === 2) { const st = S.vstage[id] || 1; return !!seen && st < KNOWN_GAP.length && dayDiff(seen, d) >= KNOWN_GAP[st]; }
+    return false;
+  }
   function dailyPlan(extra) {
     const d = lday();
     if (S.daily && S.daily.d === d && S.daily.n === S.vnew && !extra) return S.daily;
     const rnd = seeded('cet6-' + d + '-' + (extra ? Date.now() : ''));
-    const due = ALLWORDS.filter((w) => { const m = S.vocab[w.id]; if (m !== 0 && m !== 1) return false; const seen = S.vseen[w.id]; return !seen || (seen < d && dayDiff(seen, d) >= (m === 0 ? 1 : 2)); })
+    const due = ALLWORDS.filter((w) => isDue(w.id, d))
       .sort((a, b) => (S.vseen[a.id] || '').localeCompare(S.vseen[b.id] || '')).slice(0, 30).map((w) => w.id);
     const keep = S.daily && S.daily.d === d ? S.daily : null;
     const taken = new Set(keep ? [...keep.fresh, ...keep.review] : []);
@@ -197,54 +269,107 @@
     return S.daily;
   }
   function buildQueue() {
-    if (S.vsrc === 'daily') { const p = dailyPlan(); const d = lday(); vq = p.order.filter((id) => S.vseen[id] !== d).map((id) => ALLWORDS.find((x) => x.id === id)).filter(Boolean); vi = 0; flipped = false; return; }
-    const words = VOCAB[vg].words.map((w, wi) => ALLWORDS.find((x) => x.id === vg + ':' + wi));
-    const unknown = words.filter((w) => S.vocab[w.id] === 0 || S.vocab[w.id] === 1);
+    vi = 0; flipped = false;
+    if (S.vsrc === 'daily') { const p = dailyPlan(); const d = lday(); vq = p.order.filter((id) => S.vseen[id] !== d).map(wordOf).filter(Boolean); return; }
+    // 生词本：全部「不认识 + 模糊」，最近标记的排前面，同一天内随机
+    if (S.vsrc === 'wrong') { vq = shuffle(ALLWORDS.filter((w) => isWrong(w.id))).sort((a, b) => (S.vseen[b.id] || '').localeCompare(S.vseen[a.id] || '')); return; }
+    const words = VOCAB[vg].words.map((w, wi) => wordOf(vg + ':' + wi));
+    const unknown = words.filter((w) => isWrong(w.id));
     const fresh = words.filter((w) => S.vocab[w.id] === undefined);
-    vq = vmode === 'review' ? unknown : [...fresh, ...unknown]; vi = 0; flipped = false;
+    vq = vmode === 'review' ? unknown : [...fresh, ...unknown];
+  }
+  // 标记：0 不认识 / 1 模糊 / 2 认识。「再过一遍」模式只更新认识程度，不改今天的已刷记录（S.vseen / S.vstage）
+  function vmark(k) {
+    const w = vq[vi]; if (!w) return; const d = lday();
+    vhist.push({ id: w.id, v: S.vocab[w.id], s: S.vseen[w.id], st: S.vstage[w.id] }); if (vhist.length > 50) vhist.shift();
+    if (!vagain) {
+      if (k === 2) { if (!(S.vocab[w.id] === 2 && S.vseen[w.id] === d)) S.vstage[w.id] = (S.vstage[w.id] || 0) + 1; } else delete S.vstage[w.id];
+      S.vseen[w.id] = d;
+    }
+    S.vocab[w.id] = k; save(); vi++; flipped = false; renderVocab();
+  }
+  // 撤销上一个：恢复那个词标记前的状态，并把它放回当前卡片
+  function vundo() {
+    const h = vhist.pop(); if (!h) return;
+    const put = (o, k, v) => { if (v === undefined) delete o[k]; else o[k] = v; };
+    put(S.vocab, h.id, h.v); put(S.vseen, h.id, h.s); put(S.vstage, h.id, h.st); save();
+    if (vi > 0 && vq[vi - 1] && vq[vi - 1].id === h.id) vi--; else vq.splice(Math.min(vi, vq.length), 0, wordOf(h.id));
+    flipped = false; renderVocab();
   }
   function renderVocab() {
     const st = stats();
     const grp = VOCAB[vg];
     const gDone = grp.words.filter((w, wi) => S.vocab[vg + ':' + wi] === 2).length;
-    if (!vq.length || vi >= vq.length) buildQueue();
+    const src = S.vsrc, daily = src === 'daily', wrong = src === 'wrong';
+    // 生词本一轮刷完停在完成页（不自动重排）；其他模式队列空了就重建
+    if (!vq.length || vi >= vq.length) { if (!(wrong && vq.length && vi >= vq.length)) { vagain = false; buildQueue(); } }
     const w = vq[vi];
-    const daily = S.vsrc === 'daily', plan = daily ? dailyPlan() : null, dd = lday();
+    const plan = daily ? dailyPlan() : null, dd = lday();
     const pDone = plan ? plan.order.filter((id) => S.vseen[id] === dd).length : 0, pTot = plan ? plan.order.length : 0;
+    const againN = plan ? plan.order.filter(isWrong).length : 0;
+    const wrongN = ALLWORDS.filter((x) => isWrong(x.id)).length;
+    const hint = `<span class="fm-hint">${ic('i-flip')}点卡片看释义</span>`;
+    const meta = daily
+      ? `<span>${w ? `${esc(w.g)} · ${vagain ? '<b class="tag-rev">再过一遍</b>' : plan.review.includes(w.id) ? '<b class="tag-rev">复习</b>' : '新词'}` : ''}</span>${w ? hint : ''}<span>${vq.length ? `剩 ${vq.length - vi}` : ''}</span>`
+      : wrong
+        ? `<span>${w ? `${esc(w.g)} · <b class="tag-rev">${S.vocab[w.id] === 0 ? '不认识' : '模糊'}</b>` : ''}</span>${w ? hint : ''}<span>${vq.length ? `${Math.min(vi + 1, vq.length)} / ${vq.length}` : ''}</span>`
+        : `<span>${esc(grp.g)} · 本组认识 ${gDone}/${grp.words.length}</span>${w ? hint : ''}<span>${vq.length ? `${vi + 1} / ${vq.length}` : ''}<button class="chip" style="margin-left:8px" id="vmode">${vmode === 'review' ? '只刷生词' : '全部'}</button></span>`;
+    const empty = daily
+      ? `<div class="empty">${ic('i-party')}今天的 ${pTot} 个词都过完了。<div class="empty-acts">${againN ? `<button class="btn soft m-vocab" data-vagain>${ic('i-redo')}把今天不认识的再过一遍（${againN} 个）</button>` : ''}<button class="btn primary" data-vmore>${ic('i-abc')}再来 10 个新词</button></div></div>`
+      : wrong
+        ? (vq.length ? `<div class="empty">${ic('i-party')}生词本这一轮 ${vq.length} 个过完了，还剩 ${wrongN} 个生词。${wrongN ? `<div class="empty-acts"><button class="btn primary" data-vround>${ic('i-redo')}再过一轮</button></div>` : ''}</div>`
+          : `<div class="empty">${ic('i-party')}生词本是空的。刷闪卡时点「不认识」或「模糊」的词会收进来。</div>`)
+        : `<div class="empty">${ic('i-party')}这一组都认识了。换一组，或点"只刷生词"复习。</div>`;
+    const listRows = daily ? plan.order.map(wordOf).filter(Boolean) : wrong ? (vq.length ? vq : ALLWORDS.filter((x) => isWrong(x.id))) : grp.words.map((x, wi) => wordOf(vg + ':' + wi));
     $('#vocab-box').innerHTML = `
       <div class="sec-h" style="margin-top:4px"><span class="ico m-vocab">${ic('i-abc')}</span><h2>高频词汇</h2><span class="more">认识 ${st.known} · 生词 ${st.unknown}</span></div>
-      <div class="vsrc seg2" role="tablist"><button role="tab" data-vsrc="daily" aria-selected="${daily}">今日单词</button><button role="tab" data-vsrc="topic" aria-selected="${!daily}">按主题</button></div>
-      ${daily ? `<div class="vday card"><div class="vday-top"><div><b>今天 ${plan.fresh.length} 个新词 + ${plan.review.length} 个复习</b><span>随机抽取，当天固定；点「不认识」明天再出现，「模糊」隔一天再出现</span></div><div class="vday-n">${pDone}<small>/${pTot}</small></div></div>
+      <div class="vsrc seg2" role="tablist"><button role="tab" data-vsrc="daily" aria-selected="${daily}">今日单词</button><button role="tab" data-vsrc="topic" aria-selected="${src === 'topic'}">按主题</button><button role="tab" data-vsrc="wrong" aria-selected="${wrong}">生词本 ${wrongN}</button></div>
+      ${daily ? `<div class="vday card"><div class="vday-top"><div><b>今天 ${plan.fresh.length} 个新词 + ${plan.review.length} 个复习</b><span>新词随机抽取、当天固定；「不认识」明天再出现，「模糊」隔一天，「认识」7 天、21 天后各抽查一次</span></div><div class="vday-n">${pDone}<small>/${pTot}</small></div></div>
         <div class="bar"><i style="width:${pTot ? Math.round(pDone / pTot * 100) : 0}%"></i></div>
         <div class="ctl">每日新词 ${[10, 20, 30].map((n) => `<button class="chip" data-vnew="${n}" aria-pressed="${S.vnew === n}">${n}</button>`).join('')}</div></div>` : ''}
-      <div class="vt m-vocab${daily ? ' hide' : ''} ${vtOpen ? 'open' : ''}"><button class="vt-cur" id="vtToggle" aria-expanded="${vtOpen}"><span class="vt-lab">当前主题</span><b>${esc(grp.g)}</b><span class="vt-n">${gDone}/${grp.words.length}</span><span class="vt-sw">${vtOpen ? '收起' : '切换主题'}</span>${ic('i-chev-r')}</button>
+      ${wrong ? `<div class="vday card"><div class="vday-top"><div><b>生词本 ${wrongN} 个</b><span>点「不认识」「模糊」的词都在这里，最近标记的排在前面；点「认识」就移出生词本</span></div></div></div>` : ''}
+      <div class="vt m-vocab${src !== 'topic' ? ' hide' : ''} ${vtOpen ? 'open' : ''}"><button class="vt-cur" id="vtToggle" aria-expanded="${vtOpen}"><span class="vt-lab">当前主题</span><b>${esc(grp.g)}</b><span class="vt-n">${gDone}/${grp.words.length}</span><span class="vt-sw">${vtOpen ? '收起' : '切换主题'}</span>${ic('i-chev-r')}</button>
         <div class="vt-grid">${VOCAB.map((g, i) => { const d = g.words.filter((x, wi) => S.vocab[i + ':' + wi] === 2).length; return `<button class="vt-tile" data-vg="${i}" aria-pressed="${i === vg}"><span class="nm">${esc(g.g)}</span><span class="ct">${d}/${g.words.length}</span><span class="bar"><i style="width:${Math.round(d / g.words.length * 100)}%"></i></span></button>`; }).join('')}</div></div>
       <div class="flash-wrap">
-        <div class="flash-meta">${daily ? `<span>${w ? `${esc(w.g)} · ${plan.review.includes(w.id) ? '<b class="tag-rev">复习</b>' : '新词'}` : ''}</span><span>${vq.length ? `剩 ${vq.length - vi}` : ''}</span>` : `<span>${esc(grp.g)} · 本组认识 ${gDone}/${grp.words.length}</span><span>${vq.length ? `${vi + 1} / ${vq.length}` : ''}<button class="chip" style="margin-left:8px" id="vmode">${vmode === 'review' ? '只刷生词' : '全部'}</button></span>`}</div>
+        <div class="flash-meta">${meta}</div>
         ${w ? `
         <div class="flash ${flipped ? 'flipped' : ''}" id="flash"><div class="inner">
-          <div class="face front"><button class="spk" data-say="${esc(w.w)}" aria-label="朗读">${ic('i-vol')}</button><div class="w">${esc(w.w)}</div><span class="pos">${esc(w.p)}</span><div class="hint">${ic('i-flip')}点卡片看释义</div></div>
-          <div class="face back"><div class="cn">${esc(w.c)}</div><ol class="exs">${exOf(w).map(([en, zh]) => `<li><button class="spk sm" data-say="${esc(en)}" aria-label="朗读例句">${ic('i-vol')}</button><div class="ex">${hlWord(esc(en), w.w)}</div><div class="zh">${esc(zh)}</div></li>`).join('')}</ol></div>
+          <div class="face front"><button class="spk" data-say="${esc(w.w)}" aria-label="朗读">${ic('i-vol')}</button><div class="w">${esc(w.w)}</div><span class="pos">${esc(w.p)}</span></div>
+          <div class="face back"><div class="bk-hd"><span class="bw">${esc(w.w)}</span><span class="pos">${esc(w.p)}</span></div><div class="cn">${esc(w.c)}</div><ol class="exs">${exOf(w).map(([en, zh]) => `<li><button class="spk sm" data-say="${esc(en)}" aria-label="朗读例句">${ic('i-vol')}</button><div class="ex">${hlWord(esc(en), w.w)}</div><div class="zh">${esc(zh)}</div></li>`).join('')}</ol></div>
         </div></div>
         <div class="flash-acts"><button class="btn no" data-mark="0">${ic('i-x')}不认识</button><button class="btn so" data-mark="1">模糊</button><button class="btn ok" data-mark="2">${ic('i-check')}认识</button></div>`
-        : daily ? `<div class="empty">${ic('i-party')}今天的 ${pTot} 个词都过完了。<div style="margin-top:12px"><button class="btn primary" data-vmore>${ic('i-redo')}再来 10 个新词</button></div></div>` : `<div class="empty">${ic('i-party')}这一组都认识了。换一组，或点"只刷生词"复习。</div>`}
+        : empty}
+        <div class="flash-sub"><button class="btn ghost" data-undo ${vhist.length ? '' : 'disabled'}>${ic('i-redo')}撤销上一个</button><span class="kbd-hint">空格 翻面 · 1 / 2 / 3 标记 · S 朗读 · Z 撤销</span></div>
       </div>
-      <div class="sec-h"><h2 style="font-size:16px">${daily ? '今日单词表' : '本组单词表'}</h2></div>
-      <div class="vocab-list">${(daily ? plan.order.map((id) => ALLWORDS.find((x) => x.id === id)).filter(Boolean).map((x) => [x.id, x.w, x.p, x.c]) : grp.words.map((x, wi) => [vg + ':' + wi, x[0], x[1], x[2]])).map(([id, ww, pp, cc]) => { const s = S.vocab[id]; return `<button class="vw ${s === 0 || s === 1 ? 'unknown' : s === 2 ? 'known' : ''}${daily && S.vseen[id] === dd ? ' done' : ''}${w && w.id === id ? ' cur' : ''}" data-vw="${id}"><span class="hd"><span class="w">${esc(ww)}</span><span class="pos">${esc(pp)}</span></span><span class="cn">${esc(cc)}</span></button>`; }).join('')}</div>`;
+      <div class="sec-h"><h2 style="font-size:16px">${daily ? '今日单词表' : wrong ? '生词表' : '本组单词表'}</h2></div>
+      <div class="vocab-list">${listRows.map((x) => { const s = S.vocab[x.id]; return `<button class="vw ${s === 0 || s === 1 ? 'unknown' : s === 2 ? 'known' : ''}${daily && S.vseen[x.id] === dd ? ' done' : ''}${w && w.id === x.id ? ' cur' : ''}" data-vw="${x.id}"><span class="hd"><span class="w">${esc(x.w)}</span><span class="pos">${esc(x.p)}</span></span><span class="cn">${esc(x.c)}</span></button>`; }).join('')}</div>`;
     $('#vocab-box').onclick = (e) => {
       // 点单词表里的词：卡片切到这个词（不在当前队列就插到当前位置），滚回卡片
-      const vw = e.target.closest('[data-vw]'); if (vw) { const id = vw.dataset.vw; const k = vq.findIndex((x, i) => i >= vi && x.id === id); if (k === -1) vq.splice(vi, 0, ALLWORDS.find((y) => y.id === id)); else if (k > vi) { const [x] = vq.splice(k, 1); vq.splice(vi, 0, x); } flipped = false; renderVocab(); $('.flash-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
-      const vs = e.target.closest('[data-vsrc]'); if (vs) { S.vsrc = vs.dataset.vsrc; save(); vq = []; renderVocab(); return; }
+      const vw = e.target.closest('[data-vw]'); if (vw) { const id = vw.dataset.vw; const k = vq.findIndex((x, i) => i >= vi && x.id === id); if (k === -1) vq.splice(vi, 0, wordOf(id)); else if (k > vi) { const [x] = vq.splice(k, 1); vq.splice(vi, 0, x); } flipped = false; renderVocab(); $('.flash-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+      const vs = e.target.closest('[data-vsrc]'); if (vs) { S.vsrc = vs.dataset.vsrc; save(); vq = []; vhist = []; renderVocab(); return; }
       const vn = e.target.closest('[data-vnew]'); if (vn) { S.vnew = +vn.dataset.vnew; save(); vq = []; renderVocab(); return; }
       if (e.target.closest('[data-vmore]')) { dailyPlan(true); vq = []; renderVocab(); return; }
+      if (e.target.closest('[data-vagain]')) { const ids = dailyPlan().order.filter(isWrong); vq = shuffle(ids.map(wordOf).filter(Boolean)); vi = 0; flipped = false; vagain = true; renderVocab(); return; }
+      if (e.target.closest('[data-vround]')) { vq = []; renderVocab(); return; }
+      if (e.target.closest('[data-undo]')) { vundo(); return; }
       const g = e.target.closest('[data-vg]'); if (g) { vg = +g.dataset.vg; vq = []; vtOpen = false; renderVocab(); return; }
       if (e.target.closest('#vtToggle')) { vtOpen = !vtOpen; $('.vt').classList.toggle('open', vtOpen); e.target.closest('#vtToggle').setAttribute('aria-expanded', vtOpen); $('.vt-sw').textContent = vtOpen ? '收起' : '切换主题'; return; }
       if (e.target.closest('#vmode')) { vmode = vmode === 'review' ? 'flash' : 'review'; vq = []; renderVocab(); return; }
       const sp = e.target.closest('[data-say]'); if (sp) { e.stopPropagation(); speak(sp.dataset.say, 0.9); return; }
-      const mk = e.target.closest('[data-mark]'); if (mk) { S.vocab[w.id] = +mk.dataset.mark; S.vseen[w.id] = lday(); save(); vi++; flipped = false; renderVocab(); return; }
+      const mk = e.target.closest('[data-mark]'); if (mk) { vmark(+mk.dataset.mark); return; }
       if (e.target.closest('#flash')) { flipped = !flipped; $('#flash').classList.toggle('flipped', flipped); }
     };
   }
+  // 电脑键盘：空格翻面，1/2/3 = 不认识/模糊/认识，S 朗读，Z 撤销（只在单词页、焦点不在输入框时生效）
+  document.addEventListener('keydown', (e) => {
+    if ($('#view-vocab').hidden || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+    if (e.target.closest && e.target.closest('input,textarea,select,[contenteditable="true"]')) return;
+    const k = e.key.toLowerCase(), fl = $('#flash');
+    if (k === ' ') { if (!fl) return; e.preventDefault(); flipped = !flipped; fl.classList.toggle('flipped', flipped); return; }
+    if (k === '1' || k === '2' || k === '3') { if (!vq[vi] || !fl) return; e.preventDefault(); vmark(+k - 1); return; }
+    if (k === 's') { if (vq[vi] && fl) speak(vq[vi].w, 0.9); return; }
+    if (k === 'z') { e.preventDefault(); vundo(); }
+  });
 
   /* ================= 听读练习 ================= */
   let psub = 'listen', cur = null;
@@ -354,7 +479,7 @@
     cur = { ...f, ans: {}, done: false, playing: false }; renderSet(); startTimer(); window.scrollTo(0, 0);
   }
   function recordSet(id, r, t, wrongs) {
-    S.sets[id] = { r, t, at: today() }; wrongs.forEach((w) => { S.wrong[w.key] = w; }); save();
+    S.sets[id] = { r, t, at: today(), d: lday() }; wrongs.forEach((w) => { S.wrong[w.key] = w; }); save();
   }
   function renderSet() {
     const { kind, set, ans, done } = cur; const mod = kind === 'listen' ? 'm-listen' : 'm-read';
@@ -541,7 +666,7 @@
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `cet6-backup-${today()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); return;
       }
       if (e.target.closest('#files-box')) return;
-      if (e.target.closest('[data-go-vocab]')) { vmode = 'review'; vq = []; show('vocab'); }
+      if (e.target.closest('[data-go-vocab]')) { S.vsrc = 'wrong'; save(); vq = []; show('vocab'); }
       if (e.target.closest('[data-clear]') && confirm('清空错题本？')) { S.wrong = {}; save(); renderMe(); }
     };
   }

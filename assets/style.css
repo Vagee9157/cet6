@@ -2,7 +2,8 @@
    UI 字体 Manrope / Noto Sans SC；英文正文 Lora（衬线，阅读不累） */
 :root{
   --bg:#f5f4fb; --paper:#ffffff; --paper-2:#f3f2fa; --line:#e7e6f1; --line-2:#cfccdf;
-  --ink:#1b1a2e; --ink-soft:#4d4b63; --ink-dim:#8a889e;
+  --ink:#1b1a2e; --ink-soft:#4d4b63; --ink-mute:#6b6980; --ink-dim:#8a889e;
+  --mark-no:#c42b31; --mark-so:#9a4a00; --mark-ok:#12783a;
   --brand:#4f46e5; --brand-ink:#fff; --brand-soft:#e9e7ff; --brand-deep:#3730a3;
   --listen:#0d9488; --listen-soft:#d9f3ef;
   --read:#2563eb; --read-soft:#e2ebfd;
@@ -20,7 +21,8 @@
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#12111c; --paper:#1a1926; --paper-2:#222031; --line:#2b2940; --line-2:#3d3a56;
-  --ink:#ecebf5; --ink-soft:#b6b4c8; --ink-dim:#7e7c93;
+  --ink:#ecebf5; --ink-soft:#b6b4c8; --ink-mute:#a19fb6; --ink-dim:#8e8ca4;
+  --mark-no:#ff8a8a; --mark-so:#fbbf24; --mark-ok:#4ade80;
   --brand:#8b84ff; --brand-ink:#0d0b2a; --brand-soft:#2a2750; --brand-deep:#b5b0ff;
   --listen:#2dd4bf; --listen-soft:#143a37; --read:#60a5fa; --read-soft:#1b2d4f; --write:#fbbf24; --write-soft:#3d2e10;
   --trans:#f472b6; --trans-soft:#441c33; --vocab:#4ade80; --vocab-soft:#15321f; --exam:#a78bfa; --exam-soft:#2c2447;
@@ -29,7 +31,8 @@
   color-scheme:dark;}}
 :root[data-theme="dark"]{
   --bg:#12111c; --paper:#1a1926; --paper-2:#222031; --line:#2b2940; --line-2:#3d3a56;
-  --ink:#ecebf5; --ink-soft:#b6b4c8; --ink-dim:#7e7c93;
+  --ink:#ecebf5; --ink-soft:#b6b4c8; --ink-mute:#a19fb6; --ink-dim:#8e8ca4;
+  --mark-no:#ff8a8a; --mark-so:#fbbf24; --mark-ok:#4ade80;
   --brand:#8b84ff; --brand-ink:#0d0b2a; --brand-soft:#2a2750; --brand-deep:#b5b0ff;
   --listen:#2dd4bf; --listen-soft:#143a37; --read:#60a5fa; --read-soft:#1b2d4f; --write:#fbbf24; --write-soft:#3d2e10;
   --trans:#f472b6; --trans-soft:#441c33; --vocab:#4ade80; --vocab-soft:#15321f; --exam:#a78bfa; --exam-soft:#2c2447;
@@ -484,3 +487,62 @@ footer.foot b{color:var(--ink-soft)}
 .wchart .ch-pv{font:700 10px var(--sans,sans-serif);fill:#fff}
 .wchart .ch-grid{stroke:var(--line);stroke-width:.8}
 .wchart .ch-c0{fill:var(--write)}.wchart .ch-c1{fill:var(--listen)}.wchart .ch-c2{fill:var(--read,var(--brand))}.wchart .ch-c3{fill:var(--ink-dim)}
+
+/* ===== 首页 + 单词（home-vocab）===== */
+/* 正文性小字用 --ink-mute（白底 ≥4.5:1），--ink-dim 只留给装饰性元信息 */
+.plan span,.mod span,.vday-top span,.face .exs .zh{color:var(--ink-mute)}
+.flash-acts .no{color:var(--mark-no)} .flash-acts .so{color:var(--mark-so)} .flash-acts .ok{color:var(--mark-ok)}
+.hero-main a.btn{text-decoration:none}
+/* 首页布局：电脑 hero 两栏、四件事通栏在下；手机四件事紧跟 hero 主卡，统计和分值拆解放后面 */
+.hero{grid-template-areas:"main side" "plan plan"}
+.hero-main{grid-area:main}.hero-side{grid-area:side;min-width:0}.home-plan{grid-area:plan;min-width:0}
+.home-plan .sec-h{margin-top:12px}
+@media (min-width:720px) and (max-width:959px){.hero{grid-template-areas:"main" "side" "plan"}}
+@media (max-width:719px){.hero{grid-template-areas:"main" "plan" "side"}.home-plan .sec-h{margin-top:10px}}
+.plan .card>span:last-child{min-width:0}
+/* 710 分拆解：可折叠（手机默认收起） */
+details.score-split>summary{list-style:none;cursor:pointer}
+details.score-split>summary::-webkit-details-marker{display:none}
+details.score-split>summary h3{margin-bottom:0}
+details.score-split[open]>summary h3{margin-bottom:10px}
+details.score-split h3 .caret{grid-row:auto;grid-column:auto;margin-left:6px;width:26px;height:26px}
+details.score-split[open] h3 .caret{transform:rotate(90deg);color:var(--brand)}
+/* 考点 / 真题索引：网格列允许收缩，表格在 .tbl-scroll 里横滑，页面不溢出 */
+.pt-grid{grid-template-columns:minmax(0,1fr)}
+@media (min-width:860px){.pt-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+details.pt{min-width:0}
+details.pt>summary{grid-template-columns:minmax(0,1fr) auto}
+.pt-title,.pt-tip{min-width:0;overflow-wrap:anywhere}
+.pt-body{min-width:0;overflow-wrap:anywhere}
+.tbl-scroll{max-width:100%;-webkit-overflow-scrolling:touch}
+.pt-body table{overflow-wrap:normal}
+.q-list{min-width:0}
+.dist-row{display:grid;grid-template-columns:5.5em minmax(0,1fr) 3.4em;gap:10px;align-items:center;font-size:13.5px}
+.dist-row b{min-width:0;overflow-wrap:anywhere}
+.dist-row span{color:var(--ink-mute);font-weight:700;text-align:right}
+/* 闪卡：正面单词靠上；翻面提示在卡片上方的 meta 行；背面顶部小号词头 */
+.flash-meta{flex-wrap:wrap;gap:4px 12px}
+.flash-meta .fm-hint{display:inline-flex;align-items:center;gap:5px;margin-left:auto;color:var(--ink-mute);font-weight:600}
+.flash-meta .fm-hint+span{white-space:nowrap}
+.face.front{justify-content:flex-start;padding-top:clamp(52px,9vh,84px)}
+.face.back .bk-hd{display:flex;align-items:baseline;gap:8px;align-self:flex-start;max-width:100%;padding-right:4px}
+.face.back .bk-hd .bw{font-family:var(--serif);font-size:15px;font-weight:600;color:var(--ink-soft);overflow-wrap:anywhere;text-align:left}
+.face.back .bk-hd .pos{margin-top:0;font-size:11px;padding:1px 8px}
+.face.back .cn{margin-top:4px}
+.flash-sub{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;flex-wrap:wrap}
+.flash-sub .btn{padding:6px 10px;font-size:13px}
+.flash-sub .kbd-hint{display:none;font-size:12px;color:var(--ink-dim)}
+@media (hover:hover) and (pointer:fine){.flash-sub .kbd-hint{display:inline}}
+.empty-acts{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:14px}
+.empty-acts .btn{white-space:normal}
+.seg2{max-width:100%}
+.seg2 button{white-space:nowrap}
+@media (max-width:380px){.seg2 button{padding:6px 12px;font-size:13.5px}}
+/* 手机：吸底按钮下面留出空间，背面最后一条例句能滚到按钮上方 */
+@media (max-width:719px){
+  .flash-wrap{padding-bottom:12px}
+  .face.back{padding-bottom:28px}
+  .flash-sub{position:relative;z-index:6}
+}
+@media (min-width:720px) and (max-width:959px){.plan{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.hero-main .btn.w{color:#3730a3} /* 白底按钮：深色模式下 --brand-deep 变浅，固定深靛色 */
