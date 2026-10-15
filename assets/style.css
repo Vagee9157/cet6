@@ -1138,3 +1138,25 @@ mark.loc{background:color-mix(in srgb,var(--amber) 38%,transparent);color:inheri
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .hm-split .split-bar button{color:#12111c}:root:not([data-theme="light"]) .hm-split .split-bar button[aria-pressed="true"]{outline-color:rgba(18,17,28,.85)}}
 :root[data-theme="dark"] .hm-split .split-bar button{color:#12111c}
 :root[data-theme="dark"] .hm-split .split-bar button[aria-pressed="true"]{outline-color:rgba(18,17,28,.85)}
+/* ===== 写译选题面板 ===== */
+.wt-pick{margin:0 0 14px}
+.wt-pbar{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
+.wt-cur{flex:1 1 260px;display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;min-height:48px;padding:10px 14px;border-radius:var(--r-s);background:var(--paper);box-shadow:var(--shadow);text-align:left;border:1.5px solid transparent}
+.wt-cur:hover{border-color:var(--line-2)}
+.wt-cur .lab{font-size:12px;font-weight:700;color:var(--ink-mute,var(--ink-dim))}
+.wt-cur b{font-size:15px;min-width:0}
+.wt-cur .past{font-size:11.5px;font-weight:700;color:var(--c);background:var(--cs);padding:2px 8px;border-radius:999px;white-space:nowrap}
+.wt-cur .sw{margin-left:auto;font-size:12.5px;font-weight:700;color:var(--c);white-space:nowrap}
+.wt-cur svg.i{color:var(--ink-dim);transform:rotate(90deg);transition:transform .2s}
+.wt-pick.open .wt-cur svg.i{transform:rotate(-90deg)}
+.wt-left{font-size:12.5px;color:var(--ink-mute,var(--ink-dim));margin:8px 2px 0}
+.wt-panel{margin-top:10px;padding:12px;border-radius:var(--r-s);background:var(--paper);box-shadow:var(--shadow)}
+.wt-filt{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:8px}
+.wt-filt>span{font-size:12px;font-weight:800;color:var(--ink-mute,var(--ink-dim));width:3em}
+.wt-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr));gap:8px;max-height:min(60vh,520px);overflow:auto;padding:2px;margin-top:6px}
+.wt-item{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;padding:9px 34px 10px 12px;border-radius:12px;background:var(--paper-2);border:1.5px solid transparent;min-height:48px}
+.wt-item:hover{border-color:var(--line-2)}
+.wt-item.on{border-color:var(--c);background:var(--cs)}
+.wt-item b{font-size:14px;line-height:1.35}
+.wt-item span{font-size:12px;color:var(--ink-mute,var(--ink-dim))}
+.wt-item .ok{position:absolute;top:9px;right:10px;color:var(--ok)}

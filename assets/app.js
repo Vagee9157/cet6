@@ -833,6 +833,27 @@
   /* ================= 写译 ================= */
   // 先写再对照：作答存在 S.wt[题目 id]（自动保存），范文 / 参考译文默认收起；可选 30 分钟倒计时（只在本次打开期间有效）
   let wsub = 'write', wsel = 0, tsel = 0, reveal = {}, wtClock = null, wtTick = 0, wtSaveT = 0;
+  // 选题面板：题多了（写作 81 / 翻译 85）不再整排铺开，按来源（真题 / 本站）和文体 / 主题筛选
+  const wtPick = { open: false, src: 'all', kind: 'all' };
+  const WKIND = [['议论', /议论|观点/], ['名言', /名言/], ['图表', /图表/], ['应用文', /应用/], ['现象', /现象/], ['问题', /问题/]];
+  const wtKindOf = (x, isW) => isW ? ((WKIND.find(([, re]) => re.test(x.title.split('·')[0])) || ['其他'])[0]) : (x.theme || '其他');
+  function wtPickHTML(isW) {
+    const list = isW ? WRITING : TRANSLATION, ci = isW ? wsel : tsel, curX = list[ci], m = isW ? 'm-write' : 'm-trans';
+    const name = (x) => isW ? (x.tag || x.title.split('·')[0].trim()) : x.title;
+    const kinds = [...new Set(list.map((x) => wtKindOf(x, isW)))];
+    const shown = list.map((x, i) => [x, i]).filter(([x]) => (wtPick.src === 'all' || (wtPick.src === 'past' ? !!x.past : !x.past)) && (wtPick.kind === 'all' || wtKindOf(x, isW) === wtPick.kind));
+    const left = list.filter((x) => !wrote(x.id)).length;
+    const chip = (attr, v, label, on) => `<button class="chip" ${attr}="${esc(v)}" aria-pressed="${on}">${esc(label)}</button>`;
+    return `<div class="wt-pick ${m}${wtPick.open ? ' open' : ''}">
+      <div class="wt-pbar"><button class="wt-cur" data-wpick aria-expanded="${wtPick.open}"><span class="lab">当前题目</span><b>${esc(name(curX))}</b>${curX.past ? `<span class="past">真题 ${esc(curX.past)}</span>` : ''}<span class="sw">${wtPick.open ? '收起' : '选题'}</span>${ic('i-chev-r')}</button>
+        <button class="btn tone ${m}" data-wrand>${ic('i-redo')}随机一题</button></div>
+      <p class="wt-left">${left ? `共 ${list.length} 题，没写过的还有 ${left} 题；随机只从没写过的里抽` : `${list.length} 题都写过了，随机抽一题再练`}</p>
+      ${wtPick.open ? `<div class="wt-panel">
+        <div class="wt-filt"><span>来源</span>${chip('data-wsrc', 'all', '全部', wtPick.src === 'all')}${chip('data-wsrc', 'past', '近十年真题', wtPick.src === 'past')}${chip('data-wsrc', 'own', '本站练习', wtPick.src === 'own')}</div>
+        <div class="wt-filt"><span>${isW ? '文体' : '主题'}</span>${chip('data-wkind', 'all', '全部', wtPick.kind === 'all')}${kinds.map((k) => chip('data-wkind', k, k, wtPick.kind === k)).join('')}</div>
+        <div class="wt-list">${shown.map(([x, i]) => `<button class="wt-item${i === ci ? ' on' : ''}" ${isW ? 'data-wsel' : 'data-tsel'}="${i}"><b>${esc(name(x))}</b><span>${x.past ? `真题 ${esc(x.past)}` : '本站练习'} · ${esc(wtKindOf(x, isW))}</span>${wrote(x.id) ? `<i class="ok">${ic('i-check')}</i>` : ''}</button>`).join('') || '<p class="lead">没有符合条件的题目。</p>'}</div>
+      </div>` : ''}</div>`;
+  }
   S.wt = S.wt || {};
   // 高亮：每篇数据自带 hl（范文原文片段），长的先替换，避免短语嵌套
   function hl(text, phrases) { let h = esc(text); (phrases || []).slice().sort((a, b) => b.length - a.length).forEach((p) => { h = h.split(esc(p)).join(`<mark>${esc(p)}</mark>`); }); return h; }
@@ -883,7 +904,7 @@
     let body = '';
     if (wsub === 'write') {
       const w = WRITING[wsel]; const shown = !!reveal[w.id];
-      body = `<div class="vocab-top wt-sel">${WRITING.map((x, i) => `<button class="chip m-write" data-wsel="${i}" aria-pressed="${i === wsel}">${esc(x.tag || x.title.split('·')[0].trim())}${done(x.id)}</button>`).join('')}</div>
+      body = `${wtPickHTML(true)}
         <div class="prompt m-write"><div class="lab">题目 · ${esc(w.title.split('·')[0].trim())}</div>${esc(w.prompt)}${w.chart && window.writingChart ? window.writingChart(w.chart) : ''}</div>
         ${answerBox(w.id, true)}
         <details class="wt-outline m-write"><summary>${ic('i-target')}卡住了？看提纲</summary>
@@ -894,7 +915,7 @@
         <div class="notes m-write">${w.notes.map((n) => `<div class="nt">${ic('i-bulb')}<span>${esc(n)}</span></div>`).join('')}</div>` : ''}`;
     } else {
       const t = TRANSLATION[tsel]; const shown = !!reveal[t.id];
-      body = `<div class="vocab-top wt-sel">${TRANSLATION.map((x, i) => `<button class="chip m-trans" data-tsel="${i}" aria-pressed="${i === tsel}">${esc(x.title)}${done(x.id)}</button>`).join('')}</div>
+      body = `${wtPickHTML(false)}
         <div class="prompt m-trans"><div class="lab">汉译英 · ${esc(t.theme)}</div><span class="zh" style="font-family:var(--ui);line-height:1.9">${esc(t.zh)}</span></div>
         <div class="sec-h"><span class="ico m-trans">${ic('i-abc')}</span><h2 style="font-size:16px">关键词</h2></div>
         <div class="keys">${t.keys.map((k) => { const m = k.match(/^(.*?)\s+([A-Za-z(].*)$/); const zh = m ? m[1] : '', en = m ? m[2] : k; return `<span class="chip">${esc(en)}${zh ? `<i>${esc(zh)}</i>` : ''}</span>`; }).join('')}</div>
@@ -902,14 +923,15 @@
         <div class="reveal"><button class="btn tone m-trans" data-reveal="${t.id}" aria-expanded="${shown}">${ic('i-eye')}${shown ? '收起参考译文' : '对照参考译文'}</button></div>
         ${shown ? `<div class="sample m-trans">${esc(t.en)}</div><div class="notes m-trans">${t.notes.map((n) => `<div class="nt">${ic('i-bulb')}<span>${esc(n)}</span></div>`).join('')}</div>` : ''}`;
     }
-    const list = wsub === 'write' ? WRITING : TRANSLATION, left = list.filter((x) => !wrote(x.id)).length;
-    const rnd = `<div class="wt-rand"><button class="btn tone ${wsub === 'write' ? 'm-write' : 'm-trans'}" data-wrand>${ic('i-redo')}随机一题</button><span>${left ? `没写过的还有 ${left} 题，只从这里抽` : '都写过了，随机抽一题再练'}</span></div>`;
-    $('#wt-box').innerHTML = `<div class="wt-body">${hint ? wtHintBar(hint) : ''}${tabs + rnd + body}</div>`;
+        $('#wt-box').innerHTML = `<div class="wt-body">${hint ? wtHintBar(hint) : ''}${tabs + body}</div>`;
     clearInterval(wtTick); syncClock(); if (wtClock) wtTick = setInterval(syncClock, 1000);
     $('#wt-box').onclick = (e) => {
-      const s = e.target.closest('[data-wsub]'); if (s) return renderWT(s.dataset.wsub);
-      const a = e.target.closest('[data-wsel]'); if (a) { wsel = +a.dataset.wsel; return renderWT(); }
-      const b = e.target.closest('[data-tsel]'); if (b) { tsel = +b.dataset.tsel; return renderWT(); }
+      const s = e.target.closest('[data-wsub]'); if (s) { wtPick.kind = 'all'; return renderWT(s.dataset.wsub); }
+      const a = e.target.closest('[data-wsel]'); if (a) { wsel = +a.dataset.wsel; wtPick.open = false; return renderWT(); }
+      const b = e.target.closest('[data-tsel]'); if (b) { tsel = +b.dataset.tsel; wtPick.open = false; return renderWT(); }
+      if (e.target.closest('[data-wpick]')) { wtPick.open = !wtPick.open; return renderWT(); }
+      const fs = e.target.closest('[data-wsrc]'); if (fs) { wtPick.src = fs.dataset.wsrc; return renderWT(); }
+      const fk = e.target.closest('[data-wkind]'); if (fk) { wtPick.kind = fk.dataset.wkind; return renderWT(); }
       if (e.target.closest('[data-hintx]')) { delete S.wtHint; save(); return renderWT(); }
       if (e.target.closest('[data-wrand]')) {
         const isW = wsub === 'write', list = isW ? WRITING : TRANSLATION, curI = isW ? wsel : tsel;
