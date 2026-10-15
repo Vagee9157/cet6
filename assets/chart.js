@@ -3,13 +3,14 @@ window.writingChart = (c) => {
   const esc = (t) => String(t).replace(/[&<>"']/g, (x) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[x]));
   const parts = [];
   if (c.bar) {
-    const d = c.bar.data, W = 300, H = 210, L = 34, B = 30, T = 30, max = Math.ceil(Math.max(...d.map((x) => x[1])) / 2) * 2;
+    const d = c.bar.data, W = 300, H = 210, L = 34, B = 30, T = c.bar.unit ? 44 : 30, max = Math.ceil(Math.max(...d.map((x) => x[1])) / 2) * 2;
     const bw = (W - L - 20) / d.length * 0.55, gap = (W - L - 20) / d.length;
     const y = (v) => H - B - (v / max) * (H - B - T);
     let g = `<text class="ch-t" x="${W / 2}" y="16" text-anchor="middle">${esc(c.bar.title)}</text>`;
     for (let v = 0; v <= max; v += max / 4) g += `<line class="ch-grid" x1="${L}" x2="${W - 10}" y1="${y(v)}" y2="${y(v)}"/><text class="ch-ax" x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${+v.toFixed(1)}</text>`;
     d.forEach(([k, v], i) => { const x = L + gap * i + (gap - bw) / 2; g += `<rect class="ch-c0" x="${x}" y="${y(v)}" width="${bw}" height="${y(0) - y(v)}" rx="2"/><text class="ch-v" x="${x + bw / 2}" y="${y(v) - 5}" text-anchor="middle">${v}</text><text class="ch-ax" x="${x + bw / 2}" y="${H - B + 16}" text-anchor="middle">${esc(k)}</text>`; });
-    if (c.bar.unit) g += `<text class="ch-ax" x="4" y="${T - 6}">(${esc(c.bar.unit)})</text>`;
+    // 单位放在纵轴上方、标题下面一行，不再跟标题和顶部刻度挤在一起
+    if (c.bar.unit) g += `<text class="ch-ax ch-unit" x="${L - 6}" y="${T - 14}" text-anchor="start">(${esc(c.bar.unit)})</text>`;
     parts.push(`<svg class="wchart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(c.bar.title)}">${g}</svg>`);
   }
   if (c.pie) {

@@ -664,3 +664,55 @@ mark.loc{background:color-mix(in srgb,var(--amber) 38%,transparent);color:inheri
 @media (max-width:719px){.lsec > summary .m-src{display:none}}
 .set .meta .score.st-done{display:inline-flex;align-items:center;gap:3px;background:var(--ok-soft);color:var(--okt);padding:1px 8px;border-radius:999px;font-size:12px;white-space:nowrap}
 .set .meta .score.st-draft{background:var(--write-soft);color:var(--write);padding:1px 8px;border-radius:999px;font-size:12px;white-space:nowrap}
+
+/* ===== 写译：先写再对照（作答框 / 字数 / 计时 / 收起范文），电脑上行宽约 72ch ===== */
+.wt-body{max-width:46rem;margin-inline:auto}
+.wt-sel .chip .wt-done{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:var(--c);color:#fff;margin-left:2px}
+.wt-sel .chip .wt-done svg.i{width:11px;height:11px}
+.wt-ans{background:var(--paper);border-radius:var(--r-s);box-shadow:var(--shadow);padding:12px 14px 10px;margin-bottom:12px;border:1.5px solid transparent}
+.wt-ans:focus-within{border-color:var(--c)}
+.wt-bar{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.wt-bar .lab{font-size:11.5px;font-weight:800;color:var(--c);letter-spacing:.05em;margin-right:auto}
+.wt-bar .chip{padding:5px 11px;font-size:12px;box-shadow:none;background:var(--paper-2)}
+.wt-clock{font-variant-numeric:tabular-nums;font-weight:800;font-size:15px;color:var(--ink)}
+.wt-clock.warn{color:var(--amber)} .wt-clock.end{color:var(--red)}
+.wt-ta{display:block;width:100%;min-height:220px;resize:vertical;border:0;outline:0;background:var(--paper-2);color:var(--ink);border-radius:10px;padding:12px 14px;font-family:var(--serif);font-size:16px;line-height:1.75}
+.wt-ta::placeholder{color:var(--ink-dim)}
+.wt-count{display:flex;align-items:baseline;gap:4px;flex-wrap:wrap;margin-top:8px;font-size:13px;color:var(--ink-soft)}
+.wt-count b{font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums}
+.wt-count b.lo{color:var(--amber)} .wt-count b.ok{color:var(--ok)} .wt-count b.hi{color:var(--red)}
+.wt-count .wt-hint{margin-left:8px;color:var(--ink-dim)}
+.wt-outline{margin-bottom:6px}
+.wt-outline>summary{cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;color:var(--c);padding:6px 2px}
+.wt-outline>summary::-webkit-details-marker{display:none}
+.wt-outline[open]>summary{margin-bottom:6px}
+
+/* ===== 我的：错题本 / 生词本紧凑标签 ===== */
+.wrong-grp{margin-bottom:14px}
+.wrong-grp .wg-h{font-size:13px;font-weight:800;color:var(--ink-soft);margin:0 2px 8px;display:flex;align-items:center;gap:6px}
+.wrong-grp .wg-h span{font-size:11.5px;background:var(--paper-2);color:var(--ink-dim);border-radius:999px;padding:1px 8px}
+.wrong-item .ctx{font-family:var(--serif);font-size:14.5px;line-height:1.7;margin-top:6px;padding:8px 12px;border-radius:10px;background:var(--paper-2)}
+.wrong-item .ctx .gap{display:inline-block;min-width:3em;text-align:center;color:var(--red);border-bottom:2px solid var(--red);line-height:1.2}
+.wi-ans{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:8px;font-size:13.5px}
+.wi-ans>div{display:flex;gap:6px;align-items:baseline;min-width:0}
+.wi-ans span{font-size:11.5px;font-weight:700;color:var(--ink-dim);white-space:nowrap}
+.wi-mine b{color:var(--red)} .wi-right b{color:var(--ok)}
+.wrong-item .e{margin-top:6px;line-height:1.6}
+.wi-act{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.wi-act .btn{padding:7px 12px;font-size:13px}
+.me-vtags{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr));gap:6px}
+.me-vtags .mv{background:var(--paper);border-radius:10px;padding:6px 10px;box-shadow:inset 3px 0 0 var(--red),var(--shadow);display:flex;flex-direction:column;min-width:0}
+.me-vtags .mv b{font-family:var(--serif);font-weight:600;font-size:15px;line-height:1.3;overflow-wrap:anywhere}
+.me-vtags .mv span{font-size:12px;color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:719px){.me-vtags{grid-template-columns:1fr 1fr}}
+/* 写译：翻译关键词长短语在手机上换行，不撑破屏宽 */
+.keys .chip{white-space:normal;max-width:100%;flex-wrap:wrap;row-gap:1px;border-radius:14px;line-height:1.4}
+/* 写译：从真题卡跳过来的提示条 */
+.wt-hintbar{display:flex;gap:10px;align-items:flex-start;background:var(--cs);border-radius:var(--r-s);padding:12px 12px 12px 16px;margin-bottom:14px;font-size:13.5px;line-height:1.6}
+.wt-hintbar .tx{flex:1;min-width:0;display:grid;gap:3px}
+.wt-hintbar .hd{font-weight:800;color:var(--c)}
+.wt-hintbar b{color:var(--c);margin-right:4px}
+.wt-hintbar .ft{font-size:12px;color:var(--ink-soft)}
+.wt-hintbar .x{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;color:var(--ink-soft)}
+.wt-hintbar .x:hover{background:var(--paper)}
+.wrong-item .wq{font-weight:600;line-height:1.55}

@@ -3,6 +3,8 @@
 WRITING.push(
   {
     id: 'w9', title: '观点议论 · Will AI tools make people less creative?',
+    tag: '观点·AI与创造力', // 切换条上显示的短名
+    hl: ['In my view, AI will not make us less creative unless', 'On the one hand', 'On the other hand', 'whereas a genuinely new idea', 'It is not the tool itself but the way we use it that determines', 'Only when we treat AI as an assistant rather than a substitute can it'], // 范文高亮：可迁移的模板句（范文原文片段）
     prompt: 'Directions: For this part, you are allowed 30 minutes to write an essay on the question "Will AI tools make people less creative?" You should state your opinion and support it with reasons and examples. You should write at least 150 words but no more than 200 words.',
     outline: ['第一段：现象（AI 几秒钟能写诗、做海报）+ 担忧 + 立场（只要不让 AI 替我们思考，就不会削弱创造力）', '第二段：理由一 AI 接手重复劳动，腾出创造空间（设计专业学生例子）；理由二 创造力源于经历、情感与好奇心，机器无法拥有', '第三段：让步（照抄 AI 会让想象力退化）+ 强调句点明关键在用法 + 倒装收尾'],
     sample: `Today, AI tools can write poems, design posters and compose music within seconds. Many people therefore worry that we will gradually lose our own creativity. In my view, AI will not make us less creative unless we allow it to think for us.
@@ -14,6 +16,8 @@ Admittedly, if students simply copy whatever AI offers, their imagination will i
   },
   {
     id: 'w10', title: '观点议论 · Why digital literacy matters for everyone',
+    tag: '观点·数字素养', // 切换条上显示的短名
+    hl: ['is no longer a bonus for a few experts', 'Those who know how to', 'Had my grandmother not learned to use a smartphone last year, she would still be', 'Moreover', 'Not until everyone is digitally literate can technology truly benefit'], // 范文高亮：可迁移的模板句（范文原文片段）
     prompt: 'Directions: For this part, you are allowed 30 minutes to write an essay on why digital literacy has become a basic skill for everyone in today\'s world. You should give reasons and examples to support your view. You should write at least 150 words but no more than 200 words.',
     outline: ['第一段：背景（银行、求职都搬到线上）+ 观点（数字素养像读写一样是基本能力）', '第二段：理由一 自我保护（辨别假新闻、诈骗，设置隐私）；理由二 决定能否充分参与现代生活（祖母挂号的例子）；补充 职场价值', '第三段：建议（学校开实用课、年轻人帮长辈跨越数字鸿沟）+ 倒装收尾'],
     sample: `In an age when almost everything, from banking to job hunting, has moved online, digital literacy is no longer a bonus for a few experts. It has become a basic skill that everyone needs, just like reading and writing.
@@ -25,6 +29,8 @@ Therefore, schools should offer practical digital courses, and young people shou
   },
   {
     id: 'w11', title: '观点议论 · Should volunteer service be part of college education?',
+    tag: '观点·志愿服务', // 切换条上显示的短名
+    hl: ['Some people regard it as', 'but I firmly believe that', 'To begin with', 'in a way that no lecture could offer', 'So valuable are these experiences that', 'As long as students participate out of genuine willingness'], // 范文高亮：可迁移的模板句（范文原文片段）
     prompt: 'Directions: For this part, you are allowed 30 minutes to write an essay on whether volunteer service should be encouraged as part of college education. You should state your view and support it with reasons. You should write at least 150 words but no more than 200 words.',
     outline: ['第一段：现象（高校鼓励支教、社区服务）+ 反方声音（浪费学习时间）+ 立场（应纳入大学教育）', '第二段：理由一 学到课本学不到的耐心、沟通与责任（山村支教例子）；理由二 了解社会、心怀感恩；用 So ... that 倒装引出用人单位的认可', '第三段：让步（不能变成为学分的形式主义）+ 条件句收束'],
     sample: `Nowadays, many universities encourage students to take part in volunteer service, such as teaching in rural schools or helping at community centers. Some people regard it as a waste of study time, but I firmly believe that volunteer work deserves a place in college education.
@@ -36,6 +42,8 @@ Of course, volunteering should not be turned into a compulsory task done only fo
   },
   {
     id: 'w12', title: '现象解释 · Young people are returning to offline social life',
+    tag: '现象·回归线下社交', // 切换条上显示的短名
+    hl: ['Recently, however, a different trend has emerged', 'Several reasons lie behind this change', 'Equally important is', 'that no number of likes could replace', 'In my opinion, this trend is a healthy one', 'it is in real encounters that the deepest friendships are formed'], // 范文高亮：可迁移的模板句（范文原文片段）
     prompt: 'Directions: For this part, you are allowed 30 minutes to write an essay explaining why more and more young people are turning to offline social activities such as hiking clubs, board games and city walks. You should write at least 150 words but no more than 200 words.',
     outline: ['第一段：现象（曾被称为"屏幕一代"，如今报名徒步、桌游、城市漫步）', '第二段：原因一 厌倦无休止刷屏；原因二 线下连接更真实，建立信任；原因三 缓解压力（倒装引出）', '第三段：评价（健康的趋势，学会平衡数字与现实）+ 强调句收尾'],
     sample: `Not long ago, young people were often described as a generation glued to their screens. Recently, however, a different trend has emerged. More and more of them are signing up for hiking clubs, board game nights and city walks, choosing to meet friends face to face rather than online.
@@ -47,6 +55,8 @@ In my opinion, this trend is a healthy one. It shows that young people are learn
   },
   {
     id: 'w13', title: '问题解决 · How can college students overcome procrastination?',
+    tag: '问题·克服拖延', // 切换条上显示的短名
+    hl: ['has become a common habit among college students', 'not only lowers the quality of their work but also', 'The causes are not hard to find', 'Last but not least', 'is not so much a matter of laziness as a matter of method and self-control', 'Were students to adopt these simple strategies, they would find'], // 范文高亮：可迁移的模板句（范文原文片段）
     prompt: 'Directions: For this part, you are allowed 30 minutes to write an essay on how college students can overcome procrastination. You should describe the problem, analyze its causes and suggest possible solutions. You should write at least 150 words but no more than 200 words.',
     outline: ['第一段：问题（拖到截止前一晚，明知该做却一直刷手机）+ 危害（质量下降、焦虑疲惫）', '第二段：原因两条（目标大而空、网络娱乐分心）+ 对策三条（拆分任务、移除干扰、完成小步后奖励自己）', '第三段：定性（不是懒，而是方法和自控问题）+ 虚拟语气收尾'],
     sample: `Putting off assignments until the night before the deadline has become a common habit among college students. Many of them know clearly what to do, yet they keep scrolling on their phones and promise themselves to start "later." Such procrastination not only lowers the quality of their work but also leaves them anxious and exhausted.
@@ -58,6 +68,8 @@ Procrastination is not so much a matter of laziness as a matter of method and se
   },
   {
     id: 'w14', title: '名言评论 · "Fall seven times, stand up eight."',
+    tag: '名言·七倒八起', // 切换条上显示的短名
+    hl: ['tells us that', 'What really matters is not how many times we fall but whether', 'Those who give up', 'Had he stopped after the first few failures, he would never have succeeded', 'is a lesson rather than a defeat', 'Only by standing up one more time than we fall can we'], // 范文高亮：可迁移的模板句（范文原文片段）
     prompt: 'Directions: For this part, you are allowed 30 minutes to write an essay commenting on the saying "Fall seven times, stand up eight." You can cite examples to illustrate your views. You should write at least 150 words but no more than 200 words.',
     outline: ['第一段：解释名言（失败不是终点，关键是能否再站起来）+ 表态（道出了心理韧性的真义）', '第二段：挫折人人都有（学生、运动员、创业者排比）；放弃者与再站起者对比；爱迪生试验灯丝材料 + 虚拟语气', '第三段：启示（冷静面对失败、带着更好的计划再试）+ 倒装收尾'],
     sample: `The saying "Fall seven times, stand up eight" tells us that failure is not the end of the road. What really matters is not how many times we fall but whether we have the courage to rise again. To me, this simple idea captures the true meaning of resilience.

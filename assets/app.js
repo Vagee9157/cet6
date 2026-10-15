@@ -64,7 +64,6 @@
     if (v !== 'practice' && typeof stopAudio === 'function') stopAudio();
     VIEWS.forEach((x) => { $('#view-' + x).hidden = x !== v; });
     document.querySelectorAll('nav.tabs button').forEach((b) => b.setAttribute('aria-selected', b.dataset.view === v));
-    if (v === 'wt') { const d = lday(); (S.plan[d] = S.plan[d] || {}).wt = 1; save(); } // 首页「读 1 篇范文」打点
     if (!keep) R[v]();
     if (location.hash.slice(1) !== v) history.replaceState(null, '', '#' + v);
     window.scrollTo(0, 0);
@@ -101,7 +100,7 @@
   let splitSel = 'read';
   const splitInfo = (sp) => `<div class="k">${sp.pts}</div><div><b>${sp.n}</b> 满分 ${sp.pts} 分</div><div>${sp.tip}</div>`;
   // 今天的四件事：按真实行为判定完成，点卡片只负责跳转
-  // 单词 = 今日队列刷完；听力 / 阅读 = 当天有该类型交卷记录（S.sets[id].d，旧记录退回 at）；范文 = 当天打开过写译页（show('wt') 打点 S.plan[日期].wt）
+  // 单词 = 今日队列刷完；听力 / 阅读 = 当天有该类型交卷记录（S.sets[id].d，旧记录退回 at）；范文 = 当天展开过「对照范文 / 参考译文」（写译页打点 S.plan[日期].wt）
   function planStatus() {
     const d = lday(), p = dailyPlan();
     const kinds = new Set(Object.entries(S.sets).filter(([, s]) => s && (s.d || s.at) === d).map(([id]) => { const f = findSet(id); return f ? (f.kind === 'listen' ? 'listen' : 'read') : ''; }));
@@ -758,38 +757,93 @@
   }
 
   /* ================= 写译 ================= */
-  let wsub = 'write', wsel = 0, tsel = 0, reveal = {};
-  function hl(text, phrases) { let h = esc(text); phrases.forEach((p) => { h = h.split(esc(p)).join(`<mark>${esc(p)}</mark>`); }); return h; }
-  const HL_W = ['From my perspective', 'To begin with', 'What is more', 'Admittedly', 'Nevertheless', 'Only by weighing both sides carefully can we', 'conveys a profound message', 'There is no denying that', 'by contrast', 'It was their kindness, courage and sense of responsibility that moved people', 'Therefore', 'Only when we are beautiful inside can we', 'I am writing to', 'I would suggest', 'it would be worthwhile to', 'I look forward to your reply'];
+  // 先写再对照：作答存在 S.wt[题目 id]（自动保存），范文 / 参考译文默认收起；可选 30 分钟倒计时（只在本次打开期间有效）
+  let wsub = 'write', wsel = 0, tsel = 0, reveal = {}, wtClock = null, wtTick = 0, wtSaveT = 0;
+  S.wt = S.wt || {};
+  // 高亮：每篇数据自带 hl（范文原文片段），长的先替换，避免短语嵌套
+  function hl(text, phrases) { let h = esc(text); (phrases || []).slice().sort((a, b) => b.length - a.length).forEach((p) => { h = h.split(esc(p)).join(`<mark>${esc(p)}</mark>`); }); return h; }
+  const enWords = (t) => (String(t || '').match(/[A-Za-z0-9]+(?:['’\-][A-Za-z0-9]+)*/g) || []).length;
+  const wrote = (id) => !!(S.wt[id] && S.wt[id].trim());
+  const fmtClock = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  function wtCountHTML(id, isW, ref) {
+    const n = enWords(S.wt[id]);
+    if (!isW) return `<b>${n}</b> 词<span class="wt-hint">参考译文约 ${ref} 词</span>`;
+    const st = !n ? '' : n < 150 ? 'lo' : n > 200 ? 'hi' : 'ok';
+    return `<b class="${st}">${n}</b> 词<span class="wt-hint">${st === 'ok' ? '已在 150–200 词区间' : st === 'hi' ? '超过 200 词，删一点' : n ? `还差 ${150 - n} 词到 150` : '要求 150–200 词'}</span>`;
+  }
+  function syncClock() {
+    const el = $('#wtClock'), btn = $('[data-wtclock]'); if (!el || !btn) { clearInterval(wtTick); return; }
+    const on = wtClock && wtClock.id === btn.dataset.wtclock;
+    if (!on) { el.textContent = ''; btn.innerHTML = `${ic('i-timer')}计时 30 分钟`; return; }
+    const left = Math.max(0, Math.round((wtClock.end - Date.now()) / 1000));
+    el.textContent = left ? fmtClock(left) : '时间到'; el.classList.toggle('end', !left); el.classList.toggle('warn', left > 0 && left <= 300);
+    btn.innerHTML = `${ic('i-x')}停止计时`;
+    if (!left) clearInterval(wtTick);
+  }
+  function answerBox(id, isW, ref) {
+    return `<div class="wt-ans ${isW ? 'm-write' : 'm-trans'}">
+        <div class="wt-bar"><span class="lab">${isW ? '我的作文' : '我的译文'}</span><span class="wt-clock" id="wtClock"></span><button class="chip" data-wtclock="${id}">${ic('i-timer')}计时 30 分钟</button></div>
+        <textarea class="wt-ta" data-wtid="${id}" rows="${isW ? 12 : 9}" spellcheck="false" autocapitalize="sentences" placeholder="${isW ? '先列提纲再动笔，在这里写 150–200 词……' : '先自己译，再对照参考译文……'}">${esc(S.wt[id] || '')}</textarea>
+        <div class="wt-count" id="wtCount">${wtCountHTML(id, isW, ref)}</div>
+      </div>`;
+  }
+  // 从首页真题卡点「练写作 / 练翻译」会带 S.wtHint 过来：10 分钟内有效，顶部提示这套真题的题目，并预选最接近的一篇（每个 hint 只预选一次）
+  let wtHintDone = 0;
+  const wtHintFresh = () => S.wtHint && Date.now() - (S.wtHint.at || 0) < 10 * 60 * 1000 ? S.wtHint : null;
+  function wtWriteKind(type) { const t = String(type || ''); return /名言|谚语/.test(t) ? /名言/ : /图|表|漫画/.test(t) ? /图表/ : /应用|信|演讲|通知|倡议/.test(t) ? /应用文/ : /现象/.test(t) ? /现象/ : /问题|解决/.test(t) ? /问题/ : /议论|观点/; }
+  function applyWtHint(h) {
+    if (wtHintDone === h.at) return; wtHintDone = h.at;
+    if (h.writing) { const re = wtWriteKind(h.writing.type); const i = WRITING.findIndex((w) => re.test(w.title.split('·')[0])); if (i >= 0) wsel = i; }
+    if (h.translation) { const th = String(h.translation.theme || ''), zh = String(h.translation.zh || ''); let i = TRANSLATION.findIndex((t) => zh.includes(t.title)); if (i < 0) i = TRANSLATION.findIndex((t) => t.theme === th); if (i < 0) i = TRANSLATION.findIndex((t) => th && (th.includes(t.theme) || t.theme.includes(th) || th.includes(t.title))); if (i >= 0) tsel = i; }
+  }
+  function wtHintBar(h) {
+    const parts = [h.writing && h.writing.zh ? `<span><b>作文</b> ${esc(h.writing.zh)}</span>` : '', h.translation && h.translation.zh ? `<span><b>翻译</b> ${esc(h.translation.zh)}${h.translation.theme ? `（${esc(h.translation.theme)}）` : ''}</span>` : ''].filter(Boolean);
+    return `<div class="wt-hintbar m-exam"><div class="tx"><div class="hd">这套真题${h.label ? `（${esc(h.label)}）` : ''}</div>${parts.join('')}<div class="ft">下面已选好同类型的一篇，照着练。</div></div><button class="x" data-hintx aria-label="关闭提示">${ic('i-x')}</button></div>`;
+  }
   function renderWT(sub) {
     if (sub) { wsub = sub; window.scrollTo(0, 0); }
+    const hint = wtHintFresh(); if (hint) applyWtHint(hint);
     const tabs = `<div class="wt-tabs"><button class="chip m-write" data-wsub="write" aria-pressed="${wsub === 'write'}"><span class="dot"></span>写作</button><button class="chip m-trans" data-wsub="trans" aria-pressed="${wsub === 'trans'}"><span class="dot"></span>翻译</button></div>`;
+    const done = (id) => wrote(id) ? `<span class="wt-done" title="写过">${ic('i-check')}</span>` : '';
     let body = '';
     if (wsub === 'write') {
-      const w = WRITING[wsel];
-      body = `<div class="vocab-top">${WRITING.map((x, i) => `<button class="chip m-write" data-wsel="${i}" aria-pressed="${i === wsel}">${esc(x.title.split('·')[0].trim())}</button>`).join('')}</div>
-        <div class="prompt m-write"><div class="lab">题目</div>${esc(w.prompt)}${w.chart && window.writingChart ? window.writingChart(w.chart) : ''}</div>
-        <div class="sec-h"><span class="ico m-write">${ic('i-target')}</span><h2 style="font-size:16px">提纲</h2></div>
-        <div class="steps m-write">${w.outline.map((o, i) => `<div class="st"><span class="n">${i + 1}</span><span>${esc(o)}</span></div>`).join('')}</div>
-        <div class="sec-h"><span class="ico m-write">${ic('i-eye')}</span><h2 style="font-size:16px">范文</h2><span class="more">高亮 = 可以抄进模板的句式</span></div>
-        <div class="sample m-write">${hl(w.sample, HL_W)}</div>
-        <div class="notes m-write">${w.notes.map((n) => `<div class="nt">${ic('i-bulb')}<span>${esc(n)}</span></div>`).join('')}</div>`;
+      const w = WRITING[wsel]; const shown = !!reveal[w.id];
+      body = `<div class="vocab-top wt-sel">${WRITING.map((x, i) => `<button class="chip m-write" data-wsel="${i}" aria-pressed="${i === wsel}">${esc(x.tag || x.title.split('·')[0].trim())}${done(x.id)}</button>`).join('')}</div>
+        <div class="prompt m-write"><div class="lab">题目 · ${esc(w.title.split('·')[0].trim())}</div>${esc(w.prompt)}${w.chart && window.writingChart ? window.writingChart(w.chart) : ''}</div>
+        ${answerBox(w.id, true)}
+        <details class="wt-outline m-write"><summary>${ic('i-target')}卡住了？看提纲</summary>
+          <div class="steps m-write">${w.outline.map((o, i) => `<div class="st"><span class="n">${i + 1}</span><span>${esc(o)}</span></div>`).join('')}</div></details>
+        <div class="reveal"><button class="btn tone m-write" data-reveal="${w.id}" aria-expanded="${shown}">${ic('i-eye')}${shown ? '收起范文' : '对照范文'}</button></div>
+        ${shown ? `<div class="sec-h"><span class="ico m-write">${ic('i-eye')}</span><h2 style="font-size:16px">范文</h2><span class="more">高亮 = 可以抄进模板的句式</span></div>
+        <div class="sample m-write">${hl(w.sample, w.hl)}</div>
+        <div class="notes m-write">${w.notes.map((n) => `<div class="nt">${ic('i-bulb')}<span>${esc(n)}</span></div>`).join('')}</div>` : ''}`;
     } else {
       const t = TRANSLATION[tsel]; const shown = !!reveal[t.id];
-      body = `<div class="vocab-top">${TRANSLATION.map((x, i) => `<button class="chip m-trans" data-tsel="${i}" aria-pressed="${i === tsel}">${esc(x.title)}</button>`).join('')}</div>
+      body = `<div class="vocab-top wt-sel">${TRANSLATION.map((x, i) => `<button class="chip m-trans" data-tsel="${i}" aria-pressed="${i === tsel}">${esc(x.title)}${done(x.id)}</button>`).join('')}</div>
         <div class="prompt m-trans"><div class="lab">汉译英 · ${esc(t.theme)}</div><span class="zh" style="font-family:var(--ui);line-height:1.9">${esc(t.zh)}</span></div>
         <div class="sec-h"><span class="ico m-trans">${ic('i-abc')}</span><h2 style="font-size:16px">关键词</h2></div>
-        <div class="keys">${t.keys.map((k) => { const [zh, en] = k.split(/\s(?=[A-Za-z(])/); return `<span class="chip">${esc(en || k)}<i>${esc(zh)}</i></span>`; }).join('')}</div>
-        <p class="lead">先自己在纸上译一遍（25 分钟内），再看参考译文。</p>
-        <div class="reveal"><button class="btn tone m-trans" data-reveal="${t.id}">${ic('i-eye')}${shown ? '收起参考译文' : '看参考译文'}</button></div>
+        <div class="keys">${t.keys.map((k) => { const m = k.match(/^(.*?)\s+([A-Za-z(].*)$/); const zh = m ? m[1] : '', en = m ? m[2] : k; return `<span class="chip">${esc(en)}${zh ? `<i>${esc(zh)}</i>` : ''}</span>`; }).join('')}</div>
+        ${answerBox(t.id, false, enWords(t.en))}
+        <div class="reveal"><button class="btn tone m-trans" data-reveal="${t.id}" aria-expanded="${shown}">${ic('i-eye')}${shown ? '收起参考译文' : '对照参考译文'}</button></div>
         ${shown ? `<div class="sample m-trans">${esc(t.en)}</div><div class="notes m-trans">${t.notes.map((n) => `<div class="nt">${ic('i-bulb')}<span>${esc(n)}</span></div>`).join('')}</div>` : ''}`;
     }
-    $('#wt-box').innerHTML = tabs + body;
+    $('#wt-box').innerHTML = `<div class="wt-body">${hint ? wtHintBar(hint) : ''}${tabs + body}</div>`;
+    clearInterval(wtTick); syncClock(); if (wtClock) wtTick = setInterval(syncClock, 1000);
     $('#wt-box').onclick = (e) => {
       const s = e.target.closest('[data-wsub]'); if (s) return renderWT(s.dataset.wsub);
       const a = e.target.closest('[data-wsel]'); if (a) { wsel = +a.dataset.wsel; return renderWT(); }
       const b = e.target.closest('[data-tsel]'); if (b) { tsel = +b.dataset.tsel; return renderWT(); }
-      const r = e.target.closest('[data-reveal]'); if (r) { reveal[r.dataset.reveal] = !reveal[r.dataset.reveal]; return renderWT(); }
+      if (e.target.closest('[data-hintx]')) { delete S.wtHint; save(); return renderWT(); }
+      // 展开范文 / 参考译文才算完成首页的「读 1 篇范文」
+      const r = e.target.closest('[data-reveal]'); if (r) { reveal[r.dataset.reveal] = !reveal[r.dataset.reveal]; if (reveal[r.dataset.reveal]) { const d = lday(); S.plan[d] = Object.assign(S.plan[d] || {}, { wt: 1 }); save(); } renderWT(); if (reveal[r.dataset.reveal]) { const sm = $('#wt-box .sample'); if (sm) sm.scrollIntoView({ behavior: 'smooth', block: 'start' }); } return; }
+      const c = e.target.closest('[data-wtclock]'); if (c) { const id = c.dataset.wtclock; wtClock = wtClock && wtClock.id === id ? null : { id, end: Date.now() + 30 * 60 * 1000 }; clearInterval(wtTick); syncClock(); if (wtClock) wtTick = setInterval(syncClock, 1000); }
+    };
+    $('#wt-box').oninput = (e) => {
+      const id = e.target.dataset.wtid; if (!id) return;
+      const had = wrote(id); S.wt[id] = e.target.value; if (!S.wt[id]) delete S.wt[id];
+      const isW = wsub === 'write'; $('#wtCount').innerHTML = wtCountHTML(id, isW, isW ? 0 : enWords(TRANSLATION[tsel].en));
+      if (had !== wrote(id)) { const chip = $(`#wt-box [aria-pressed="true"][data-${isW ? 'wsel' : 'tsel'}]`); if (chip) { const m = chip.querySelector('.wt-done'); if (m) m.remove(); else chip.insertAdjacentHTML('beforeend', `<span class="wt-done" title="写过">${ic('i-check')}</span>`); } }
+      clearTimeout(wtSaveT); wtSaveT = setTimeout(save, 400);
     };
   }
 
@@ -835,29 +889,53 @@
   }
 
   /* ================= 我的 ================= */
+  // 错题：新数据带 {key, src, q, a, e, mine, setId, kind, ctx}；旧数据只有 key/src/q/a/e，setId / kind 从 key、src 推出来
+  const WK = { listen: '听力', mc: '仔细阅读', match: '段落匹配', cloze: '选词填空' };
+  const wrongKind = (w) => w.kind && WK[w.kind] ? w.kind : /听力/.test(w.src || '') ? 'listen' : /选词/.test(w.src || '') ? 'cloze' : /匹配/.test(w.src || '') ? 'match' : 'mc';
+  const wrongSet = (w) => w.setId || String(w.key || '').split(':')[0];
+  function wrongHTML(w) {
+    const gap = (t) => esc(t).replace(/_{2,}/g, '<b class="gap" aria-label="空格">&nbsp;</b>');
+    const can = !!findSet(wrongSet(w));
+    const mine = w.mine === undefined ? '' : `<div class="wi-mine"><span>你的答案</span><b>${w.mine === null || w.mine === '' ? '未作答' : esc(w.mine)}</b></div>`;
+    return `<div class="wrong-item ${wrongKind(w) === 'listen' ? 'm-listen' : 'm-read'}">
+      <div class="src">${esc(String(w.src || '').replace(/^([^·]+?)\s*·\s*\1\s*·\s*/, '$1 · '))}</div>
+      ${w.q ? `<div class="wq">${esc(w.q)}</div>` : ''}
+      ${w.ctx ? `<div class="ctx">${gap(w.ctx)}</div>` : ''}
+      <div class="wi-ans">${mine}<div class="wi-right"><span>正确答案</span><b>${esc(w.a)}</b></div></div>
+      ${w.e ? `<div class="e">${esc(w.e)}</div>` : ''}
+      <div class="wi-act">${can ? `<button class="btn soft" data-wgo="${esc(wrongSet(w))}">${ic('i-redo')}回原题</button>` : ''}<button class="btn ghost" data-wdel="${esc(w.key)}">${ic('i-check')}已掌握</button></div>
+    </div>`;
+  }
+  let meVocabAll = false;
+  // 从别处直接打开某套题：切到听读 tab（对应听力 / 阅读子页），再打开这一套
+  function goSet(id) { const f = findSet(id); if (!f) return false; psub = f.kind === 'listen' ? 'listen' : 'read'; show('practice'); openSet(id); return true; }
   function renderMe() {
-    const st = stats(); const wrongs = Object.values(S.wrong);
+    const st = stats(); const wrongs = Object.values(S.wrong).reverse(); // 新的在前（按加入顺序倒序）
     const unknownWords = ALLWORDS.filter((w) => S.vocab[w.id] === 0 || S.vocab[w.id] === 1);
+    const groups = Object.keys(WK).map((k) => [k, wrongs.filter((w) => wrongKind(w) === k)]).filter(([, xs]) => xs.length);
+    const VN = 20, vShow = meVocabAll ? unknownWords : unknownWords.slice(0, VN);
     $('#me-box').innerHTML = `
       <div class="me-grid">
         <div class="num m-vocab"><div class="v">${st.known}</div><div class="l">认识的词</div></div>
         <div class="num m-vocab" style="--brand:var(--red)"><div class="v" style="color:var(--red)">${unknownWords.length}</div><div class="l">生词本</div></div>
+        <div class="num m-read" style="--brand:var(--red)"><div class="v" style="color:var(--red)">${wrongs.length}</div><div class="l">错题</div></div>
         <div class="num m-read"><div class="v">${st.setsDone}</div><div class="l">做过的练习</div></div>
         <div class="num m-listen"><div class="v">${st.acc === null ? '—' : st.acc + '%'}</div><div class="l">练习正确率</div></div>
         <div class="num m-exam"><div class="v">${st.m}/${totalPts}</div><div class="l">考点已掌握</div></div>
       </div>
+      <div class="sec-h"><span class="ico m-read">${ic('i-x')}</span><h2>错题本</h2>${wrongs.length ? `<button class="more" data-clear>清空</button>` : ''}</div>
+      ${wrongs.length ? groups.map(([k, xs]) => `<div class="wrong-grp"><div class="wg-h">${WK[k]}<span>${xs.length}</span></div>${xs.map(wrongHTML).join('')}</div>`).join('') : `<div class="empty">${ic('i-party')}还没有错题。</div>`}
       <div class="sec-h"><span class="ico m-vocab">${ic('i-abc')}</span><h2>生词本</h2>${unknownWords.length ? `<button class="more" data-go-vocab>去复习 ${ic('i-chev-r')}</button>` : ''}</div>
-      ${unknownWords.length ? `<div class="vocab-list">${unknownWords.map((w) => `<div class="vw unknown"><span class="w">${esc(w.w)}</span><span class="pos">${esc(w.p)}</span><span class="cn">${esc(w.c)}</span></div>`).join('')}</div>` : `<div class="empty">${ic('i-party')}还没有生词。去"单词"页刷闪卡，点"不认识"的会收进来。</div>`}
-      <div class="sec-h"><span class="ico m-exam">${ic('i-timer')}</span><h2>我的真题库</h2><span class="more">仅本机</span></div>
-      <div id="files-box"></div>
+      ${unknownWords.length ? `<div class="me-vtags">${vShow.map((w) => `<div class="mv"><b>${esc(w.w)}</b><span>${esc(w.c)}</span></div>`).join('')}</div>
+        ${unknownWords.length > VN ? `<div class="reveal" style="margin-top:10px"><button class="btn ghost" data-vall>${meVocabAll ? '收起' : `展开全部 ${unknownWords.length} 个`}</button></div>` : ''}` : `<div class="empty">${ic('i-party')}还没有生词。去"单词"页刷闪卡，点"不认识"的会收进来。</div>`}
       <div class="sec-h"><span class="ico m-vocab">${ic('i-redo')}</span><h2>数据与备份</h2></div>
       <div class="card" style="margin-bottom:12px">
         <p class="lead" style="margin:0 0 10px" id="storageLine">正在读取存储状态…</p>
         <p class="lead" style="margin:0 0 12px">所有数据只在这台设备的浏览器里：换浏览器、换手机、清站点数据都会丢。把本站<b>添加到主屏幕</b>后，系统会按 App 对待，不会在长期不用时清掉。换设备前先导出备份。</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-export>${ic('i-pen')}导出备份（进度 / 生词 / 错题）</button><label class="btn" style="cursor:pointer">${ic('i-redo')}导入备份<input type="file" id="importIn" accept=".json,application/json" hidden></label></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-export>${ic('i-pen')}导出备份（进度 / 生词 / 错题 / 作文）</button><label class="btn" style="cursor:pointer">${ic('i-redo')}导入备份<input type="file" id="importIn" accept=".json,application/json" hidden></label></div>
       </div>
-      <div class="sec-h"><span class="ico m-read">${ic('i-x')}</span><h2>错题本</h2>${wrongs.length ? `<button class="more" data-clear>清空</button>` : ''}</div>
-      ${wrongs.length ? wrongs.map((w) => `<div class="wrong-item"><div class="src">${esc(w.src)}</div><div class="q">${esc(w.q)}</div><div class="a">答案：${esc(w.a)}</div>${w.e ? `<div class="e">${esc(w.e)}</div>` : ''}</div>`).join('') : `<div class="empty">${ic('i-party')}还没有错题。</div>`}`;
+      <div class="sec-h"><span class="ico m-exam">${ic('i-timer')}</span><h2>我的真题库</h2><span class="more">仅本机</span></div>
+      <div id="files-box"></div>`;
     renderFiles();
     (async () => {
       const el = $('#storageLine'); if (!el) return;
@@ -883,12 +961,18 @@
       if (e.target.closest('#files-box')) return;
       if (e.target.closest('[data-go-vocab]')) { S.vsrc = 'wrong'; save(); vq = []; show('vocab'); }
       if (e.target.closest('[data-clear]') && confirm('清空错题本？')) { S.wrong = {}; save(); renderMe(); }
+      const wg = e.target.closest('[data-wgo]'); if (wg) { goSet(wg.dataset.wgo); return; }
+      const wd = e.target.closest('[data-wdel]'); if (wd) { delete S.wrong[wd.dataset.wdel]; save(); const y = window.scrollY; renderMe(); window.scrollTo(0, y); return; }
+      if (e.target.closest('[data-vall]')) { meVocabAll = !meVocabAll; const y = window.scrollY; renderMe(); window.scrollTo(0, y); }
     };
   }
 
   /* ---------- 启动 ---------- */
   if ('speechSynthesis' in window) speechSynthesis.getVoices();
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-  const start = location.hash.slice(1); show(VIEWS.includes(start) ? start : 'home');
+  const start = location.hash.slice(1);
+  // #set=<id>：直接打开某套听力 / 阅读（模拟卷 Part II 的篇目链接用）
+  const setM = start.match(/^set=([\w-]+)$/);
+  if (!(setM && goSet(setM[1]))) show(VIEWS.includes(start) ? start : 'home');
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
