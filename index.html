@@ -43,6 +43,7 @@
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></symbol>
   <symbol id="i-party" viewBox="0 0 24 24"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z"/></symbol>
   <symbol id="i-timer" viewBox="0 0 24 24"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></symbol>
   <symbol id="i-flame" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol>
 </svg>
 
@@ -53,6 +54,7 @@
     <button role="tab" data-view="vocab" aria-selected="false"><svg class="i"><use href="#i-abc"/></svg>单词</button>
     <button role="tab" data-view="practice" aria-selected="false"><svg class="i"><use href="#i-ear"/></svg>听读</button>
     <button role="tab" data-view="wt" aria-selected="false"><svg class="i"><use href="#i-pen"/></svg>写译</button>
+    <button role="tab" data-view="exam" aria-selected="false"><svg class="i"><use href="#i-clip"/></svg>模考</button>
     <button role="tab" data-view="me" aria-selected="false"><svg class="i"><use href="#i-user"/></svg>我的</button>
   </nav>
   <button class="icon-btn" id="themeBtn" aria-label="切换深浅色"><svg class="i" style="font-size:18px"><use href="#i-moon"/></svg></button>
@@ -63,6 +65,7 @@
   <section class="view" id="view-vocab" hidden><div id="vocab-box"></div></section>
   <section class="view" id="view-practice" hidden><div id="practice-box"></div></section>
   <section class="view" id="view-wt" hidden><div id="wt-box"></div></section>
+  <section class="view" id="view-exam" hidden><div id="exam-box"></div></section>
   <section class="view" id="view-me" hidden><div id="me-box"></div></section>
   <footer class="foot">
     <b>说明</b>：六级真题版权归教育部教育考试院所有，本站练习题按真题的题型、篇幅、难度和出题套路自编，不收录历年原卷。考试结构、分值依据全国大学英语四、六级考试官网公布的考试大纲。听力的六级题型练习用神经网络语音分角色录制，另有 NASA / NOAA / VOA 的真人原声（公有领域）；语音和真题播音员仍有差异，考前建议再配合真题音频练。<br>
@@ -87,6 +90,8 @@
 <script src="assets/data-audio.js?v=17"></script>
 <script src="assets/data-real.js?v=17"></script>
 <script src="assets/chart.js?v=17"></script>
+<script src="assets/draw.js?v=17"></script>
+<script src="assets/exam.js?v=17"></script>
 <script src="assets/app.js?v=17"></script>
 </body>
 </html>

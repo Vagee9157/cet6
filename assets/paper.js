@@ -7,24 +7,21 @@
   const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const K = ['A', 'B', 'C', 'D'];
   let seed = +(new URL(location.href).searchParams.get('seed')) || (Date.now() % 100000);
-  // 抽题：给定卷号确定性地抽一套。随机数用 splitmix32（先把卷号打散），相邻卷号也会抽出完全不同的题。
-  // 旧版线性同余在 JS 浮点下丢精度，卷号相近时抽出的题高度重合，「换一套」常常内容不变。
-  const draw = (sd) => {
-    let h = (sd ^ 0x9e3779b9) >>> 0;
-    const rnd = () => { h = (h + 0x9e3779b9) >>> 0; let z = h; z = Math.imul(z ^ (z >>> 16), 0x85ebca6b); z = Math.imul(z ^ (z >>> 13), 0xc2b2ae35); return ((z ^ (z >>> 16)) >>> 0) / 4294967296; };
-    const pick = (arr, n) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a.slice(0, Math.min(n, a.length)); };
-    // 篇章 2 篇合计 7 题、讲座 3 篇合计 10 题，照真题题量；凑不出就退回随机
-    const pickSum = (arr, n, total) => { let best = null; for (let t = 0; t < 40; t++) { const c = pick(arr, n); const sum = c.reduce((a, x) => a + x.questions.length, 0); if (sum === total) return c; if (!best) best = c; } return best; };
-    const W = pick(WRITING, 1)[0];
-    const conv = pick(LISTENING.filter((x) => x.type === 'conv'), 2), pas = pickSum(LISTENING.filter((x) => x.type === 'passage'), 2, 7), lec = pickSum(LISTENING.filter((x) => x.type === 'lecture'), 3, 10);
-    const cloze = pick(READING.cloze, 1)[0], match = pick(READING.match, 1)[0], mc = pick(READING.mc, 2);
-    const T = pick(TRANSLATION, 1)[0];
-    return { W, conv, pas, lec, cloze, match, mc, T };
-  };
-  const idsOf = (d) => [d.W, ...d.conv, ...d.pas, ...d.lec, d.cloze, d.match, ...d.mc, d.T].map((x) => x.id);
-  const { W, conv, pas, lec, cloze, match, mc, T } = draw(seed);
-  const short = (conv.length < 2 || pas.length < 2 || lec.length < 3 || mc.length < 2) ? '题库仍在扩充，本卷听力 / 阅读题量少于真题的 25 / 30 题。' : '';
-  const listenSets = [...conv, ...pas, ...lec];
+  // 抽题在 draw.js（与主站在线模考共用）。这个卷号以前生成过（打印 / 在线模考）就按记录还原；
+  // 否则按「优先抽没做过的」勾选抽题（默认开，记在 S.drawFresh），并把题目 id 记进 S.papers
+  const S0 = CET6Draw.readS();
+  const freshBox = document.getElementById('fresh');
+  let W, conv, pas, lec, cloze, match, mc, T, short, listenSets, ids;
+  function setup(redraw) {
+    const S = CET6Draw.readS();
+    const p = redraw ? (() => { const d = CET6Draw.draw(seed, freshBox.checked ? { done: CET6Draw.doneSet(S) } : null); return { d, ids: CET6Draw.idsOf(d), fresh: freshBox.checked }; })() : CET6Draw.paperOf(seed, S, freshBox.checked);
+    ({ W, conv, pas, lec, cloze, match, mc, T } = p.d); ids = p.ids; freshBox.checked = p.fresh;
+    short = (conv.length < 2 || pas.length < 2 || lec.length < 3 || mc.length < 2) ? '题库仍在扩充，本卷听力 / 阅读题量少于真题的 25 / 30 题。' : '';
+    listenSets = [...conv, ...pas, ...lec];
+    CET6Draw.recordPaper(seed, 'print', ids, p.fresh);
+  }
+  freshBox.checked = S0.drawFresh !== false;
+  setup(false);
 
   // ---------- 工具 ----------
   const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen'];
@@ -295,6 +292,7 @@
     if (withKey) { const kp = flow(keyBlocks(), 'key'); kp.forEach((p, i) => { p.pf.textContent = `教师用 · 答案页 第 ${i + 1} 页（共 ${kp.length} 页）`; }); total += kp.length; }
     root.classList.remove('measuring');
     document.getElementById('seedLab').textContent = seed;
+    document.getElementById('online').href = 'index.html#exam=' + seed;
     document.getElementById('stat').textContent = `试题册 ${bk.length} 页${withSheet ? ' + 答题卡 2 页' : ''}${withKey ? ` + 教师用答案页 ${total - bk.length - (withSheet ? 2 : 0)} 页` : ''}，共 ${total} 张 A4。`;
     history.replaceState(null, '', '?seed=' + seed);
     document.title = `六级模拟卷 ${seed}`;
@@ -302,11 +300,11 @@
   }
 
   ['withKey', 'withSheet', 'withStem'].forEach((id) => { document.getElementById(id).onchange = render; });
+  // 切换「优先抽没做过的」：记住选项，并按新选项重抽这个卷号
+  freshBox.onchange = () => { const S = CET6Draw.readS(); S.drawFresh = freshBox.checked; try { localStorage.setItem('cet6.v1', JSON.stringify(S)); } catch {} setup(true); render(); };
   // 换一套：试 300 个候选卷号，挑和当前这套重复篇目最少的（通常一篇不重）
   document.getElementById('regen').onclick = () => {
-    const cur = new Set(idsOf(draw(seed))); let best = null, bestN = 1e9;
-    for (let t = 0; t < 300; t++) { const c = Math.floor(Math.random() * 90000) + 10000; if (c === seed) continue; const n = idsOf(draw(c)).filter((id) => cur.has(id)).length; if (n < bestN) { best = c; bestN = n; if (!n) break; } }
-    location.href = 'paper.html?seed=' + best;
+    location.href = 'paper.html?seed=' + CET6Draw.pickSeed(ids, CET6Draw.readS(), freshBox.checked, seed);
   };
   document.getElementById('print').onclick = () => window.print();
   window.addEventListener('resize', fit);

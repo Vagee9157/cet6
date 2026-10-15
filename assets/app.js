@@ -60,10 +60,12 @@
   $('#themeBtn').onclick = () => { S.theme = isDark() ? 'light' : 'dark'; applyTheme(); save(); };
 
   /* ---------- 导航 ---------- */
-  const VIEWS = ['home', 'vocab', 'practice', 'wt', 'me'];
-  const R = { home: renderHome, vocab: renderVocab, practice: renderPracticeHome, wt: renderWT, me: renderMe };
+  const VIEWS = ['home', 'vocab', 'practice', 'wt', 'exam', 'me'];
+  // 模考页逻辑在 assets/exam.js（window.CET6Exam），通过 window.CET6 用本文件的工具函数
+  const R = { home: renderHome, vocab: renderVocab, practice: renderPracticeHome, wt: renderWT, exam: () => window.CET6Exam && window.CET6Exam.render(), me: renderMe };
   function show(v, keep) {
     if (v !== 'practice' && typeof stopAudio === 'function') stopAudio();
+    if (v !== 'exam' && window.CET6Exam) window.CET6Exam.leave();
     VIEWS.forEach((x) => { $('#view-' + x).hidden = x !== v; });
     document.querySelectorAll('nav.tabs button').forEach((b) => b.setAttribute('aria-selected', b.dataset.view === v));
     if (!keep) R[v]();
@@ -126,7 +128,7 @@
         <div class="hero-main">
           <h1>目标 <b>500</b>，按分值分配精力</h1>
           <p>六级满分 710，听力和阅读各占 35%。先把单题分值最高的仔细阅读和讲座练稳，写作翻译用模板保底、再靠加分句式抬一档，500 分留足了过 425 的余量。</p>
-          <div class="acts"><button class="btn w" data-go="practice">${ic('i-ear')}开始练习</button><button class="btn" data-go="vocab">${ic('i-abc')}背单词</button><button class="btn" data-go="outline">${ic('i-target')}看考点</button><a class="btn" href="paper.html">${ic('i-pen')}生成模拟卷</a></div>
+          <div class="acts"><button class="btn w" data-go="practice">${ic('i-ear')}开始练习</button><button class="btn" data-go="vocab">${ic('i-abc')}背单词</button><button class="btn" data-go="outline">${ic('i-target')}看考点</button><button class="btn" data-go="exam">${ic('i-clip')}在线模考</button><a class="btn" href="paper.html">${ic('i-pen')}打印模拟卷</a></div>
         </div>
         <div class="hero-side">
           <div class="stat-tiles">
@@ -548,7 +550,7 @@
     }
     box.innerHTML = `
       <div class="wt-tabs"><button class="chip m-listen" data-sub="listen" aria-pressed="${psub === 'listen'}"><span class="dot"></span>听力</button><button class="chip m-read" data-sub="read" aria-pressed="${psub === 'read'}"><span class="dot"></span>阅读</button></div>
-      <a class="set m-exam" href="paper.html" style="margin-bottom:14px;text-decoration:none;color:inherit;display:flex"><span class="kind">整卷模拟 · A4 可打印</span><b>一键生成一份完整六级模拟卷</b><span class="meta">写作 + 听力 + 阅读 + 翻译，附答题卡、答案和听力原文</span></a>
+      <div class="ex-entry m-exam"><div class="tx"><span class="kind">整卷模拟 · 130 分钟</span><b>完整六级模拟卷</b><span class="meta">写作 + 听力 + 阅读 + 翻译，和真题同结构同题量，按 710 分换算</span></div><div class="acts"><button class="btn tone" data-goexam>${ic('i-clip')}在线模考</button><a class="btn" href="paper.html">${ic('i-pen')}打印版</a></div></div>
       ${psub === 'listen' ? `
         <p class="lead">全部配录音：六级题型练习用神经网络语音分角色录制，另有 NASA / NOAA / VOA 的真人原声。答完再对着原文精听。</p>
         ${rpickHTML('listen')}
@@ -561,6 +563,7 @@
         ${rsec('选词填空', `15 选 10 · 每题 0.5% · ${Rd.cloze.length} 篇`)}<div class="set-grid">${Rd.cloze.map((s) => rcard(s, '选词填空', '10 空')).join('')}</div>`}`;
     box.onclick = (e) => {
       const t = e.target.closest('[data-sub]'); if (t) return renderPracticeHome(t.dataset.sub);
+      if (e.target.closest('[data-goexam]')) return show('exam');
       const rk = e.target.closest('[data-rpk]'); if (rk) { S.rpick[psub] = rk.dataset.rpk; save(); const y = window.scrollY; renderPracticeHome(); window.scrollTo(0, y); return; }
       const rg = e.target.closest('[data-rpgo]'); if (rg) return rpickGo(rg.dataset.rpgo);
       const o = e.target.closest('[data-open]'); if (o) openSet(o.dataset.open);
@@ -609,6 +612,14 @@
     const f = findSet(id); if (f) { S.hist.push({ id, kind: f.kind, title: f.set.title, r, t, sec, d: lday(), ts: Date.now() }); if (S.hist.length > 600) S.hist = S.hist.slice(-600); }
     rights.forEach((k) => { delete S.wrong[k]; }); wrongs.forEach((w) => { S.wrong[w.key] = w; });
     delete S.drafts[id]; save();
+  }
+  // 模考报告里「看解析 / 定位原文 / 听这句」：在听读页按交卷状态打开这一篇（带模考里的作答），返回键回模考报告
+  function reviewSet(id, ans, back) {
+    const f = findSet(id); if (!f) return;
+    psub = f.kind === 'listen' ? 'listen' : 'read'; show('practice', true);
+    cur = { ...f, ans: { ...ans }, done: true, playing: false, back };
+    cur.r = marksOf(cur).filter(Boolean).length; t0 = Date.now(); clearInterval(timerId);
+    renderSet(); jumpTop(0);
   }
 
   /* ---------- 解析 ↔ 原文定位 ---------- */
@@ -688,7 +699,7 @@
     const box = $('#practice-box');
     const total = kind === 'cloze' ? set.answers.length : kind === 'match' ? set.items.length : set.questions.length;
     const answered = Object.keys(ans).length;
-    const back = `<div class="prac-head"><button class="btn ghost" data-back>${ic('i-chev-l')}返回</button><h2>${esc(set.title)}</h2>${kind === 'listen' ? '' : `<span class="timer" id="timer"><small>已用</small><b id="timerVal">00:00</b>${set.minutes ? `<small>/ 建议 ${set.minutes} 分钟</small>` : ''}</span>`}</div>`;
+    const back = `<div class="prac-head"><button class="btn ghost" data-back>${ic('i-chev-l')}返回</button><h2>${esc(set.title)}</h2>${kind === 'listen' || cur.back ? '' : `<span class="timer" id="timer"><small>已用</small><b id="timerVal">00:00</b>${set.minutes ? `<small>/ 建议 ${set.minutes} 分钟</small>` : ''}</span>`}</div>`;
     const K = ['A', 'B', 'C', 'D'];
     // 交卷后：手机上原文收进 <details>，先看到对错；选词填空的对错就在原文里，不收
     const fold = done && isPhone() && kind !== 'cloze';
@@ -740,7 +751,7 @@
     box.innerHTML = back + restore + resHtml + body + bar;
     box.classList.toggle('only-wrong', !!(done && cur.onlyWrong));
     box.onclick = (e) => {
-      if (e.target.closest('[data-back]')) { stashDraft(); return renderPracticeHome(null, true); }
+      if (e.target.closest('[data-back]')) { if (cur.back) { const b = cur.back; cur = null; return b(); } stashDraft(); return renderPracticeHome(null, true); }
       if (e.target.closest('[data-redo]')) return openSet(set.id, true);
       const nx = e.target.closest('[data-next]'); if (nx) return openSet(nx.dataset.next);
       const jp = e.target.closest('[data-jump]'); if (jp) { const i = +jp.dataset.jump; const el = kind === 'cloze' ? box.querySelector(`[data-blank="${i}"]`) : $('#q-' + i); if (el) { if (cur.onlyWrong && el.closest('.is-right')) { cur.onlyWrong = false; box.classList.remove('only-wrong'); const c = $('[data-onlywrong]'); if (c) c.checked = false; } el.scrollIntoView({ block: kind === 'cloze' ? 'center' : 'start', behavior: 'smooth' }); } return; }
@@ -783,9 +794,9 @@
     if (e.key === ' ' || e.code === 'Space') { if (t && t.closest && t.closest('button,a,summary') && t.matches(':focus-visible')) return; e.preventDefault(); auToggle(); }
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); auSeek(AU.currentTime + (e.key === 'ArrowLeft' ? -5 : 5)); }
   });
-  function submitSet() {
-    const { kind, set, ans } = cur; const K = ['A', 'B', 'C', 'D'];
-    const marks = marksOf(cur); const r = marks.filter(Boolean).length; const total = marks.length;
+  // 错题记录（练习交卷和模考交卷共用）：返回 { wrongs, rights }
+  function wrongsOf(kind, set, ans) {
+    const K = ['A', 'B', 'C', 'D']; const marks = marksOf({ kind, set, ans });
     // 来源：set.title 本身已带「选词填空 · 」这类前缀时不再重复
     const pre = kind === 'listen' ? (REALMAP[set.id] ? '真人听力' : '听力') : { mc: '仔细阅读', match: '段落匹配', cloze: '选词填空' }[kind];
     const src = set.title.startsWith(pre) ? set.title : pre + ' · ' + set.title;
@@ -798,6 +809,12 @@
       else { const q = set.questions[i]; w = { q: q.q, a: K[q.a] + ' ' + q.opts[q.a], e: q.exp, mine: p === undefined ? '未作答' : K[p] + ' ' + q.opts[p] }; }
       wrongs.push({ key, src, setId: set.id, kind, at: today(), ...w });
     });
+    return { wrongs, rights };
+  }
+  function submitSet() {
+    const { kind, set, ans } = cur;
+    const marks = marksOf(cur); const r = marks.filter(Boolean).length; const total = marks.length;
+    const { wrongs, rights } = wrongsOf(kind, set, ans);
     cur.done = true; cur.r = r; cur.sec = elapsed(); clearInterval(timerId);
     recordSet(set.id, r, total, wrongs, rights, cur.sec); renderSet(); jumpTop(0);
   }
@@ -974,15 +991,16 @@
     const legacy = Object.entries(S.sets).filter(([id]) => !seen.has(id)).map(([id, r]) => { const f = findSet(id); return f && { id, kind: f.kind, title: f.set.title, r: r.r, t: r.t, sec: r.sec, d: r.d || r.at || '', ts: 0 }; }).filter(Boolean);
     const all = [...legacy, ...S.hist].sort((a, b) => (b.d || '').localeCompare(a.d || '') || b.ts - a.ts);
     const papers = S.papers.slice().reverse();
+    const exams = (S.exams || []).slice().reverse();
     const KN = { listen: '听力', mc: '仔细阅读', match: '段落匹配', cloze: '选词填空' };
     const shown = histAll ? all : all.slice(0, 15);
     let lastD = '';
     const list = shown.map((h) => { const day = h.d !== lastD ? `<div class="hl-d">${esc(h.d || '更早')}</div>` : ''; lastD = h.d; const pct = h.t ? Math.round(h.r / h.t * 100) : 0;
       return `${day}<div class="hl"><span class="hl-k">${KN[h.kind] || ''}</span><span class="hl-t">${esc(String(h.title).replace(/^[^·]+·\s*/, ''))}</span><span class="hl-s ${pct >= 80 ? 'good' : pct < 60 ? 'bad' : ''}">${h.r}/${h.t}</span>${h.sec ? `<span class="hl-m">${mmss(h.sec)}</span>` : ''}<button class="chip" data-wgo="${h.id}">再做</button></div>`; }).join('');
     return `<div class="sec-h"><span class="ico m-listen">${ic('i-timer')}</span><h2>练习记录</h2><span class="more">共 ${all.length} 次${papers.length ? ` · 模拟卷 ${papers.length} 套` : ''}</span></div>
-      <div class="card hist"><div class="hp-grid">${rows}</div>
+      <div class="card hist">${exams.length ? `<div class="hl-d" style="margin-top:0">模考成绩</div><div class="ex-hist">${exams.slice(0, 5).map((x) => `<button class="ex-hrow" data-exrep="${x.ts}"><span class="ex-ht"><b>${x.total}</b><small>/710</small></span><span class="ex-hm">${esc(x.d)} · 卷号 ${esc(x.seed)}${x.self && x.self.write != null && x.self.trans != null ? '' : ' · 写译待自评'}</span>${ic('i-chev-r')}</button>`).join('')}</div>` : ''}<div class="hp-grid">${rows}</div>
         ${all.length ? `<div class="hl-list">${list}</div>${all.length > 15 ? `<div class="reveal" style="margin-top:8px"><button class="btn ghost" data-hall>${histAll ? '收起' : `显示全部 ${all.length} 条`}</button></div>` : ''}` : `<p class="lead" style="margin:12px 0 0">还没有交卷记录。去「听读」点「随机来一篇」开始吧。</p>`}
-        ${papers.length ? `<div class="hl-d">生成过的模拟卷</div><div class="hl-papers">${papers.slice(0, 12).map((p) => `<a class="chip" href="paper.html?seed=${encodeURIComponent(p.seed)}">卷号 ${esc(p.seed)} · ${esc(p.d)}</a>`).join('')}</div>` : ''}</div>`;
+        ${papers.length ? `<div class="hl-d">生成过的模拟卷</div><div class="hl-papers">${papers.slice(0, 12).map((p) => `<a class="chip" href="paper.html?seed=${encodeURIComponent(p.seed)}">${p.mode === 'online' ? '在线' : '打印'} · 卷号 ${esc(p.seed)} · ${esc(p.d)}</a>`).join('')}</div>` : ''}</div>`;
   }
   function renderMe() {
     const st = stats(); const wrongs = Object.values(S.wrong).reverse(); // 新的在前（按加入顺序倒序）
@@ -1038,11 +1056,15 @@
       if (e.target.closest('[data-go-vocab]')) { S.vsrc = 'wrong'; save(); vq = []; show('vocab'); }
       if (e.target.closest('[data-clear]') && confirm('清空错题本？')) { S.wrong = {}; save(); renderMe(); }
       const wg = e.target.closest('[data-wgo]'); if (wg) { goSet(wg.dataset.wgo); return; }
+      const xr = e.target.closest('[data-exrep]'); if (xr && window.CET6Exam) { show('exam', true); window.CET6Exam.openReport(+xr.dataset.exrep); return; }
       const wd = e.target.closest('[data-wdel]'); if (wd) { delete S.wrong[wd.dataset.wdel]; save(); const y = window.scrollY; renderMe(); window.scrollTo(0, y); return; }
       if (e.target.closest('[data-hall]')) { histAll = !histAll; const y = window.scrollY; renderMe(); window.scrollTo(0, y); return; }
       if (e.target.closest('[data-vall]')) { meVocabAll = !meVocabAll; const y = window.scrollY; renderMe(); window.scrollTo(0, y); }
     };
   }
+
+  /* ---------- 给模考页（assets/exam.js）用的最小接口 ---------- */
+  window.CET6 = { S, save, esc, ic, lday, today, show, findSet, marksOf, wrongsOf, recordSet, reviewSet, clozeWord, enWords, hl, AUD, stopAudio, mmss, isPhone };
 
   /* ---------- 启动 ---------- */
   if ('speechSynthesis' in window) speechSynthesis.getVoices();
@@ -1050,6 +1072,9 @@
   const start = location.hash.slice(1);
   // #set=<id>：直接打开某套听力 / 阅读（模拟卷 Part II 的篇目链接用）
   const setM = start.match(/^set=([\w-]+)$/);
-  if (!(setM && goSet(setM[1]))) show(VIEWS.includes(start) ? start : 'home');
+  // #exam=<卷号>：打印版「在线做这套」，到模考页并填好卷号
+  const exM = start.match(/^exam=(\d+)$/);
+  if (exM && window.CET6Exam) { window.CET6Exam.preset(+exM[1]); show('exam'); }
+  else if (!(setM && goSet(setM[1]))) show(VIEWS.includes(start) ? start : 'home');
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

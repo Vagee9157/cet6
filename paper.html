@@ -18,8 +18,10 @@
   <label><input type="checkbox" id="withSheet" checked> 附答题卡</label>
   <label><input type="checkbox" id="withKey" checked> 附答案<span class="lg">与听力原文（教师用）</span></label>
   <label><input type="checkbox" id="withStem"> 听力印题干</label>
+  <label title="各题型先从没交过卷 / 没写过的题里抽，不够再补；同一卷号以后按记录还原"><input type="checkbox" id="fresh" checked> 优先抽没做过的</label>
   <button id="regen">换一套</button>
   <button class="p" id="print">打印 / 存 PDF</button>
+  <a id="online" href="index.html#exam">在线做这套</a>
   <a href="index.html">返回主站</a>
   <span class="st" id="stat"></span>
 </div>
@@ -33,6 +35,7 @@
 <script src="assets/data-writing-2.js?v=17"></script>
 <script src="assets/data-writing-3.js?v=17"></script>
 <script src="assets/chart.js?v=17"></script>
+<script src="assets/draw.js?v=17"></script>
 <script src="assets/paper.js?v=17"></script>
 </body>
 </html>
