@@ -44,6 +44,7 @@ assets/draw.js          抽题（打印版与在线模考共用，优先抽没�
 assets/exam.js          在线模考
 assets/learn.js         学习闭环 window.CET6Learn：预测分 / 今日计划 / 错因 / 错题重测 / 打卡周报
 assets/recall.js        提取练习 window.CET6Recall：关键词卡 / 模板句（间隔复习）+ 写译估分趋势与改写任务
+assets/review.js        今日复习 window.CET6Review：跨模块到期项合成一个连续复习流程 + 考点「记住了 → 练一题」
 assets/drills.js        专项训练 window.CET6Drills：定位训练 / 同义替换 / 逐句听写 / 先读选项预判 / 倍速爬坡
 assets/data-paraphrase.js 同义替换库 PARA（tools/build_paraphrase.js 生成，勿手改）
 tools/build_paraphrase.js 从题库解析抽同义替换短语对：node tools/build_paraphrase.js
@@ -74,7 +75,15 @@ assets/style.css        样式（浅色 / 深色）
 | `S.vsv` | 2 | 单词间隔版本。缺省 = 旧数据（7 / 21 天两档）：启动时把认识词的阶段 1→2、2→3、≥3→5 迁移一次 |
 | `S.vqk` | `'spell'` / `'mc'` | 生词本判定题方式，缺省拼写（易混词「a / b」和超长短语仍四选一） |
 | `S.cards[id]` | `{due, stage, last, wrongN, n}` | 关键词卡 `tk:<翻译id>:<keys 下标>`、模板句 `hl:<写作id>:<hl 下标>`。答对 `stage+1`，间隔按 `[1,3,7,14,30]`（stage ≥4 恒 30 天），答错 `stage=0`、`wrongN+1`、明天再来；`n` 首次学的日期（每天新卡额度：关键词 10、模板句 5）；同样经 `capDue` |
+| `S.vnewAuto` | bool | 每日新词「按建议」。缺省：存档里没有 `vnew`（新用户）为 true，老用户 false；点 10 / 20 / 30 置 false |
+| `S.vsug` | `{key, n, core, hi, days}` | 当天的建议新词数缓存，`key = 日期|考试日期`。`n = (未学基础+核心 + 0.5 × 未学高频) / max(1, 剩余天数 − 14)`，夹在 10–40 |
+| `S.act[日期]` | `{vr, vn, cd}` | 按天计数：单词复习（之前见过的词当天第一次标记 / 判定）、新词、关键词卡 / 模板句作答；保留 60 天。打卡和周报用 |
+| `S.rvLog[日期]` | `{n, left, done}` | 今日复习：当天到期总数 `n`（中途新到期的会加上）、最后一次看到还剩 `left`、`done = n − left`；首页 / 复习流程 / 页面隐藏时更新，保留 60 天。周报「复习完成率」= Σdone / Σn |
+| `S.rvq` | `{d, skip, done, ok}` | 当天复习流程会话：跳过的项 key（重开时排最后）、流程里做完 / 答对的项数 |
+| `S.dayPlan.tasks[i].k` 新增 `review` | `{k:'review', min, must:1}` | 今日复习，排第一（取代原来的 `retest`；旧计划里的 `retest` 照常显示）。完成 = 队列清空 |
 | `S.dayPlan.tasks[i].k` 新增 `cards` | `{k:'cards', sub:'tk'/'hl', min}` | 关键词卡 / 模板句：打基础期有到期才往前排，专项期跟在写译后，冲刺期必做；完成 = 今天到期和新卡额度都做完 |
+
+**今日复习（`assets/review.js`，`window.CET6Review`）**：`queue()` 汇总到期项——单词（`dailyPlan().review` 里今天还没刷的）、错题（`dueList()`，含同义替换错题）、关键词卡 / 模板句（`CET6Recall.dueAll()`）、听写错句（`CET6Drills.dictDue()`），按 `(过期天数 + 1) × 权重` 降序；权重：错题 = 题型单题分值（`TMAP[sub].pt`，同义替换错题按出处题型），单词 / 卡 / 听写句 = 1。`info()` → `{n, min, by, q, total, done}`（单词 0.3、卡 0.4、听写 1、错题 1.5 分钟 / 项）。`open()` 在首页里一项接一项做：单词用 `CET6.vreview`（与单词页判定题同规则）、错题用 `CET6Learn.retestOne`、卡用 `CET6Recall.mountOne`、听写用 `CET6Drills.dictReview`；做完的项不再到期，所以退出后重开就是剩下的。`outlineTry(ch, i)` / `outlineGo(a)`：考点勾「这条我记住了」后给一个相关练习入口（听力 / 阅读 → 推荐一篇对应题型或同义替换 / 听写专项，写作 → 作文或模板句卡，翻译 → 翻译或关键词卡，词汇 → 今日单词 / 选词填空；考试结构章没有对应练习，只记勾选）。
 
 **重测规则**：交卷答错（练习 / 模考 / 诊断）→ `streak=0`、`due=明天`，保留已选错因；之后答对（重做整套或单题重测）只有与 `last` 隔 ≥1 天才 `streak+1`，间隔 `GAPS=[1,3,7]` 按 streak 取，`streak` 到 `CLEAR_AT=2` 移出错题本；重测答错重置为 1 天。同一天重做答对不计数也不删除。
 
@@ -84,7 +93,7 @@ assets/style.css        样式（浅色 / 深色）
 - `subOf(id)`、`logWt(kind, id, gradeResult, via, ts?)`、`setWtManual(id, ts, v)`
 - `applyResult(wrongs, rights)`（recordSet 调）、`retestAnswer(key, ok)`、`dueList()`、`setCause(key, c)`、`causeHTML(key, kind)`（任意页面插入即可用，点击由全局委托处理）
 - `examDate()`、`dailyMin()`、`daysLeft()`、`phase()`（>60 天 base 打基础 / 21–60 focus 专项 / <21 sprint 冲刺）、`planToday()` → `{tasks(含 done/f/title), total, budget, phase, days}`
-- `studyDays()`（由 hist / sets / vseen / wtScore / exams / rt / mastered 日期推算）、`streak()`、`weekReport()`、`weekStart()`
+- `studyDays()`（由 hist / sets / vseen / wtScore / exams / rt / mastered / cards / drill / act / rvLog 日期推算）、`logAct(k, n?)`、`retestOne(host, key, onNext)`、`pickSet(sub)`；周报 `weekReport()` 新增 `act`（单词复习 / 新词 / 卡片）、`drill`（专项题量）、`rvRate`（复习完成率）、`streak()`、`weekReport()`、`weekStart()`
 - 渲染：`planHTML()`、`rankHTML(pr)`、`weekHTML()`、`meTopHTML()`、`causeChartHTML()`、`wrongExtraHTML(w)`、`diagHTML(lv)`、`openRetest()`；首页点击 / 改值交给 `homeClick(e)` / `homeChange(e)`
 - `window.CET6Recall`：`capDue(last, raw)`、`judge(input, alts)`（宽松比对）、`tkCards()` / `hlCards()` / `themes()`、`counts(kind)`、`grade(id, ok)`、`mount(el, kind)`、`planInfo()`、`trendHTML(id, opt)`、`markLow(el, gr)`、`rewriteTask(kind, item, text, gr)`；`window.CET6` 新增 `openWTItem(kind, id, text?)`（模考报告「去写译页改写这篇」，也可用 `#wt=<题目 id>` 直达）；`window.CET6Game` 新增 `distractors` / `overlap`；`window.CET6Grade` 新增 `stem` / `sentences` / `paras`
 - `window.CET6Exam` 新增 `startDiag()`、`diagMinutes()`、`DIAG_SEL`；`window.CET6` 新增 `qLoc(kind, set, i)`（解析引文在原文里的段落 / 录音段）、`clozeCtx`、`goSet`、`renderHome`、`openOutline`、`openVocabDaily`、`openWT`
@@ -103,7 +112,7 @@ assets/style.css        样式（浅色 / 深色）
 |---|---|---|
 | `S.drill[日期]` | `{locate:{n,ok}, para:{n,ok}, dict:{n,ok,w,wok}, pre:{n,ok}}` | 每日训练量，保留 60 天。`dict` 的 `n` 句数、`ok` 正确率 ≥90% 的句数、`w` / `wok` 原文词数 / 写对词数；`pre` 预判题数 / 命中数 |
 | `S.myWords` | `[{w, d, src, ctx}]` | 听写收的单词库外生词，最多 500 |
-| `S.dictBad` | `[{id, k, t, acc, d, n}]` | 听写正确率 < 80% 的句子（`k` 句子键：录音段序号，长段拆句为 `段.句`），供后续统一复习，最多 200 |
+| `S.dictBad` | `[{id, k, t, acc, d, n, st?, due?}]` | 听写正确率 < 80% 的句子（`k` 句子键：录音段序号，长段拆句为 `段.句`），最多 200。进「今日复习」：`due` 缺省 = `d` + 1 天；重听重写 ≥80% 移出，仍 <80% 则 `st+1`、按 `[1,3,7]` 天拉开（7 天封顶）；听写页里同一句再写到 ≥80% 也移出，再错重置为明天 |
 | `S.dictPos[题目 id]` / `S.dictLast` / `S.dictG` / `S.dictRate` | 数字 / id / `'cet'`·`'real'` / 0.8·1 | 听写进度、上次那篇、素材组、语速 |
 | `S.locSeen` / `S.paraSeen` | 数组 | 做过的定位题 / 同义替换（出题时排后） |
 | `S.rampOff` | bool | 关闭倍速爬坡 |

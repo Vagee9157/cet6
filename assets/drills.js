@@ -305,12 +305,13 @@
     const typed = inp ? inp.value : ''; const c = Dd.e.ch[Dd.k];
     const r = diff(c.t, typed); Dd.res = r; Dd.typed = typed;
     const s = St(); s.dictPos = s.dictPos || {}; s.dictPos[Dd.e.set.id] = Dd.k + 1;
+    s.dictBad = Array.isArray(s.dictBad) ? s.dictBad : [];
+    const old = s.dictBad.find((x) => x && x.id === Dd.e.set.id && x.k === c.k);
     if (r.acc < 0.8) {
-      s.dictBad = Array.isArray(s.dictBad) ? s.dictBad : [];
-      const old = s.dictBad.find((x) => x && x.id === Dd.e.set.id && x.k === c.k);
-      if (old) { old.acc = Math.round(r.acc * 100) / 100; old.d = today(); old.n = (old.n || 1) + 1; }
-      else { s.dictBad.push({ id: Dd.e.set.id, k: c.k, t: c.t, acc: Math.round(r.acc * 100) / 100, d: today(), n: 1 }); if (s.dictBad.length > 200) s.dictBad = s.dictBad.slice(-200); }
-    }
+      // 错句：明天起进「今日复习」重听重写（due / st 见 dictGrade）
+      if (old) { old.acc = Math.round(r.acc * 100) / 100; old.d = today(); old.n = (old.n || 1) + 1; old.st = 0; old.due = addDays(today(), DGAPS[0]); }
+      else { s.dictBad.push({ id: Dd.e.set.id, k: c.k, t: c.t, acc: Math.round(r.acc * 100) / 100, d: today(), n: 1, st: 0, due: addDays(today(), DGAPS[0]) }); if (s.dictBad.length > 200) s.dictBad = s.dictBad.slice(-200); }
+    } else if (old) s.dictBad = s.dictBad.filter((x) => x !== old);   // 重写对了 ≥80%，移出错句
     bump('dict', r.acc >= 0.9, { w: r.total, wok: r.ok });
     dictRender();
   }
@@ -349,6 +350,66 @@
     if (e.key === 'Escape') { e.preventDefault(); stopDA(); daPlay(); return; }
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && (e.target.id === 'ddIn' || e.target === document.body)) { e.preventDefault(); if (Dd.res) dictNext(); else dictCheck(); }
   });
+
+  /* ---------- 听写错句复习（今日复习流程 assets/review.js 用） ----------
+     S.dictBad[i] 新增 due（到期日）/ st（复习仍没过的次数）。旧记录没有 due：按 d + 1 天算。
+     重写正确率 ≥80% 移出；仍 <80% 的 st+1，按 DGAPS = [1, 3, 7] 天逐次拉开（同一句卡住不天天出现，7 天封顶） */
+  const DGAPS = [1, 3, 7];
+  const isDay = (x) => typeof x === 'string' && /^\d{4}-\d\d-\d\d$/.test(x);
+  function addDays(ds, n) { const [y, m, d] = ds.split('-').map(Number); return C().lday(new Date(y, m - 1, d + n)); }
+  const dictDueOf = (x) => (isDay(x.due) ? x.due : addDays(isDay(x.d) ? x.d : today(), DGAPS[0]));
+  function dictFind(id, k) { const P = dictPool(); for (const g of ['cet', 'real']) { const e = P[g].find((x) => x.set.id === id); if (e) { const c = e.ch.find((x) => x.k === k); if (c) return { e, c }; } } return null; }
+  // 到期的错句：[{x: 记录, due, key}]
+  function dictDue() { const t = today(); return (Array.isArray(St().dictBad) ? St().dictBad : []).filter((x) => x && x.id && x.k != null && dictDueOf(x) <= t && dictFind(x.id, x.k)).map((x) => ({ x, due: dictDueOf(x), key: 'dict:' + x.id + ':' + x.k })); }
+  function dictGrade(x, acc) {
+    const s = St(), arr = Array.isArray(s.dictBad) ? s.dictBad : [];
+    const it = arr.find((y) => y && y.id === x.id && y.k === x.k); if (!it) return 'none';
+    if (acc >= 0.8) { s.dictBad = arr.filter((y) => y !== it); C().save(); return 'clear'; }
+    it.st = (it.st || 0) + 1; it.acc = Math.round(acc * 100) / 100; it.n = (it.n || 1) + 1; it.d = today();
+    it.due = addDays(today(), DGAPS[Math.min(it.st, DGAPS.length - 1)]); C().save(); return 'next';
+  }
+  // 在 el 里重听重写一句，点「下一项」/ 跳过回调 onDone(正确率 / null)
+  let RV = null;
+  function dictReview(el, key, onDone) {
+    const hit = dictDue().find((y) => y.key === key); if (!hit) return false;
+    const f = dictFind(hit.x.id, hit.x.k), m = C().AUD(f.e.set.id); if (!m) return false;
+    RV = { el, x: hit.x, e: f.e, c: f.c, m, res: null, typed: '', res2: '', onDone };
+    const play = () => {
+      if (!DA.paused) { DA.pause(); return; }
+      C().stopAudio(); daRange = [RV.c.a, RV.c.b];
+      const go = () => { try { DA.currentTime = RV.c.a; } catch {} DA.defaultPlaybackRate = DA.playbackRate = St().dictRate || 1; DA.play().catch(() => {}); };
+      if (DA.dataset.src !== RV.m.src) { DA.dataset.src = RV.m.src; DA.src = RV.m.src; DA.addEventListener('loadedmetadata', go, { once: true }); DA.load(); } else go();
+    };
+    const paint = () => {
+      const r = RV.res, rate = St().dictRate || 1, x = RV.x;
+      const diffHTML = r ? r.ops.map((o) => o.t === 'ok' ? `<span class="dd-w ok">${esc(o.w)}</span>` : o.t === 'miss' ? `<span class="dd-w miss" title="漏听">${esc(o.w)}</span>` : o.t === 'sub' ? `<span class="dd-w sub" title="错听">${esc(o.w)}<small>${esc(o.y)}</small></span>` : `<span class="dd-x" title="多写">+${esc(o.y)}</span>`).join(' ') : '';
+      const sched = RV.res2 === 'clear' ? '≥80%，已移出听写错句。' : RV.res2 === 'next' ? `还没到 80%，${esc((St().dictBad || []).find((y) => y.id === x.id && y.k === x.k)?.due?.slice(5) || '')} 再听一次。` : '';
+      el.innerHTML = `<div class="card dd-card m-listen">
+        <p class="dd-note">${esc(RV.e.set.title.replace(/^[^·]+·\s*/, ''))} · 上次听写 ${Math.round((x.acc || 0) * 100)}%${x.n > 1 ? ` · 第 ${x.n} 次` : ''}</p>
+        <div class="dd-ctl"><button class="btn tone m-listen" id="ddPlay" data-rvdplay>${ic(DA.paused ? 'i-play' : 'i-pause')}${DA.paused ? '播放这句' : '暂停'}</button><span class="dd-rate">语速 ${[0.8, 1].map((v) => `<button class="chip" data-rvdrate="${v}" aria-pressed="${rate === v}">${v.toFixed(1)}×</button>`).join('')}</span></div>
+        ${RV.c.est ? '<p class="dd-note">这句截自真人长段，起止按字数估算，只写中间这句。</p>' : ''}
+        <textarea id="rvdIn" class="dd-in serif" rows="3" placeholder="重听这句，写下听到的…" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" ${r ? 'readonly' : ''}>${esc(RV.typed)}</textarea>
+        ${r ? `<div class="dd-res"><div class="dd-acc"><b>${Math.round(r.acc * 100)}%</b><span>对了 ${r.ok} / ${r.total} 词 · ${sched}</span></div><div class="dd-diff serif">${diffHTML}</div>
+          <p class="dd-legend"><span class="dd-w miss">漏听</span><span class="dd-w sub">错听<small>你写的</small></span><span class="dd-x">+多写</span></p></div>` : ''}
+        <div class="dd-acts">${r ? `<button class="btn primary" data-rvdnext>下一项${ic('i-chev-r')}</button><button class="btn" data-rvdplay>${ic('i-redo')}再听一遍</button>` : `<button class="btn primary" data-rvdcheck>检查</button><button class="btn ghost" data-rvdskip>跳过这句</button>`}</div></div>`;
+    };
+    const check = () => {
+      if (RV.res) return; const inp = el.querySelector('#rvdIn'); const typed = inp ? inp.value : '';
+      if (!typed.trim()) { if (inp) inp.focus(); return; }
+      RV.typed = typed; RV.res = diff(RV.c.t, typed); RV.res2 = dictGrade(RV.x, RV.res.acc); paint();
+    };
+    const end = (v) => { stopDA(); const cb = RV.onDone; RV = null; cb(v); };
+    el.onclick = (e) => {
+      if (!RV) return;
+      if (e.target.closest('[data-rvdplay]')) { if (e.target.closest('.dd-acts')) stopDA(); play(); return; }
+      const rt = e.target.closest('[data-rvdrate]'); if (rt) { St().dictRate = +rt.dataset.rvdrate; C().save(); DA.playbackRate = St().dictRate; el.querySelectorAll('[data-rvdrate]').forEach((b) => b.setAttribute('aria-pressed', +b.dataset.rvdrate === St().dictRate)); return; }
+      if (e.target.closest('[data-rvdcheck]')) { check(); return; }
+      if (e.target.closest('[data-rvdnext]')) { end(RV.res ? RV.res.acc : null); return; }
+      if (e.target.closest('[data-rvdskip]')) end(null);
+    };
+    el.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target.id === 'rvdIn' && RV && !RV.res) { e.preventDefault(); check(); } };
+    paint(); return true;
+  }
 
   /* ---------- 入口 / 分发 ---------- */
   const DRILLS = {
@@ -499,7 +560,7 @@
   function delMyWord(w) { const s = St(); s.myWords = (s.myWords || []).filter((x) => x && x.w !== w); C().save(); }
 
   window.CET6Drills = {
-    open, leave, entryHTML, todayOf, planTask, taskStatus, rtItem, paraKey,
+    open, leave, entryHTML, todayOf, planTask, taskStatus, rtItem, paraKey, dictDue, dictReview, dictGrade, stopDict: stopDA,
     preGate, preBarHTML, preQHTML, preClick, preExpHTML, preSumHTML, qType,
     rampOf, rateSrcHTML, myWordsHTML, delMyWord,
     _diff: diff, _locPool: locPool, _dictPool: dictPool, _wordId: wordId,

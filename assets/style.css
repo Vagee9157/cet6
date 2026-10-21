@@ -1713,3 +1713,47 @@ body.ex-focus .ex-bar{top:env(safe-area-inset-top);margin-top:0}
 .mw button{position:absolute;top:2px;right:2px;width:32px;height:32px;display:grid;place-items:center;color:var(--ink-dim);border-radius:8px}
 .mw button:hover{background:var(--paper-2)}
 @media (max-width:719px){.pre-bar.run{padding:8px 12px;gap:4px 10px}.pre-bar.run .pre-tx{order:3;flex-basis:100%;font-size:12.5px}.pre-bar.run .btn{margin-left:auto;padding:8px 12px}}
+
+/* ---------- 第三批 3a：今日复习连续流程（review.js）/ 每日新词建议 / 考点练一题 / 周报补充 ---------- */
+.rv-wrap{max-width:760px;margin:0 auto}
+.rv-head .rv-n{margin-left:auto;font-size:13px;font-weight:800;color:var(--ink-dim);background:var(--paper);padding:5px 10px;border-radius:10px;box-shadow:var(--shadow);white-space:nowrap}
+.rv-prog{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin:0 0 12px}
+.rv-prog .bar{height:8px}
+.rv-prog .bar i{background:var(--vocab)}
+.rv-prog .tx{font-size:12.5px;font-weight:600;color:var(--ink-dim)}
+.rv-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin:0 0 10px;font-size:12.5px;color:var(--ink-dim);font-weight:600}
+.rv-meta .tag{--cs:color-mix(in srgb,var(--c) 14%,transparent);background:var(--cs);color:var(--c);font-weight:800}
+.rv-meta .rv-od{color:var(--badt,var(--red));font-weight:800}
+.rv-body .rt-wrap{max-width:none}
+.rv-body .rt-card{max-width:none}
+.rv-body .submit-bar{justify-content:flex-end}
+.rv-body .cd-card{margin:0}
+.rv-body .rv-skip{margin-top:8px}
+.rv-wcard{padding:14px 16px;margin-top:0}
+.rv-wcard .bk-hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rv-wcard .bw{font-family:var(--serif);font-size:24px;font-weight:600;overflow-wrap:anywhere}
+.rv-wcard .pos{font-size:12px;font-weight:700;color:var(--vocab);background:var(--vocab-soft);padding:2px 10px;border-radius:999px}
+.rv-wcard .spk{width:34px;height:34px;border-radius:999px;background:var(--paper-2);color:var(--ink-soft);display:grid;place-items:center;margin-left:auto}
+.rv-wcard .cn{font-size:18px;font-weight:800;margin:8px 0 10px}
+.rv-wcard .exs{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.rv-wcard .exs li{background:var(--paper-2);border-radius:12px;padding:9px 12px}
+.rv-wcard .ex{font-size:15px;line-height:1.55}
+.rv-wcard .ex em{font-style:normal;font-weight:700;color:var(--vocab)}
+.rv-wcard .zh{font-size:13px;color:var(--ink-dim);margin-top:2px;line-height:1.5}
+.rv-body .dd-card{margin:0}
+.vnew-ctl .chip[data-vnewauto]{font-weight:800}
+.vnew-sug{margin:8px 0 0;font-size:12.5px;line-height:1.6;color:var(--ink-mute)}
+.vnew-sug b{color:var(--vocab)}
+.pt-foot{flex-wrap:wrap;gap:8px}
+.ot-try{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:10px 12px;border-radius:var(--r-xs);background:color-mix(in srgb,var(--c) 9%,var(--paper-2));border-left:3px solid var(--c)}
+.ot-try .lab{font-size:12px;font-weight:800;color:var(--c);flex:1 1 100%}
+.ot-try .what{flex:1 1 180px;min-width:0;display:grid;gap:1px}
+.ot-try .what b{font-size:14px}
+.ot-try .what small{font-size:12px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ot-try .btn{flex:none}
+.lw-nums{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:519px){.lw-nums{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.lw-more{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.lw-more span{font-size:12px;color:var(--ink-dim);background:var(--paper-2);border-radius:999px;padding:4px 10px;font-weight:600}
+.lw-more span b{color:var(--ink);margin-right:4px;font-variant-numeric:tabular-nums}
+.lw-more .lw-rv{background:none;padding-left:2px}

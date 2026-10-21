@@ -200,7 +200,17 @@
     (s.rt || []).forEach((x) => { if (x && isDay(x.d)) set.add(x.d); });
     Object.values(s.mastered || {}).forEach((v) => { if (isDay(v)) set.add(v); });
     Object.values(s.cards || {}).forEach((c) => { if (c && isDay(c.last)) set.add(c.last); });   // 关键词卡 / 模板句
+    Object.entries(s.drill || {}).forEach(([d, r]) => { if (isDay(d) && r && Object.values(r).some((x) => x && x.n > 0)) set.add(d); });   // 专项训练
+    Object.entries(s.act || {}).forEach(([d, r]) => { if (isDay(d) && r && Object.values(r).some((v) => v > 0)) set.add(d); });   // 单词复习 / 新词 / 卡片（按天计数）
+    Object.entries(s.rvLog || {}).forEach(([d, r]) => { if (isDay(d) && r && r.done > 0) set.add(d); });   // 今日复习流程
     return set;
+  }
+  // 按天计数：S.act[日期] = {vr 单词复习, vn 新词, cd 关键词卡 / 模板句}，保留 60 天
+  function logAct(k, n) {
+    const s = St(); if (!s.act || typeof s.act !== 'object' || Array.isArray(s.act)) s.act = {};
+    const d = today(), r = s.act[d] || (s.act[d] = {});
+    r[k] = (r[k] || 0) + (n == null ? 1 : n);
+    const ks = Object.keys(s.act).sort(); if (ks.length > 60) ks.slice(0, ks.length - 60).forEach((x) => delete s.act[x]);
   }
   // 连续学习天数：今天还没学时从昨天往回数（今天学了就 +1）
   function streak() {
@@ -246,10 +256,13 @@
   function buildPlan() {
     const s = St(), pr = predict(), ph = phase(), budget = dailyMin(), d = today();
     const cand = [];
-    const due = dueList().length;
-    if (due) cand.push({ k: 'retest', min: Math.ceil(Math.min(due, RT_CAP) * 1.5), must: 1 });
+    // 今日复习（assets/review.js）：到期单词 / 错题重测 / 关键词卡与模板句 / 听写错句合成一个连续流程，排第一
+    const RV = window.CET6Review, rv = RV ? RV.info() : null;
+    if (rv && rv.n) cand.push({ k: 'review', min: rv.min, must: 1 });
+    else if (!RV) { const due = dueList().length; if (due) cand.push({ k: 'retest', min: Math.ceil(Math.min(due, RT_CAP) * 1.5), must: 1 }); }
     const vp = C().dailyPlan();
-    const vocab = { k: 'vocab', min: Math.max(3, Math.round(vp.fresh.length * 0.5 + vp.review.length * 0.2)), must: ph.k !== 'sprint' ? 1 : 0 };
+    // 复习词已算进「今日复习」，单词任务只按新词估时
+    const vocab = { k: 'vocab', min: Math.max(3, Math.round(vp.fresh.length * 0.5 + (RV ? 0 : vp.review.length * 0.2))), must: ph.k !== 'sprint' ? 1 : 0 };
     const setTask = (sub) => { const set = pickSet(sub); return set ? { k: 'set', sub, id: set.id, min: setMin(set) } : null; };
     const wtDay = +d.slice(-2) % 2 ? 'trans' : 'write';
     const wtTask = (k) => ({ k: 'wt', sub: k, min: 30 });
@@ -259,7 +272,7 @@
     const objRank = pr.rank.filter((x) => !x.wt);
     const topL = objRank.find((x) => x.part === 'listen'), topR = objRank.find((x) => x.part === 'read');
     if (ph.k === 'base') {
-      cand.push(vocab, ci && ci.due ? cards() : null, setTask(topL ? topL.k : 'conv'), setTask(topR ? topR.k : 'mc'), outlineTask(pr), wtTask(wtDay), cards());
+      cand.push(vocab, ci && ci.due && !RV ? cards() : null, setTask(topL ? topL.k : 'conv'), setTask(topR ? topR.k : 'mc'), outlineTask(pr), wtTask(wtDay), cards());
     } else if (ph.k === 'focus') {
       const tops = pr.rank.slice(0, 3).map((x) => (x.wt ? wtTask(x.k) : setTask(x.k)));
       // 专项训练（assets/drills.js）：按近两周头号错因 / 提分排行挑定位训练 / 同义替换 / 逐句听写之一，k = 'drill'，sub = locate / para / dict
@@ -284,13 +297,14 @@
   }
   // 当天固定一份（考试日期 / 每日时间改了就重排）；完成状态每次按真实数据现算
   function planToday() {
-    const s = St(), d = today(), key = `${d}|${dailyMin()}|${examDate()}`;
+    const s = St(), d = today(), key = `${d}|${dailyMin()}|${examDate()}|rv`;
     if (!s.dayPlan || s.dayPlan.key !== key || !Array.isArray(s.dayPlan.tasks)) { s.dayPlan = { key, d, tasks: buildPlan() }; C().save(); }
     const tasks = s.dayPlan.tasks.map((t) => Object.assign({}, t, taskStatus(t)));
     return { tasks, total: tasks.reduce((a, t) => a + t.min, 0), done: tasks.filter((t) => t.done).length, budget: dailyMin(), phase: phase(), days: daysLeft(), date: examDate() };
   }
   function taskStatus(t) {
     const s = St(), d = today();
+    if (t.k === 'review') return window.CET6Review ? window.CET6Review.taskStatus(t) : { done: false, f: 0, title: '今日复习', p: '', mod: 'm-vocab' };
     if (t.k === 'retest') {
       const left = dueList().length, did = rtToday(), n = Math.min(left, RT_CAP);
       return { done: !left && did > 0, f: did + left ? did / (did + Math.min(left, RT_CAP)) : 1, title: left ? `错题重测 ${n} 道${left > RT_CAP ? `（共 ${left}）` : ''}` : '错题重测', p: left ? `今天已测 ${did}` : did ? `已测 ${did} 道` : '今天没有到期的', mod: 'm-read' };
@@ -350,6 +364,7 @@
     goTask(t); return true;
   }
   function goTask(t) {
+    if (t.k === 'review') return window.CET6Review && window.CET6Review.open();
     if (t.k === 'retest') return openRetest();
     if (t.k === 'vocab') return C().openVocabDaily();
     if (t.k === 'set') { const st = St(); const id = st.sets[t.id] && taskStatus(t).done ? t.id : (pickSet(t.sub) || {}).id || t.id; return C().goSet(id); }
@@ -381,7 +396,11 @@
     const days = [...studyDays()].filter(inW).length;
     const qs = (s.hist || []).filter((h) => h && inW(h.d)).reduce((a, h) => a + (h.t || 0), 0) + (s.rt || []).filter((x) => inW(x.d)).length;
     const cs = {}; Object.values(s.causeLog || {}).forEach((x) => { if (x && inW(x.d)) cs[x.c] = (cs[x.c] || 0) + 1; });
-    return { days, qs, causes: cs };
+    // 单词复习 / 新词 / 卡片（S.act）、专项训练（S.drill：定位题 + 同义替换 + 听写句）、今日复习完成率（S.rvLog：当天到期总数 n、最后还剩 left）
+    const act = { vr: 0, vn: 0, cd: 0 }; Object.entries(s.act || {}).forEach(([d, r]) => { if (inW(d) && r) Object.keys(act).forEach((k) => { act[k] += +r[k] || 0; }); });
+    let drill = 0; Object.entries(s.drill || {}).forEach(([d, r]) => { if (inW(d) && r) ['locate', 'para', 'dict'].forEach((k) => { drill += (r[k] && r[k].n) || 0; }); });
+    let rvN = 0, rvDone = 0; Object.entries(s.rvLog || {}).forEach(([d, r]) => { if (inW(d) && r && r.n > 0) { rvN += r.n; rvDone += Math.max(0, r.n - (r.left || 0)); } });
+    return { days, qs, causes: cs, act, drill, rvRate: rvN ? rvDone / rvN : null, rvN, rvDone };
   }
   function weekReport() {
     const mon = weekStart(), s = St();
@@ -392,13 +411,14 @@
     const a = predict({ asOf: endTs(addDays(mon, -1)) }), b = predict({ asOf: endTs(addDays(lastMon, -1)) });
     const topC = Object.entries(w.causes).sort((x, y) => y[1] - x[1])[0];
     const now = predict();
-    return { mon, lastMon, days: w.days, qs: w.qs, pred: a.ready ? a.total : null, delta: a.ready && b.ready ? a.total - b.total : null, cause: topC ? { c: topC[0], n: topC[1] } : null, focus: now.rank[0] };
+    return { mon, lastMon, days: w.days, qs: w.qs, act: w.act, drill: w.drill, rvRate: w.rvRate, rvN: w.rvN, rvDone: w.rvDone, pred: a.ready ? a.total : null, delta: a.ready && b.ready ? a.total - b.total : null, cause: topC ? { c: topC[0], n: topC[1] } : null, focus: now.rank[0] };
   }
   function weekHTML() {
     const r = weekReport(); if (!r) return '';
     const dl = r.delta == null ? '' : r.delta > 0 ? `<b class="up">+${r.delta}</b>` : r.delta < 0 ? `<b class="down">${r.delta}</b>` : '<b>持平</b>';
     return `<div class="card lw-card m-exam"><div class="lw-h"><b>上周周报</b><span>${esc(r.lastMon.slice(5))} – ${esc(addDays(r.lastMon, 6).slice(5))}</span><button class="x" data-weekx aria-label="关闭周报">${ic('i-x')}</button></div>
-      <div class="lw-nums"><div><b>${r.days}<small>/7</small></b><span>学习天数</span></div><div><b>${r.qs}</b><span>做题量</span></div><div><b>${r.pred == null ? '—' : r.pred}</b><span>周末预测 ${dl}</span></div></div>
+      <div class="lw-nums"><div><b>${r.days}<small>/7</small></b><span>学习天数</span></div><div><b>${r.qs}</b><span>做题量</span></div><div><b>${r.rvRate == null ? '—' : Math.round(r.rvRate * 100) + '<small>%</small>'}</b><span>复习完成率</span></div><div><b>${r.pred == null ? '—' : r.pred}</b><span>周末预测 ${dl}</span></div></div>
+      <div class="lw-more">${[['单词复习', r.act.vr], ['新词', r.act.vn], ['关键词卡 / 模板句', r.act.cd], ['专项训练', r.drill]].map(([n, v]) => `<span><b>${v}</b>${n}</span>`).join('')}${r.rvN ? `<span class="lw-rv">到期复习 ${r.rvN} 项，完成 ${r.rvDone}</span>` : ''}</div>
       <ul class="lw-tips">${r.cause ? `<li><b>头号错因</b>${esc(CAUSES[r.cause.c])}（${r.cause.n} 次）：${esc(CAUSE_TIP[r.cause.c])}</li>` : '<li><b>头号错因</b>上周没标错因。交卷后在错题下面点一下错因，周报才能帮你找规律。</li>'}
         ${r.focus ? `<li><b>下周重点</b>${esc(r.focus.name)}（当前 ${Math.round(r.focus.rate * 100)}%，${esc(rankText(r.focus))}）</li>` : ''}</ul></div>`;
   }
@@ -469,9 +489,15 @@
     }
     rt.items[key] = it; return it;
   }
+  // 今日复习流程（assets/review.js）里只做一道：host 是流程卡片区，答完 / 跳过回调 onNext(结果 / null)
+  function retestOne(host, key, onNext) {
+    stopRA(); rt = { q: [key], i: 0, pick: null, res: null, ok: 0, items: {}, host, one: true, onNext };
+    if (!prep(key)) { rt = null; return false; }
+    renderRetest(); return true;
+  }
   function renderRetest() {
-    const box = $('#me-box'); if (!rt) return;
-    const head = (n) => `<div class="prac-head"><button class="btn ghost" data-rtback>${ic('i-chev-l')}错题本</button><h2>错题重测</h2>${n || ''}</div>`;
+    if (!rt) return; const box = rt.host || $('#me-box');
+    const head = (n) => rt.one ? '' : `<div class="prac-head"><button class="btn ghost" data-rtback>${ic('i-chev-l')}错题本</button><h2>错题重测</h2>${n || ''}</div>`;
     while (rt.i < rt.q.length && !prep(rt.q[rt.i])) rt.i++;
     if (rt.i >= rt.q.length) {
       const left = dueList().length;
@@ -515,13 +541,14 @@
     const res = done ? `<div class="exp rt-res ${rt.res === 'reset' ? 'bad' : 'ok'}"><b class="vd ${rt.res === 'reset' ? 'bad' : 'ok'}">${rt.res === 'reset' ? '✗ 答错' : '✓ 答对'}</b> · 正确答案 ${ansLabel}。${esc(expT)}<div class="rt-sched">${RES[rt.res] || ''}</div>${rt.res === 'reset' ? causeHTML(it.key, kind) : ''}</div>` : '';
     box.innerHTML = `<div class="rt-wrap">${head(`<span class="rt-n tabular">${rt.i + 1} / ${rt.q.length}</span>`)}
       <div class="rt-card card ${mod}"><div class="src">${src}</div>${ctx}${choices}${res}</div>
-      <div class="submit-bar">${done ? `<button class="btn primary" data-rtnext>${rt.i + 1 < rt.q.length ? '下一道' : '看结果'}${ic('i-chev-r')}</button>` : `<button class="btn ghost" data-rtskip>跳过这道</button>`}</div></div>`;
+      <div class="submit-bar">${done ? `<button class="btn primary" data-rtnext>${rt.one ? '下一项' : rt.i + 1 < rt.q.length ? '下一道' : '看结果'}${ic('i-chev-r')}</button>` : `<button class="btn ghost" data-rtskip>跳过这道</button>`}</div></div>`;
     box.onclick = rtClick;
   }
   function rtClick(e) {
     if (e.target.closest('[data-rtback]')) { stopRA(); rt = null; C().show('me'); return; }
     if (e.target.closest('[data-rthome]')) { stopRA(); rt = null; C().show('home'); return; }
     if (e.target.closest('[data-rtmore]')) { openRetest(); return; }
+    if (rt && rt.one && (e.target.closest('[data-rtnext]') || e.target.closest('[data-rtskip]'))) { stopRA(); const cb = rt.onNext, r = e.target.closest('[data-rtnext]') ? rt.res : null; rt = null; if (cb) cb(r); return; }
     if (e.target.closest('[data-rtnext]') || e.target.closest('[data-rtskip]')) { stopRA(); rt.i++; rt.pick = null; rt.res = null; renderRetest(); window.scrollTo(0, 0); return; }
     if (e.target.closest('[data-rtau]')) { const it = prep(rt.q[rt.i]); if (it && it.m && it.range) raPlay(it.m, it.range[0], it.range[1]); return; }
     const p = e.target.closest('[data-rtpick]'); if (!p || rt.res !== null) return;
@@ -551,5 +578,6 @@
     studyDays, streak, examDate, defaultExamDate, dailyMin, daysLeft, phase,
     planToday, planHTML, homeClick, homeChange, heroInfo, rankHTML, weekReport, weekHTML, weekStart,
     meTopHTML, causeChartHTML, openRetest, diagHTML,
+    TMAP, pickSet, logAct, retestOne, stopRetest: () => { stopRA(); rt = null; },
   };
 })();

@@ -155,7 +155,9 @@
   function blankHTML(c) {
     return `${esc(c.before)}<span class="cd-blank" aria-label="空格，${c.nw} 个词">${'＿'.repeat(Math.min(10, Math.max(3, c.nw * 2)))}<small>${c.nw} 词</small></span>${esc(c.after)}`;
   }
-  function cardHTML(c, r) {
+  // opt.one：今日复习流程里单张作答（不在本轮末尾重来，按钮是「下一项」）
+  function cardHTML(c, r, opt) {
+    const one = !!(opt && opt.one);
     const st = box()[c.id];
     const tag = !st ? '<span class="tag">新卡</span>' : st.stage ? `<span class="tag">第 ${st.stage + 1} 轮</span>` : '<span class="tag hot">上次答错</span>';
     let q = '';
@@ -172,8 +174,8 @@
       const note = r.ok && r.level === 'near' ? `<p class="cd-note">${r.miss.length ? `漏了 ${r.miss.map(esc).join('、')}，` : ''}注意介词、冠词和词形，考场上按参考写。</p>` : '';
       res = `<div class="cd-res ${r.ok ? 'ok' : 'bad'}" role="status"><b>${head}</b>${r.input ? `<span class="mine">你写：${esc(r.input)}</span>` : ''}
         <div class="cd-ans"><span>参考</span><b>${esc(ans)}</b></div>${note}
-        <p class="cd-sched">${r.again ? '本轮重来，不改复习安排' : r.ok ? `下次复习 ${esc(box()[c.id].due)}` : '明天再来；本轮末尾还会再出一次'}</p></div>
-        <div class="cd-next"><button class="btn primary" data-cdnext>${ses.i + 1 >= ses.q.length ? '完成' : '下一张'}${ic('i-chev-r')}</button>${!r.ok && !r.again && r.level !== 'empty' ? '<button class="btn ghost" data-cdok>其实我写对了</button>' : ''}</div>`;
+        <p class="cd-sched">${r.again ? '本轮重来，不改复习安排' : r.ok ? `下次复习 ${esc(box()[c.id].due)}` : one ? '明天再来' : '明天再来；本轮末尾还会再出一次'}</p></div>
+        <div class="cd-next"><button class="btn primary" data-cdnext>${one ? '下一项' : ses.i + 1 >= ses.q.length ? '完成' : '下一张'}${ic('i-chev-r')}</button>${!r.ok && !r.again && r.level !== 'empty' ? '<button class="btn ghost" data-cdok>其实我写对了</button>' : ''}</div>`;
     }
     return `<div class="card cd-card">${q}${res}${form}</div>`;
   }
@@ -206,7 +208,7 @@
     const cur = ses.q[ses.i]; if (!cur || ses.res) return;
     const c = byId(cur.id), r = giveUp ? { ok: false, level: 'empty', miss: [] } : judge(input, c.kind === 'tk' ? c.alts : [c.ans]);
     r.input = giveUp ? '' : String(input || '').trim(); r.again = !!cur.again;
-    if (!cur.again) { cur.snap = box()[c.id] ? Object.assign({}, box()[c.id]) : null; grade(c.id, r.ok); if (r.ok) ses.right++; else ses.wrong++; }
+    if (!cur.again) { cur.snap = box()[c.id] ? Object.assign({}, box()[c.id]) : null; grade(c.id, r.ok); logCd(); if (r.ok) ses.right++; else ses.wrong++; }
     if (!r.ok && !cur.again) ses.q.push({ id: c.id, again: true });   // 答错的本轮末尾再来一次
     ses.res = r; paint(); if (onRerender) onRerender();
   }
@@ -230,6 +232,40 @@
       if (e.target.closest('[data-cdmore]')) { extra[curKind] += curKind === 'tk' ? 10 : 5; ses = null; paint(); if (onRerender) onRerender(); return; }
     };
   }
+
+  const logCd = () => { const L = window.CET6Learn; if (L && L.logAct) { L.logAct('cd'); C().save(); } };
+
+  /* ---------- 今日复习流程（assets/review.js）：到期卡列表 + 单张作答 ---------- */
+  // 两种卡里所有到期的：[{id, kind, due}]
+  function dueAll() { const b = box(); return ['tk', 'hl'].flatMap((k) => dueCards(k).map((c) => ({ id: c.id, kind: k, due: b[c.id].due }))); }
+  // 在 el 里做一张卡，点「下一项」/ 跳过回调 onDone(ok / null)
+  let one = null;
+  function mountOne(el, id, onDone) {
+    const c = byId(id); if (!c) return false;
+    one = { el, c, res: null, snap: null, onDone };
+    const paintOne = () => {
+      el.innerHTML = cardHTML(c, one.res, { one: true }) + (one.res ? '' : '<div class="cd-sub rv-skip"><button class="btn ghost" type="button" data-cdpass>跳过这张</button></div>');
+      const inp = el.querySelector('.cd-in'), nx = el.querySelector('[data-cdnext]');
+      if (inp && matchMedia('(hover:hover) and (pointer:fine)').matches) inp.focus({ preventScroll: true }); else if (nx) nx.focus({ preventScroll: true });
+    };
+    const ans = (input, giveUp) => {
+      if (one.res) return;
+      const r = giveUp ? { ok: false, level: 'empty', miss: [] } : judge(input, c.kind === 'tk' ? c.alts : [c.ans]);
+      r.input = giveUp ? '' : String(input || '').trim();
+      one.snap = box()[c.id] ? Object.assign({}, box()[c.id]) : null; grade(c.id, r.ok); logCd();
+      one.res = r; paintOne();
+    };
+    el.onsubmit = (e) => { e.preventDefault(); const f = e.target.closest('[data-cdform]'); if (f && f.elements.a.value.trim()) ans(f.elements.a.value); };
+    el.onclick = (e) => {
+      if (e.target.closest('[data-cdskip]')) { ans('', true); return; }
+      const fw = e.target.closest('[data-cdfirst]'); if (fw) { const s = el.querySelector('.cd-first'); if (s) s.hidden = false; fw.remove(); const inp = el.querySelector('.cd-in'); if (inp) inp.focus(); return; }
+      if (e.target.closest('[data-cdok]')) { const b = box(); if (one.snap) b[c.id] = one.snap; else delete b[c.id]; grade(c.id, true); one.res = Object.assign({}, one.res, { ok: true, level: 'near', miss: [] }); paintOne(); return; }
+      if (e.target.closest('[data-cdnext]')) { const r = one.res, cb = one.onDone; one = null; cb(r ? r.ok : null); return; }
+      if (e.target.closest('[data-cdpass]')) { const cb = one.onDone; one = null; cb(null); }
+    };
+    paintOne(); return true;
+  }
+  const cardLabel = (id) => { const c = byId(id); return c ? (c.kind === 'tk' ? c.zh : c.ans) : ''; };
 
   /* ---------- 首页今日计划用 ---------- */
   // 合计两种卡：left 今日还剩（到期 + 新卡额度），did 今天已练；sub = 到期多的那种
@@ -303,6 +339,6 @@
   // 估分面板里把最低的一项标出来
   function markLow(el, gr) { const k = lowItem(gr); if (!el || k < 0) return; const rows = el.querySelectorAll('.gr-it'); if (rows[k]) rows[k].classList.add('low'); }
 
-  window.CET6Recall = { GAPS, NEW_PER_DAY, capDue, judge, tkCards, hlCards, themes, counts, grade, mount, planInfo, trendHTML, markLow, rewriteTask, wtHist,
+  window.CET6Recall = { GAPS, NEW_PER_DAY, dueAll, mountOne, cardLabel, capDue, judge, tkCards, hlCards, themes, counts, grade, mount, planInfo, trendHTML, markLow, rewriteTask, wtHist,
     _debug: () => ses && { kind: ses.kind, i: ses.i, n: ses.q.length, cur: ses.q[ses.i] && byId(ses.q[ses.i].id), res: ses.res } };
 })();
