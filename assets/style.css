@@ -1713,3 +1713,91 @@ body.ex-focus .ex-bar{top:env(safe-area-inset-top);margin-top:0}
 .mw button{position:absolute;top:2px;right:2px;width:32px;height:32px;display:grid;place-items:center;color:var(--ink-dim);border-radius:8px}
 .mw button:hover{background:var(--paper-2)}
 @media (max-width:719px){.pre-bar.run{padding:8px 12px;gap:4px 10px}.pre-bar.run .pre-tx{order:3;flex-basis:100%;font-size:12.5px}.pre-bar.run .btn{margin-left:auto;padding:8px 12px}}
+
+/* ---------- 做题页工具（assets/readtools.js）：限时 / 两步作答 / 点词 / 速度追踪 ---------- */
+.rt-tools{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:-4px 0 12px}
+.rt-tools .chip{min-height:34px;padding:6px 12px;font-size:12.5px}
+.rt-sw[aria-pressed="true"]{background:var(--read);color:#fff}
+.rt-tip{flex:1 1 220px;font-size:12px;color:var(--ink-dim);line-height:1.5}
+.prac-head .timer.cd{background:var(--read-soft);color:var(--read)}
+.prac-head .timer.cd small{color:color-mix(in srgb,var(--read) 70%,var(--ink-dim))}
+.prac-head .timer.cd.warn{background:var(--red-soft);color:var(--badt);animation:rtPulse 1s ease-in-out infinite}
+@keyframes rtPulse{50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--red) 22%,transparent)}}
+@media (max-width:480px){.prac-head{flex-wrap:wrap}.prac-head h2{flex-basis:calc(100% - 110px)}.prac-head .timer{margin-left:auto}}
+.rt-tags{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:8px}
+.rt-tag{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--paper-2);color:var(--ink-soft)}
+.rt-tag.to{background:var(--red-soft);color:var(--badt)}
+.rt-tag.in{background:var(--ok-soft);color:var(--okt)}
+.rt-tag.pos{background:var(--read-soft);color:var(--read)}
+/* 两步作答 */
+.bank.rt-pick{flex-direction:column;gap:6px;flex-wrap:nowrap;max-height:none;overflow:visible;align-items:stretch}
+.rt-prow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-size:13px;color:var(--ink-soft)}
+.rt-prow b{font-size:14px;color:var(--ink);margin-right:2px}
+.rt-prow > span{font-size:12px;color:var(--ink-dim)}
+.rt-prow .chip{min-height:38px;padding:6px 14px;font-size:14px;font-weight:700}
+.rt-prow .chip i{font-style:normal;font-size:11.5px;font-weight:600;color:var(--ink-dim)}
+.rt-prow .chip[aria-pressed="true"]{background:var(--read);color:#fff}
+.rt-prow .chip[aria-pressed="true"] i{color:inherit;opacity:.85}
+.rt-prow .chip.go{background:var(--read-soft);color:var(--read);box-shadow:none}
+.bank .chip.rt-cur{background:var(--read);color:#fff;box-shadow:none}
+.bank .chip.rt-cur i{font-style:normal;font-size:11px;opacity:.85;border-left:1px solid rgba(255,255,255,.4);padding-left:6px}
+.bank .chip.pos-hit{box-shadow:inset 0 0 0 1.5px var(--read),var(--shadow);color:var(--ink)}
+.bank .chip.pos-dim{opacity:.5}
+.bank .chip.pos-dim.used,.bank .chip.pos-hit.used{opacity:.3}
+.blank .rt-bp{font-style:normal;font-size:11px;opacity:.8}
+.rt-pj{margin-top:4px;font-size:12.5px;font-weight:700}
+.rt-pj.ok{color:var(--okt)} .rt-pj.bad{color:var(--badt)}
+@media (max-width:719px){.bank.rt-pick{padding:8px 2px}.rt-prow .chip{padding:6px 11px}}
+/* 阅读列表：限时设置 */
+.rt-set{padding:14px 16px;margin:0 0 14px}
+.rt-set .rp-h{flex-wrap:wrap}
+.rt-set .rp-h svg.i{color:var(--read)}
+.rt-set .rp-h .chip{margin-left:auto}
+.rt-lims{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:8px 16px;margin-top:10px}
+.rt-lim{display:grid;grid-template-columns:5.5em auto 4.6em auto 1fr;align-items:center;gap:6px;font-size:13.5px}
+.rt-lim .chip{width:34px;height:34px;padding:0;justify-content:center;font-size:16px;font-weight:800}
+.rt-lim .chip:disabled{opacity:.4;cursor:default}
+.rt-lim b{text-align:center;font-size:17px;font-variant-numeric:tabular-nums}
+.rt-lim b small{font-size:11.5px;font-weight:600;color:var(--ink-dim)}
+.rt-lim .ex{font-size:11.5px;color:var(--ink-dim);white-space:nowrap}
+/* 我的 · 做题速度 */
+.sp-card{margin:14px 0 4px;padding:12px 0 0;border-top:1px dashed var(--line)}
+.sp-card .hl-d small{font-weight:600;color:var(--ink-dim);margin-left:8px;font-size:11.5px}
+.sp-row{display:grid;grid-template-columns:5.5em minmax(60px,1fr) auto 3em 3em;align-items:center;gap:8px;font-size:13px;padding:5px 0}
+.sp-row.none{grid-template-columns:5.5em 1fr;color:var(--ink-dim)}
+.sp-n{font-weight:700}
+.sp-bar{position:relative;height:10px;border-radius:99px;background:var(--paper-2)}
+.sp-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:var(--read)}
+.sp-row.over .sp-bar i{background:var(--red)}
+.sp-bar em{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink-soft);border-radius:2px}
+.sp-v{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink-soft)}
+.sp-v b{color:var(--ink)} .sp-row.over .sp-v b{color:var(--badt)}
+.sp-a{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.sp-a.good{color:var(--okt)} .sp-a.bad{color:var(--badt)}
+.sp-c{text-align:right;font-size:12px;color:var(--ink-dim)}
+.sp-tip{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:8px;padding:10px 12px;border-radius:12px;background:var(--read-soft);font-size:13px;line-height:1.6;color:var(--ink)}
+.sp-tip > svg.i{color:var(--read);flex:none}
+.sp-tip > span{flex:1 1 200px}
+.sp-tip .btn{padding:8px 12px;font-size:13px}
+@media (max-width:480px){.sp-row{grid-template-columns:4.8em minmax(40px,1fr) auto 2.6em}.sp-c{display:none}}
+/* 原文点词 */
+#practice-box .passage,#practice-box .script{-webkit-touch-callout:none}
+body:has(.rt-sw[data-rt-tap][aria-pressed="true"]) #practice-box :is(.passage,.script){-webkit-user-select:none;user-select:none;cursor:help}
+.wpop{position:fixed;z-index:60;width:min(320px,calc(100vw - 16px));background:var(--paper);color:var(--ink);border-radius:14px;box-shadow:var(--shadow-2);border:1px solid var(--line);padding:10px 12px 12px;font-size:13.5px;line-height:1.55}
+.wp-h{display:flex;align-items:center;gap:4px}
+.wp-w{font-family:var(--serif);font-size:20px;font-weight:600;flex:1;min-width:0;overflow-wrap:anywhere}
+.wp-ic{width:36px;height:36px;display:grid;place-items:center;border-radius:10px;color:var(--ink-soft)}
+.wp-ic:hover{background:var(--paper-2)}
+.wp-d{margin-top:2px}
+.wp-d.dim{color:var(--ink-mute);font-size:12.5px}
+.wp-d .pos{font-size:12px;color:var(--ink-dim);font-style:italic;margin-right:2px}
+.wp-base{display:block;font-size:12px;color:var(--ink-dim)}
+.wp-base b{font-family:var(--serif);color:var(--ink)}
+.wp-st{font-size:12px;color:var(--okt);margin-top:2px}
+.wp-ctx{margin-top:8px;padding:6px 8px;border-radius:8px;background:var(--paper-2);font-family:var(--serif);font-size:13px;color:var(--ink-soft);max-height:6.5em;overflow:auto}
+.wp-ctx mark{background:color-mix(in srgb,var(--amber) 35%,transparent);color:inherit;border-radius:3px;padding:0 1px}
+.wp-acts{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.wp-acts .btn{padding:8px 14px;font-size:13px}
+.wp-acts .btn:disabled{cursor:default}
+.wp-ok{font-size:12px;color:var(--okt);font-weight:700}
+@media (max-width:560px){.rt-set .rp-h > span{order:3;flex-basis:100%}}

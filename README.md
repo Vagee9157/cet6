@@ -47,6 +47,9 @@ assets/recall.js        提取练习 window.CET6Recall：关键词卡 / 模板�
 assets/drills.js        专项训练 window.CET6Drills：定位训练 / 同义替换 / 逐句听写 / 先读选项预判 / 倍速爬坡
 assets/data-paraphrase.js 同义替换库 PARA（tools/build_paraphrase.js 生成，勿手改）
 tools/build_paraphrase.js 从题库解析抽同义替换短语对：node tools/build_paraphrase.js
+assets/readtools.js     做题页工具 window.CET6RT：限时模式 / 速度追踪 / 选词填空两步作答 / 原文点词
+assets/data-cloze-pos.js 选词填空词库词性 CLOZE_POS（tools/build_cloze_pos.js 生成，勿手改）
+tools/build_cloze_pos.js 推断选词填空词库词性：node tools/build_cloze_pos.js
 assets/style.css        样式（浅色 / 深色）
 ```
 
@@ -113,6 +116,26 @@ assets/style.css        样式（浅色 / 深色）
 **改了题库要重跑同义替换库**：`node tools/build_paraphrase.js`（可重复运行，结果只取决于题库；抽「X 同义替换 / 对应 / 即 / 指 / 替换 Y」「Y 替换为 / 改写为 X」两边都是英文短语的小句，过滤超长和纯虚词，去重）。
 
 **任务预计分钟**：阅读 `set.minutes`；听力 录音时长/60 + 题数×0.3；单词 新词×0.5 + 复习×0.2；关键词卡 / 模板句 到期×0.4 + 新卡×0.6；写作 / 翻译 30；看考点 10；错题重测 每题 1.5（一次最多 10 道）；完整模考 130。
+
+## 做题页工具（数据）
+
+逻辑在 `assets/readtools.js`（`window.CET6RT`），app.js 在做题页 / 阅读列表 / 练习记录里调它的钩子。
+
+- **限时模式**：阅读做题页「限时」开关（只阅读，听力不需要），倒计时取 `S.timeLim`（缺省 = 考场节奏：仔细阅读每篇 8、段落匹配 15、选词填空 5 分钟），阅读列表「限时设置」卡里 ± 1 分钟（2–30）。做到一半打开限时会从那一刻起重新倒计时；最后 60 秒变红；到 0 自动交卷，结果卡标「限时交卷」。
+- **速度追踪**：「我的 · 练习记录」按题型取最近 10 次练习交卷（不含模考 / 诊断）的平均用时，对比考场时限（固定 8 / 15 / 5，不随 ± 变）和正确率；超时最多的题型给一句提示和跳转（段落匹配 / 仔细阅读 → 定位训练 `CET6.openDrill('locate')`，选词填空 → 开两步作答做一篇）；不超时但正确率 < 60% → 同义替换。
+- **两步作答**（选词填空，`S.clozeStep`）：点空格 → 先选这空的词性（n. / v. / adj. / adv.，名词可选单复数、动词可选时态，可跳过）→ 词库里同词性的词亮起再选词；交卷后每空对照「词性判断 ✓/✗」（选了形式且词性对时再对形式，形式按答案词形 -s / -ed / -ing 推断），结果卡显示总数。
+- **原文点词**：阅读原文、听力原文（交卷后或打开原文时）里，电脑双击、手机长按 300ms（移动 >10px 视为滚动取消，触发后吞掉随后的 click，不会点句重听），或打开「点词」模式单击，弹出气泡：单词库（含 -s / -ed / -ing / -ly 还原）里有的显示释义，「加入生词本」= 标不认识；没有的存 `S.myWords`（`ctx` = 所在句子，`src` = 题目 id），我的 → 生词本显示。
+
+| 字段 | 格式 | 说明 |
+|---|---|---|
+| `S.timed` | bool | 限时开关 |
+| `S.timeLim` | `{mc, match, cloze}` 分钟 | 缺省 8 / 15 / 5 |
+| `S.clozeStep` | bool | 选词填空两步作答 |
+| `S.tapWord` | bool | 点词模式 |
+| `S.hist[i].tl` / `.to` / `.pos` | 分钟 / 1 / `{n, ok}` | 限时练的时长、时间到自动交卷、两步作答词性判断数 / 对数（旧记录没有，不影响） |
+| `S.drafts[id].pos` | `{空序号: {p, f?}}` | 未交卷的词性选择（`f` ∈ sg / pl / base / s / ed / ing） |
+
+**改了选词填空题库要重跑词性表**：`node tools/build_cloze_pos.js`（可重复运行，结果只取决于题库 + 单词库 + 脚本里的 `MANUAL`）。答案词取解析（「填 X 词」优先，否则「→」前最后一个词性关键词），干扰项按词形后缀 + 单词库推断；运行时打印每个词的来源（exp / rule / vocab / manual / default），default 和 rule 的抽查一下，改错的写进 `MANUAL` 再跑。
 
 ## 加题
 

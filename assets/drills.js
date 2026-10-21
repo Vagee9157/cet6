@@ -494,7 +494,7 @@
   function myWordsHTML() {
     const xs = (Array.isArray(St().myWords) ? St().myWords : []).filter((x) => x && x.w).slice().reverse();
     if (!xs.length) return '';
-    return `<div class="my-words"><div class="mw-h">听写收的词（不在单词库）<span>${xs.length}</span></div><div class="mw-list">${xs.map((x) => `<span class="mw"><b>${esc(x.w)}</b>${x.ctx ? `<small title="${esc(x.ctx)}">${esc(x.ctx.length > 48 ? x.ctx.slice(0, 48) + '…' : x.ctx)}</small>` : ''}<button data-mwdel="${esc(x.w)}" aria-label="从生词本移除 ${esc(x.w)}">${ic('i-x')}</button></span>`).join('')}</div></div>`;
+    return `<div class="my-words"><div class="mw-h">听写 / 原文点词收的词（不在单词库）<span>${xs.length}</span></div><div class="mw-list">${xs.map((x) => `<span class="mw"><b>${esc(x.w)}</b>${x.ctx ? `<small title="${esc(x.ctx)}">${esc(x.ctx.length > 48 ? x.ctx.slice(0, 48) + '…' : x.ctx)}</small>` : ''}<button data-mwdel="${esc(x.w)}" aria-label="从生词本移除 ${esc(x.w)}">${ic('i-x')}</button></span>`).join('')}</div></div>`;
   }
   function delMyWord(w) { const s = St(); s.myWords = (s.myWords || []).filter((x) => x && x.w !== w); C().save(); }
 

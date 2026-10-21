@@ -666,6 +666,7 @@
       : `
         <p class="lead">仔细阅读分最高先做；段落匹配找定位词；选词填空最后兜底。标「真实原文」的是美国政府机构的公有领域文章，只按篇幅删节。</p>
         ${rpickHTML('read')}
+        ${window.CET6RT ? window.CET6RT.readHomeHTML() : ''}
         ${rsec('仔细阅读', `每题 2% · ${Rd.mc.length} 篇`)}<div class="set-grid">${Rd.mc.map((s) => rcard(s, '仔细阅读', '5 题')).join('')}</div>
         ${rsec('长篇阅读（段落匹配）', `每题 1% · ${Rd.match.length} 篇`)}<div class="set-grid">${Rd.match.map((s) => rcard(s, '段落匹配', '10 题')).join('')}</div>
         ${rsec('选词填空', `15 选 10 · 每题 0.5% · ${Rd.cloze.length} 篇`)}<div class="set-grid">${Rd.cloze.map((s) => rcard(s, '选词填空', '10 空')).join('')}</div>`}`;
@@ -673,6 +674,7 @@
       const t = e.target.closest('[data-sub]'); if (t) return renderPracticeHome(t.dataset.sub);
       if (e.target.closest('[data-goexam]')) return show('exam');
       const dr = e.target.closest('[data-drill]'); if (dr) return openDrill(dr.dataset.drill);
+      if (window.CET6RT && window.CET6RT.homeClick(e)) return;
       const rk = e.target.closest('[data-rpk]'); if (rk) { S.rpick[psub] = rk.dataset.rpk; save(); const y = window.scrollY; renderPracticeHome(); window.scrollTo(0, y); return; }
       const rg = e.target.closest('[data-rpgo]'); if (rg) return rpickGo(rg.dataset.rpgo);
       const o = e.target.closest('[data-open]'); if (o) openSet(o.dataset.open);
@@ -693,13 +695,19 @@
   /* ---------- 计时 ---------- */
   let timerId = null, t0 = 0;
   const elapsed = () => Math.floor((Date.now() - t0) / 1000);
-  function tickTimer() { const el = $('#timer'); if (!el || !cur) return; const s = cur.done && cur.sec !== undefined ? cur.sec : elapsed(); const v = $('#timerVal'); if (v) v.textContent = mmss(s); el.classList.toggle('over', !!(cur.set.minutes && s > cur.set.minutes * 60)); }
+  // 限时模式（assets/readtools.js）：显示倒计时，到 0 自动交卷（cur.to 标记）
+  function tickTimer() {
+    const el = $('#timer'); if (!el || !cur) return; const s = cur.done && cur.sec !== undefined ? cur.sec : elapsed(); const v = $('#timerVal');
+    const lim = window.CET6RT ? window.CET6RT.limitOf(cur) : 0;
+    if (lim) { const left = Math.max(0, lim - s); if (v) v.textContent = mmss(left); el.classList.toggle('warn', left <= 60); if (!left && !cur.done) { cur.to = true; submitSet(); } return; }
+    if (v) v.textContent = mmss(s); el.classList.toggle('over', !!(cur.set.minutes && s > cur.set.minutes * 60));
+  }
   function startTimer(from) { clearInterval(timerId); t0 = Date.now() - (from || 0); timerId = setInterval(tickTimer, 1000); }
 
   /* ---------- 未交卷暂存 ---------- */
   function stashDraft() {
     if (!cur || cur.done) return; const id = cur.set.id;
-    if (Object.keys(cur.ans).length) S.drafts[id] = { ans: cur.ans, el: Date.now() - t0, at: today() }; else delete S.drafts[id];
+    if (Object.keys(cur.ans).length) { S.drafts[id] = { ans: cur.ans, el: Date.now() - t0, at: today() }; if (cur.pos && Object.keys(cur.pos).length) S.drafts[id].pos = cur.pos; } else delete S.drafts[id];
     save();
   }
   // 切到别的底栏 tab / 切后台 / 关页面时也暂存
@@ -714,6 +722,7 @@
     const d = !fresh && S.drafts[id];
     cur = { ...f, ans: d ? { ...d.ans } : {}, done: false, playing: false, restored: !!(d && Object.keys(d.ans || {}).length) };
     if (f.kind === 'cloze') { let a = 0; while (a < f.set.answers.length - 1 && cur.ans[a]) a++; cur.active = a; }
+    if (window.CET6RT) window.CET6RT.initCur(cur, d);   // 限时开关、两步作答的词性选择
     const am = f.kind === 'listen' && AUD(id); if (am && window.CET6Drills) cur.ramp = window.CET6Drills.rampOf(id, baseRate(am), !!am.slow);
     startTimer(d ? d.el : 0); renderSet(); jumpTop(0);
   }
@@ -822,7 +831,8 @@
     const box = $('#practice-box');
     const total = kind === 'cloze' ? set.answers.length : kind === 'match' ? set.items.length : set.questions.length;
     const answered = Object.keys(ans).length;
-    const back = `<div class="prac-head"><button class="btn ghost" data-back>${ic('i-chev-l')}返回</button><h2>${esc(set.title)}</h2>${kind === 'listen' || cur.back ? '' : `<span class="timer" id="timer"><small>已用</small><b id="timerVal">00:00</b>${set.minutes ? `<small>/ 建议 ${set.minutes} 分钟</small>` : ''}</span>`}</div>`;
+    const RT = window.CET6RT, tlim = RT ? RT.limitOf(cur) : 0;
+    const back = `<div class="prac-head"><button class="btn ghost" data-back>${ic('i-chev-l')}返回</button><h2>${esc(set.title)}</h2>${kind === 'listen' || cur.back ? '' : `<span class="timer${tlim ? ' cd' : ''}" id="timer"><small>${tlim ? '剩余' : '已用'}</small><b id="timerVal">00:00</b>${tlim ? `<small>/ 限时 ${tlim / 60} 分钟</small>` : set.minutes ? `<small>/ 建议 ${set.minutes} 分钟</small>` : ''}</span>`}</div>${RT ? RT.toolsHTML(cur) : ''}`;
     const K = ['A', 'B', 'C', 'D'], DR = window.CET6Drills;
     // 交卷后：手机上原文收进 <details>，先看到对错；选词填空的对错就在原文里，不收
     const fold = done && isPhone() && kind !== 'cloze';
@@ -850,12 +860,14 @@
       const used = new Set(Object.values(ans));
       const W = (L) => esc(clozeWord(set, L));
       const html = esc(set.text).replace(/\[(\d+)\]/g, (m, i) => { i = +i; const p = ans[i - 1], a = set.answers[i - 1]; let cls = 'blank'; if (done) cls += p === a ? ' right' : ' wrong'; else if (cur.active === i - 1) cls += ' active'; else if (p) cls += ' filled';
-        const inner = done ? `<span class="bn">${i}</span>${p === a ? W(a) : `<s>${p ? `${p} ${W(p)}` : '空'}</s> → ${a} ${W(a)}`}` : `${i}${p ? ' · ' + p : ''}`;
+        const inner = done ? `<span class="bn">${i}</span>${p === a ? W(a) : `<s>${p ? `${p} ${W(p)}` : '空'}</s> → ${a} ${W(a)}`}` : `${i}${p ? ' · ' + p : RT ? RT.blankTag(cur, i - 1) : ''}`;
         return `<button class="${cls}" data-blank="${i - 1}" ${done ? 'disabled' : ''}>${inner}</button>`; });
-      body = `<div class="bank${done ? ' done' : ''}">${set.bank.map((b) => { const L = b[0]; return `<button class="chip ${used.has(L) ? 'used' : ''}" data-bank="${L}" ${done ? 'disabled' : ''}>${esc(b)}</button>`; }).join('')}</div>
-        ${done ? '' : '<p class="lead">先点空格，再点上面的词；点已填的空可以改。</p>'}
+      // 两步作答（assets/readtools.js）：没判词性时词库区换成词性选择，判了之后同词性的词亮起
+      const stepBank = RT ? RT.clozeBankHTML(cur, used) : '';
+      body = `${stepBank || `<div class="bank${done ? ' done' : ''}">${set.bank.map((b) => { const L = b[0]; return `<button class="chip ${used.has(L) ? 'used' : ''}" data-bank="${L}" ${done ? 'disabled' : ''}>${esc(b)}</button>`; }).join('')}</div>`}
+        ${done ? '' : (RT && RT.clozeLead(cur)) || '<p class="lead">先点空格，再点上面的词；点已填的空可以改。</p>'}
         <div class="passage">${html.split('\n').map((p) => `<p>${p}</p>`).join('')}</div>
-        ${done ? `<div class="q-list cloze-exp">${set.exp.map((e, i) => { const ok = ans[i] === set.answers[i]; return `<div class="exp${qcls(ok)}" id="q-${i}x">${vd(ok, ans[i])} · <b>${i + 1}. ${set.answers[i]} ${W(set.answers[i])}</b>${ok || ans[i] === undefined ? '' : `（你填 ${ans[i]} ${W(ans[i])}）`}　${esc(e)}${ok ? '' : causeRow(set.id + ':' + i, kind)}</div>`; }).join('')}</div>` : ''}`;
+        ${done ? `<div class="q-list cloze-exp">${set.exp.map((e, i) => { const ok = ans[i] === set.answers[i]; return `<div class="exp${qcls(ok)}" id="q-${i}x">${vd(ok, ans[i])} · <b>${i + 1}. ${set.answers[i]} ${W(set.answers[i])}</b>${ok || ans[i] === undefined ? '' : `（你填 ${ans[i]} ${W(ans[i])}）`}　${esc(e)}${RT ? RT.clozeExpHTML(cur, i) : ''}${ok ? '' : causeRow(set.id + ':' + i, kind)}</div>`; }).join('')}</div>` : ''}`;
     }
     // 真实原文（美国政府机构公有领域文章）注明出处
     if (set.url && kind !== 'listen') body += `<p class="lead src-note">原文：<a href="${esc(set.url)}" target="_blank" rel="noopener">${esc(set.source || set.org)}</a>（美国政府作品，公有领域；仅按篇幅删节，未改写句子）</p>`;
@@ -863,7 +875,8 @@
     if (done) {
       const r = cur.r, marks = marksOf(cur);
       resHtml = `<div class="result ${mod}"><div class="score">${r}<small> / ${total}</small></div><p>${r === total ? '全对，稳。' : r >= total * 0.7 ? '达标了，看看错的那几题的解析。' : '把错题的定位句和选项改写对照着看一遍。'}</p>
-        ${cur.sec !== undefined ? `<p class="res-time">${ic('i-timer')}用时 ${mmss(cur.sec)}${kind !== 'listen' && set.minutes ? ` · 建议 ${set.minutes} 分钟${cur.sec > set.minutes * 60 ? '，超时了' : ''}` : ''}</p>` : ''}
+        ${cur.sec !== undefined ? `<p class="res-time">${ic('i-timer')}用时 ${mmss(cur.sec)}${cur.tl ? ` · 限时 ${cur.tl} 分钟` : kind !== 'listen' && set.minutes ? ` · 建议 ${set.minutes} 分钟${cur.sec > set.minutes * 60 ? '，超时了' : ''}` : ''}</p>` : ''}
+        ${RT ? RT.resultHTML(cur) : ''}
         <div class="res-nums">${marks.map((ok, i) => `<button class="${ok ? 'ok' : 'bad'}" data-jump="${i}" aria-label="第 ${i + 1} 题${ok ? '答对' : '答错'}">${i + 1}<i>${ok ? '✓' : '✗'}</i></button>`).join('')}</div>
         ${DR && kind === 'listen' ? DR.preSumHTML(cur) : ''}
         ${r < total ? `<label class="ow-sw"><input type="checkbox" data-onlywrong ${cur.onlyWrong ? 'checked' : ''}>只看错题</label>` : ''}</div>`;
@@ -875,6 +888,7 @@
     box.innerHTML = back + restore + resHtml + body + bar;
     box.classList.toggle('only-wrong', !!(done && cur.onlyWrong));
     box.onclick = (e) => {
+      if (RT && RT.click(e, cur)) return;
       if (DR && DR.preClick(e, cur)) return;
       const rpb = e.target.closest('[data-ramp]'); if (rpb) { S.rampOff = rpb.dataset.ramp === 'off'; save(); const m0 = AUD(set.id); cur.ramp = DR.rampOf(set.id, baseRate(m0), !!m0.slow); cur.rampManual = false; applyRate(m0); return renderSet(); }
       if (e.target.closest('[data-back]')) { if (cur.back) { const b = cur.back; cur = null; return b(); } stashDraft(); return renderPracticeHome(null, true); }
@@ -953,7 +967,7 @@
     const marks = marksOf(cur); const r = marks.filter(Boolean).length; const total = marks.length;
     const { wrongs, rights } = wrongsOf(kind, set, ans);
     cur.done = true; cur.r = r; cur.sec = elapsed(); clearInterval(timerId);
-    recordSet(set.id, r, total, wrongs, rights, cur.sec); renderSet(); jumpTop(0);
+    recordSet(set.id, r, total, wrongs, rights, cur.sec); if (window.CET6RT) window.CET6RT.afterSubmit(cur); renderSet(); jumpTop(0);
   }
 
   /* ================= 写译 ================= */
@@ -1194,6 +1208,7 @@
       return `${day}<div class="hl"><span class="hl-k">${KN[h.kind] || ''}</span><span class="hl-t">${esc(String(h.title).replace(/^[^·]+·\s*/, ''))}</span><span class="hl-s ${pct >= 80 ? 'good' : pct < 60 ? 'bad' : ''}">${h.r}/${h.t}</span>${h.sec ? `<span class="hl-m">${mmss(h.sec)}</span>` : ''}<button class="chip" data-wgo="${h.id}">再做</button></div>`; }).join('');
     return `<div class="sec-h"><span class="ico m-listen">${ic('i-timer')}</span><h2>练习记录</h2><span class="more">共 ${all.length} 次${papers.length ? ` · 模拟卷 ${papers.length} 套` : ''}</span></div>
       <div class="card hist">${exams.length ? `<div class="hl-d" style="margin-top:0">模考成绩</div><div class="ex-hist">${exams.slice(0, 5).map((x) => { const m = window.CET6Exam ? window.CET6Exam.meta(x) : { v: x.total, tag: '完整模考', rate: Math.round((x.total || 0) / 7.1), custom: false }; return `<button class="ex-hrow" data-exrep="${x.ts}"><span class="ex-ht"><b>${m.v}</b><small>${m.custom ? '折算' : '/710'}</small></span><span class="ex-hm"><span class="ex-tags"><span class="ex-tag${m.custom ? ' cu' : ''}">${esc(m.tag)}</span><span>得分率 ${m.rate}%</span></span>${esc(x.d)} · 卷号 ${esc(x.seed)}</span>${ic('i-chev-r')}</button>`; }).join('')}</div>` : ''}<div class="hp-grid">${rows}</div>
+        ${window.CET6RT ? window.CET6RT.speedHTML() : ''}
         ${all.length ? `<div class="hl-list">${list}</div>${all.length > 15 ? `<div class="reveal" style="margin-top:8px"><button class="btn ghost" data-hall>${histAll ? '收起' : `显示全部 ${all.length} 条`}</button></div>` : ''}` : `<p class="lead" style="margin:12px 0 0">还没有交卷记录。去「听读」点「随机来一篇」开始吧。</p>`}
         ${papers.length ? `<div class="hl-d">生成过的模拟卷</div><div class="hl-papers">${papers.slice(0, 12).map((p) => `<a class="chip" href="paper.html?seed=${encodeURIComponent(p.seed)}">${p.mode === 'online' ? '在线' : '打印'} · 卷号 ${esc(p.seed)} · ${esc(p.d)}</a>`).join('')}</div>` : ''}</div>`;
   }
@@ -1251,6 +1266,7 @@
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `cet6-backup-${today()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); return;
       }
       if (e.target.closest('#files-box')) return;
+      if (window.CET6RT && window.CET6RT.meClick(e)) return;
       if (e.target.closest('[data-rtgo]') && window.CET6Learn) { window.CET6Learn.openRetest(); return; }
       if (e.target.closest('[data-go-vocab]')) { if (S.vgame) S.vgame.on = false; S.vsrc = 'wrong'; save(); vq = []; show('vocab'); }
       if (e.target.closest('[data-clear]') && confirm('清空错题本？')) { S.wrong = {}; save(); renderMe(); }
@@ -1274,6 +1290,7 @@
   /* ---------- 给专项训练（assets/drills.js）用的接口 ---------- */
   Object.assign(window.CET6, {
     tokIndex, findQuote, practiceHome: () => renderPracticeHome(null, true), rerenderSet: () => { if (cur) renderSet(); },
+    startTimer, curSet: () => (cur && cur.set ? cur.set.id : ''),   // 限时模式重新计时 / 点词收藏记来源（assets/readtools.js）
     openDrill: (k) => { psub = k === 'dict' ? 'listen' : 'read'; show('practice', true); openDrill(k); },
   });
   /* ---------- 给单词小游戏（assets/vgame.js）用的接口 ---------- */
