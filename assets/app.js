@@ -185,16 +185,22 @@
       <div class="pt-grid">${c.points.map((p, i) => { const k = ptKey(c, i), m = !!S.mastered[k]; return `
         <details class="pt ${MOD[c.id]}" data-k="${k}">
           <summary><div class="pt-title">${esc(p.t)} ${p.hot === 2 ? '<span class="tag hot">必考</span>' : p.hot === 1 ? '<span class="tag warm">常考</span>' : ''}${m ? MASTER_TAG : ''}</div><span class="caret">${ic('i-chev-r')}</span><div class="pt-tip">${esc(p.tip)}</div></summary>
-          <div class="pt-body"><div class="tbl-scroll">${p.body}</div><div class="pt-foot"><label class="master"><input type="checkbox" data-master="${k}" ${m ? 'checked' : ''}> 这条我记住了</label></div></div>
+          <div class="pt-body"><div class="tbl-scroll">${p.body}</div><div class="pt-foot"><label class="master"><input type="checkbox" data-master="${k}" ${m ? 'checked' : ''}> ${c.id === 'exam' ? '这条我记住了' : '记住了 → 练一题'}</label></div></div>
         </details>`; }).join('')}</div>
       ${c.id === 'exam' ? `<div class="sec-h"><span class="ico m-exam">${ic('i-target')}</span><h2>关键数字</h2></div>${NUMBERS.map((g) => `<p class="lead" style="margin:8px 0 8px;font-weight:700;color:var(--ink)">${esc(g.g)}</p><div class="num-grid">${g.rows.map(([l, v]) => `<div class="num m-exam"><div class="v">${esc(v)}</div><div class="l">${esc(l)}</div></div>`).join('')}</div>`).join('')}` : ''}`;
-    $('#outline-box').onclick = (e) => { const b = e.target.closest('[data-ch]'); if (b) { chSel = b.dataset.ch; renderOutline(); } };
+    $('#outline-box').onclick = (e) => {
+      const tr = e.target.closest('[data-otry]'); if (tr) { if (window.CET6Review) window.CET6Review.outlineGo(tr.dataset.otry); return; }
+      const b = e.target.closest('[data-ch]'); if (b) { chSel = b.dataset.ch; renderOutline(); }
+    };
     // 勾「这条我记住了」：只局部更新标签和进度数字，不重绘、不收起其他卡片、不跳滚动
     $('#outline-box').onchange = (e) => {
       const k = e.target.dataset.master; if (!k) return;
       if (e.target.checked) S.mastered[k] = lday(); else delete S.mastered[k]; save();
       const tt = e.target.closest('details.pt').querySelector('.pt-title'), tg = tt.querySelector('.tag.mst');
       if (e.target.checked && !tg) tt.insertAdjacentHTML('beforeend', MASTER_TAG); else if (!e.target.checked && tg) tg.remove();
+      // 勾上后给一道相关练习的入口（assets/review.js outlineTry；考试结构类考点没有对应练习，只记勾选）
+      const foot = e.target.closest('.pt-foot'), old = foot.querySelector('.ot-try'); if (old) old.remove();
+      if (e.target.checked && window.CET6Review) { const [cid, pi] = k.split(':'); foot.insertAdjacentHTML('beforeend', window.CET6Review.outlineTry(cid, +pi)); }
       const cc = $('#chCount'); if (cc) cc.textContent = `${chDone(c)}/${c.points.length} 已掌握`;
       const pc = $('#ptCount'); if (pc) pc.textContent = `${stats().m}/${totalPts} 已掌握`;
       const bar = document.querySelector(`[data-chbar="${c.id}"]`); if (bar) bar.style.width = chDone(c) / c.points.length * 100 + '%';
@@ -247,6 +253,8 @@
   const dayDiff = (a, b) => Math.round((new Date(b) - new Date(a)) / 864e5);
   const seeded = (str) => { let h = 2166136261; for (const c of str) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return ((h ^= h >>> 16) >>> 0) / 4294967296; }; };
   const shufBy = (arr, rnd) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  // S.vnewAuto：每日新词「按建议」（随倒计时和未学词数自动算）。新用户（存档里没有 vnew）默认开，老用户保持原来的手动档
+  if (typeof S.vnewAuto !== 'boolean') S.vnewAuto = S.vnew === undefined;
   S.vseen = S.vseen || {}; S.vsrc = S.vsrc || 'daily'; S.vnew = S.vnew || 20; S.vstage = S.vstage || {};
   const isWrong = (id) => S.vocab[id] === 0 || S.vocab[id] === 1;
   const wordOf = (id) => ALLWORDS.find((x) => x.id === id);
@@ -270,9 +278,20 @@
     if (m !== 2 && !(seen < d)) return false;
     const due = vdueDay(id); return !!due && due <= d;
   }
+  // 建议每天新词数 = (未学基础 + 核心词 + 0.5 × 未学高频词) / max(1, 剩余天数 − 14)，夹在 10–40；留出考前两周只复习不加新词。当天固定（考试日期改了重算）
+  const isHi = (w) => /^高频 ·/.test(w.g);
+  function vnewSug() {
+    const d = lday(), L = window.CET6Learn, ex = L ? L.examDate() : '', key = d + '|' + ex;
+    if (S.vsug && S.vsug.key === key) return S.vsug;
+    const left = ALLWORDS.filter((w) => S.vocab[w.id] === undefined), hi = left.filter(isHi).length, core = left.length - hi;
+    const days = L ? L.daysLeft() : 180, raw = (core + 0.5 * hi) / Math.max(1, days - 14);
+    S.vsug = { key, n: Math.max(10, Math.min(40, Math.round(raw))), core, hi, days }; save();
+    return S.vsug;
+  }
+  const vnewN = () => (S.vnewAuto ? vnewSug().n : S.vnew);
   function dailyPlan(extra) {
     const d = lday();
-    if (S.daily && S.daily.d === d && S.daily.n === S.vnew && !extra) return S.daily;
+    if (S.daily && S.daily.d === d && S.daily.n === vnewN() && !extra) return S.daily;
     const rnd = seeded('cet6-' + d + '-' + (extra ? Date.now() : ''));
     const due = ALLWORDS.filter((w) => isDue(w.id, d))
       .sort((a, b) => (S.vseen[a.id] || '').localeCompare(S.vseen[b.id] || '')).slice(0, 30).map((w) => w.id);
@@ -282,10 +301,11 @@
     const fresh0 = shufBy(ALLWORDS.filter((w) => S.vocab[w.id] === undefined && !taken.has(w.id)), rnd);
     const pool = [...fresh0.filter((w) => !/^高频 ·/.test(w.g)), ...fresh0.filter((w) => /^高频 ·/.test(w.g))].map((w) => w.id);
     // 当天改小「每日新词」：保留已刷过的，未刷的按新数量裁掉；改大则补新词
-    const kept = keep ? (extra || S.vnew >= keep.fresh.length ? keep.fresh : (() => { const seen = keep.fresh.filter((id) => S.vseen[id] === d); return [...seen, ...keep.fresh.filter((id) => S.vseen[id] !== d)].slice(0, Math.max(S.vnew, seen.length)); })()) : [];
-    const fresh = keep ? [...kept, ...pool.slice(0, extra ? 10 : Math.max(0, S.vnew - kept.length))] : pool.slice(0, S.vnew);
+    const N = vnewN();
+    const kept = keep ? (extra || N >= keep.fresh.length ? keep.fresh : (() => { const seen = keep.fresh.filter((id) => S.vseen[id] === d); return [...seen, ...keep.fresh.filter((id) => S.vseen[id] !== d)].slice(0, Math.max(N, seen.length)); })()) : [];
+    const fresh = keep ? [...kept, ...pool.slice(0, extra ? 10 : Math.max(0, N - kept.length))] : pool.slice(0, N);
     const review = keep ? keep.review : due.filter((id) => !fresh.includes(id));
-    S.daily = { d, n: S.vnew, fresh, review, order: shufBy([...fresh, ...review], rnd) }; save();
+    S.daily = { d, n: N, fresh, review, order: shufBy([...fresh, ...review], rnd) }; save();
     return S.daily;
   }
   function buildQueue() {
@@ -303,6 +323,8 @@
     const d = lday();
     vhist.push({ id: w.id, v: S.vocab[w.id], s: S.vseen[w.id], st: S.vstage[w.id] }); if (vhist.length > 50) vhist.shift();
     if (!vagain) {
+      // 按天计数（周报 / 打卡）：之前见过的算复习，第一次见算新词；同一天第二次标记不重复计
+      if (S.vseen[w.id] !== d && window.CET6Learn && window.CET6Learn.logAct) window.CET6Learn.logAct(S.vseen[w.id] ? 'vr' : 'vn');
       if (k === 2) { if (!(S.vocab[w.id] === 2 && S.vseen[w.id] === d)) S.vstage[w.id] = (S.vstage[w.id] || 0) + 1; } else delete S.vstage[w.id];
       S.vseen[w.id] = d;
     }
@@ -410,7 +432,8 @@
       ${vsegHtml(src, wrongN, false)}
       ${daily ? `<div class="vday card"><div class="vday-top"><div><b>今天 ${plan.fresh.length} 个新词 + ${plan.review.length} 个复习</b><span>新词自评三档；复习词先做一道判定题，答对按 3 / 7 / 14 / 30 / 60 天拉长间隔，答错明天再来；考前 3 天内的到期会提前</span></div><div class="vday-n">${pDone}<small>/${pTot}</small></div></div>
         <div class="bar"><i style="width:${pTot ? Math.round(pDone / pTot * 100) : 0}%"></i></div>
-        <div class="ctl">每日新词 ${[10, 20, 30].map((n) => `<button class="chip" data-vnew="${n}" aria-pressed="${S.vnew === n}">${n}</button>`).join('')}</div></div>` : ''}
+        ${(() => { const sg = vnewSug(); return `<div class="ctl vnew-ctl">每日新词 <button class="chip" data-vnewauto aria-pressed="${!!S.vnewAuto}">按建议 ${sg.n}</button>${[10, 20, 30].map((n) => `<button class="chip" data-vnew="${n}" aria-pressed="${!S.vnewAuto && S.vnew === n}">${n}</button>`).join('')}</div>
+        <p class="vnew-sug">建议 <b>${sg.n}</b> 个：还没学的基础 + 核心词 ${sg.core} 个、高频词 ${sg.hi} 个（按半数算），${sg.days > 14 ? `距考试 ${sg.days} 天，留出考前 14 天只复习` : '离考试不到两周，按最少量安排'}，限 10–40 个。${S.vnewAuto ? '' : '现在按手动选的数量。'}</p>`; })()}</div>` : ''}
       ${wrong ? `<div class="vday card"><div class="vday-top"><div><b>生词本 ${wrongN} 个</b><span>点「不认识」「模糊」的词都在这里，最近标记的排在前面；每个词先${(S.vqk || 'spell') === 'spell' ? '看中文拼英文' : '做四选一'}，答对就移出生词本</span></div></div></div>` : ''}
       <div class="vt m-vocab${src !== 'topic' ? ' hide' : ''} ${vtOpen ? 'open' : ''}"><button class="vt-cur" id="vtToggle" aria-expanded="${vtOpen}"><span class="vt-lab">当前主题</span><b>${esc(grp.g)}</b><span class="vt-n">${gDone}/${grp.words.length}</span><span class="vt-sw">${vtOpen ? '收起' : '切换主题'}</span>${ic('i-chev-r')}</button>
         ${(() => { const tile = (g, i) => { const d = g.words.filter((x, wi) => S.vocab[i + ':' + wi] === 2).length; return `<button class="vt-tile" data-vg="${i}" aria-pressed="${i === vg}"><span class="nm">${esc(g.g.replace(/^(核心|高频) · /, ''))}</span><span class="ct">${d}/${g.words.length}</span><span class="bar"><i style="width:${Math.round(d / g.words.length * 100)}%"></i></span></button>`; };
@@ -435,7 +458,8 @@
       const vw = e.target.closest('[data-vw]'); if (vw) { const id = vw.dataset.vw; const k = vq.findIndex((x, i) => i >= vi && x.id === id); if (k === -1) vq.splice(vi, 0, wordOf(id)); else if (k > vi) { const [x] = vq.splice(k, 1); vq.splice(vi, 0, x); } flipped = false; renderVocab(); $('.flash-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
       const vs = e.target.closest('[data-vsrc]'); if (vs) { S.vsrc = vs.dataset.vsrc; save(); vq = []; vhist = []; renderVocab(); return; }
       if (e.target.closest('[data-vgame]')) { S.vgame = Object.assign(S.vgame || {}, { on: true }); save(); renderVocab(); return; }
-      const vn = e.target.closest('[data-vnew]'); if (vn) { S.vnew = +vn.dataset.vnew; save(); vq = []; renderVocab(); return; }
+      const vn = e.target.closest('[data-vnew]'); if (vn) { S.vnew = +vn.dataset.vnew; S.vnewAuto = false; save(); vq = []; renderVocab(); return; }
+      if (e.target.closest('[data-vnewauto]')) { S.vnewAuto = true; save(); vq = []; renderVocab(); return; }
       if (e.target.closest('[data-vmore]')) { dailyPlan(true); vq = []; renderVocab(); return; }
       if (e.target.closest('[data-vagain]')) { const ids = dailyPlan().order.filter(isWrong); vq = shuffle(ids.map(wordOf).filter(Boolean)); vi = 0; flipped = false; vagain = true; renderVocab(); return; }
       if (e.target.closest('[data-vround]')) { vq = []; renderVocab(); return; }
@@ -1302,6 +1326,14 @@
     save();
   };
   Object.assign(window.CET6, { VOCAB, ALLWORDS, exOf, hlWord, speak, dailyPlan, isWrong, wordOf, shuffle, gameMark, renderVocab });
+  /* ---------- 给今日复习流程（assets/review.js）用的接口 ---------- */
+  // vreview：复习判定题作答（与单词页判定题同一套规则：答对 = 认识升一级，答错 = 不认识、阶段清零）；vfuzzy：「蒙对的，记模糊」
+  Object.assign(window.CET6, {
+    vdueDay, canSpell,
+    vreview: (id, ok) => { const w = wordOf(id); if (!w) return; const ag = vagain; vagain = false; vapply(w, ok ? 2 : 0); vagain = ag; vhist.pop(); vq = []; },
+    vfuzzy: (id) => { S.vocab[id] = 1; delete S.vstage[id]; save(); },
+    vnewSug,
+  });
 
   /* ---------- 启动 ---------- */
   if (window.CET6Learn) window.CET6Learn.init();   // 旧记录补 sub、错题补 due / streak（幂等）
