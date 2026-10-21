@@ -12,6 +12,8 @@
   };
   const SRCS = [['daily', '今日单词'], ['wrong', '生词本'], ['topic', '某个主题'], ['rand', '随机 20 个']];
   const QUIZ_MS = 8000;
+  // 选项长（如易混词「值得尊敬的 / 恭敬的」）多给 4 秒阅读时间；得分仍按 8 秒算
+  const qms = (q) => q && q.opts && q.opts.some((o) => String(o.c).length > 9) ? QUIZ_MS + 4000 : QUIZ_MS;
 
   // 图标：追加到页面已有的 SVG sprite（不改 index.html 的图标区）
   const sprite = document.querySelector('body > svg');
@@ -43,11 +45,14 @@
     return shuffle(ALLWORDS).slice(0, 20);
   }
   // 干扰项：先同主题同词性，再同词性，最后随便；中文释义不能重复
+  // 释义拆成义项（按 ，、；/ 分），两个词有任一义项相同就算近义，不能同时出现
+  const senses = (c) => String(c).split(/[，、；;,/（）()]+/).map((x) => x.replace(/[的地得了]$/, '').trim()).filter((x) => x.length >= 2);
+  const overlap = (a, b) => { const A = senses(a); return senses(b).some((x) => A.some((y) => y === x || (x.length >= 2 && (y.includes(x) || x.includes(y))))); };
   function distractors(w, n) {
     const { ALLWORDS, shuffle } = C(), pk = posKey(w.p), seen = new Set([w.c]), out = [];
     const tiers = [(x) => x.g === w.g && posKey(x.p) === pk, (x) => posKey(x.p) === pk, (x) => x.g === w.g, () => true];
     for (const t of tiers) {
-      for (const x of shuffle(ALLWORDS.filter((x) => x.id !== w.id && t(x)))) { if (out.length >= n) break; if (!seen.has(x.c)) { seen.add(x.c); out.push(x); } }
+      for (const x of shuffle(ALLWORDS.filter((x) => x.id !== w.id && t(x)))) { if (out.length >= n) break; if (!seen.has(x.c) && !overlap(x.c, w.c) && !out.some((o) => overlap(o.c, x.c))) { seen.add(x.c); out.push(x); } }
       if (out.length >= n) break;
     }
     return out;
@@ -55,9 +60,16 @@
   // 例句挖空：用 app.js 的 hlWord 找到目标词（含变形），把高亮处换成 ____
   function blankEx(w, target) {
     const { exOf, hlWord, esc } = C();
+    const others = /\s\/\s/.test(w.w) ? w.w.split(/\s\/\s/).slice(1).map((x) => x.trim().toLowerCase()) : [];
+    const B = '<span class="vg-blank">____</span>';
     for (const [en, zh] of exOf(w)) {
-      const h = hlWord(esc(en), target);
-      if (h.includes('<em>')) return { html: h.replace(/<em>[\s\S]*?<\/em>/, '<span class="vg-blank">____</span>').replace(/<\/?em>/g, ''), zh, en };
+      // 易混词组：例句里出现了另一个词就会泄露答案，跳过
+      if (others.some((o) => new RegExp('\\b' + o.slice(0, Math.max(4, o.length - 2)), 'i').test(en))) continue;
+      const e = esc(en), t = target.replace(/^be /, '');
+      // 短语：原句里能整段找到就整段挖掉
+      if (/\s/.test(t)) { const re = new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'), 'i'); if (re.test(e)) return { html: e.replace(re, B), zh, en }; }
+      const h = hlWord(e, target);
+      if (h.includes('<em>')) { const html = h.replace(/<em>[\s\S]*?<\/em>/g, B); if (/\s/.test(t) && t.split(/\s+/).some((x) => x.length > 3 && new RegExp('\\b' + x + '\\b', 'i').test(html.replace(/<[^>]+>/g, '')))) continue; return { html, zh, en }; }
     }
     return null;
   }
@@ -69,7 +81,7 @@
     stopTimers();
     if (kind === 'match') {
       const words = [], cs = new Set();
-      for (const w of pool) { if (words.length >= 12) break; if (!cs.has(w.c)) { cs.add(w.c); words.push(w); } }
+      for (const w of pool) { if (words.length >= 12) break; if (!cs.has(w.c) && !words.some((o) => overlap(o.c, w.c))) { cs.add(w.c); words.push(w); } }
       const per = innerWidth < 700 ? 6 : 12, nb = Math.ceil(words.length / per), size = Math.ceil(words.length / nb);
       const boards = []; for (let i = 0; i < words.length; i += size) boards.push(words.slice(i, i + size));
       G = { kind, words, boards, bi: 0, sec: 0, moves: 0, miss: 0, combo: 0, maxCombo: 0, score: 0, wrong: new Set(), right: new Set(), sel: null };
@@ -83,7 +95,7 @@
       const single = pool.filter((w) => !/\s/.test(firstPart(w.w))), multi = pool.filter((w) => /\s/.test(firstPart(w.w)));
       const words = [...single, ...multi].slice(0, 10);
       G = { kind, words, qi: 0, score: 0, combo: 0, maxCombo: 0, wrong: new Set(), right: new Set(),
-        qs: words.map((w) => { const ans = firstPart(w.w), cn = /\s\/\s/.test(w.w) ? firstPart(w.c) : w.c; return { w, ans, cn, ex: blankEx(w, ans), shown: 0, tries: 0 }; }) };
+        qs: words.map((w) => { const ans = firstPart(w.w), cn = /\s\/\s/.test(w.w) ? firstPart(w.c) : w.c; return { w, ans, cn, pos: /\s\/\s/.test(w.w) ? String(w.p).split(/\s*\/\s*/)[0] : w.p, ex: blankEx(w, ans), shown: 0, tries: 0 }; }) };
     }
     G.phase = 'play'; G.src = v.src; G.t0 = Date.now(); G.done = false;
     render(box);
@@ -194,7 +206,7 @@
     const ea = el(ai), eb = el(i);
     if (a.id === b.id) {
       const m = hit(true), pts = 10 * m; G.score += pts; G.gone.add(ai); G.gone.add(i);
-      markWord(a.id, !G.wrong.has(a.id));
+      markWord(a.id, !G.wrong.has(a.id) && !(G.miss1 && G.miss1[a.id]));
       [ea, eb].forEach((e) => { e.classList.remove('sel'); e.classList.add('ok'); });
       setTimeout(() => [ea, eb].forEach((e) => e.classList.add('gone')), RM() ? 120 : 520);
       popCombo(eb, `+${pts}`);
@@ -205,7 +217,7 @@
       }
     } else {
       hit(false); G.miss++; G.score = Math.max(0, G.score - 2);
-      markWord(a.id, false); // 先点的那张是要找配对的词，记它错
+      G.miss1 = G.miss1 || {}; if (G.miss1[a.id]) markWord(a.id, false); else G.miss1[a.id] = 1; // 同一个词第二次配错才记「不认识」，手滑一次不算
       [ea, eb].forEach((e) => { e.classList.remove('sel', 'bad'); void e.offsetWidth; e.classList.add('bad'); });
       setTimeout(() => [ea, eb].forEach((e) => e.classList.remove('bad')), 450);
       popCombo(null);
@@ -226,9 +238,9 @@
     const bar = $('#vgBar', box); bar.style.transition = 'none'; bar.style.transform = 'scaleX(1)'; void bar.offsetWidth;
     G.qt0 = Date.now(); clearTimeout(quizTimer); clearInterval(barTick);
     // 减少动效时不用过渡，改成每 0.25 秒跳一格（全局 reduced-motion 规则会关掉 transition）
-    if (RM()) barTick = setInterval(() => { if (!bar.isConnected || G.answered) return clearInterval(barTick); bar.style.transform = `scaleX(${Math.max(0, 1 - (Date.now() - G.qt0) / QUIZ_MS)})`; }, 250);
-    else { bar.style.transition = `transform ${QUIZ_MS}ms linear`; bar.style.transform = 'scaleX(0)'; }
-    quizTimer = setTimeout(() => { if (G && G.kind === 'quiz' && !G.answered && visible()) answerQuiz(-1); }, QUIZ_MS);
+    if (RM()) barTick = setInterval(() => { if (!bar.isConnected || G.answered) return clearInterval(barTick); bar.style.transform = `scaleX(${Math.max(0, 1 - (Date.now() - G.qt0) / qms(q))})`; }, 250);
+    else { bar.style.transition = `transform ${qms(q)}ms linear`; bar.style.transform = 'scaleX(0)'; }
+    quizTimer = setTimeout(() => { if (G && G.kind === 'quiz' && !G.answered && visible() && !document.hidden) answerQuiz(-1); }, qms(q));
   }
   function answerQuiz(i) {
     if (G.answered) return; G.answered = true; clearTimeout(quizTimer); clearInterval(barTick);
@@ -238,13 +250,15 @@
     btns[q.a].classList.add('right'); if (!ok && i >= 0) btns[i].classList.add('wrong');
     markWord(q.w.id, ok);
     if (ok) {
-      const left = Math.max(0, Math.ceil((QUIZ_MS - (Date.now() - G.qt0)) / 1000)), m = hit(true), pts = (10 + left) * m;
+      const left = Math.max(0, Math.ceil((8000 - Math.max(0, Date.now() - G.qt0 - (qms(q) - 8000))) / 1000)), m = hit(true), pts = (10 + left) * m;
       G.score += pts; popCombo(btns[q.a], `+${pts}`);
-      advTimer = setTimeout(nextQ, RM() ? 500 : 800);
+      const [en0, zh0] = exOf(q.w)[0] || [];
+      if (en0) $('#vgFb', box).innerHTML = `<div class="vg-fb ok card"><div class="fx"><div><div class="en">${hlWord(esc(en0), q.w.w)}</div>${zh0 ? `<div class="zh">${esc(zh0)}</div>` : ''}</div></div></div>`;
+      advTimer = setTimeout(nextQ, RM() ? 900 : 1800);
     } else {
       hit(false); popCombo(null);
       const [en, zh] = exOf(q.w)[0];
-      $('#vgFb', box).innerHTML = `<div class="vg-fb card"><div class="fh">${i < 0 ? '时间到' : '选错了'} · 正确答案：<b>${esc(q.w.w)}</b> ${esc(q.w.c)}</div>
+      $('#vgFb', box).innerHTML = `<div class="vg-fb card"><div class="fh">${i < 0 ? '时间到' : '选错了'} · 正确答案：<b>${esc(q.w.w)}</b> ${esc(q.w.c)}</div>${i >= 0 ? `<div class="fo">你选的「${esc(q.opts[i].c)}」是 <b>${esc(q.opts[i].w)}</b></div>` : ''}
         <div class="fx">${sayBtn(en, '朗读例句')}<div><div class="en">${hlWord(esc(en), q.w.w)}</div>${zh ? `<div class="zh">${esc(zh)}</div>` : ''}</div></div>
         <button class="btn primary vg-next" data-vg-next>下一题 ${ic('i-chev-r')}</button></div>`;
       const fb = $('.vg-fb', box); if (fb && fb.scrollIntoView) fb.scrollIntoView({ block: 'nearest', behavior: RM() ? 'auto' : 'smooth' });
@@ -266,7 +280,7 @@
     const { esc, ic } = C(), q = G.qs[G.qi];
     G.answered = false;
     box.innerHTML = `<div class="vg vg-play m-vocab">${head(`第 ${G.qi + 1}/${G.qs.length} 题`, '')}
-      <div class="vg-sp card"><div class="cn"><span class="pos">${esc(q.w.p)}</span>${esc(q.cn)}</div>
+      <div class="vg-sp card"><div class="cn"><span class="pos">${esc(q.pos || q.w.p)}</span>${esc(q.cn)}</div>
         ${q.ex ? `<div class="ex">${q.ex.html}</div>${q.ex.zh ? `<div class="zh">${esc(q.ex.zh)}</div>` : ''}` : ''}
         <div class="vg-slots" id="vgSlots" aria-label="${q.ans.length} 个字母">${slots(q)}</div></div>
       <form class="vg-in" id="vgForm" autocomplete="off"><input id="vgInput" type="text" inputmode="text" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="输入单词，回车提交" aria-label="输入单词"><button class="btn primary" type="submit">提交</button></form>
@@ -282,7 +296,7 @@
     if (ok) {
       G.answered = true; inp.disabled = true; inp.classList.add('right');
       const m = hit(true), base = Math.max(2, 10 - 3 * q.shown), pts = Math.round(base * (q.tries ? 0.5 : 1)) * m;
-      G.score += pts; markWord(q.w.id, true); popCombo($('#vgForm', box), `+${pts}`);
+      G.score += pts; if (!q.tries) markWord(q.w.id, true); popCombo($('#vgForm', box), `+${pts}`);
       q.shown = q.ans.length; $('#vgSlots', box).innerHTML = slots(q); $('#vgSlots', box).classList.add('ok');
       sayAuto(q.ans);
       advTimer = setTimeout(nextQ, RM() ? 600 : 1000);
@@ -327,7 +341,7 @@
         <div class="vg-again"><button class="btn primary" data-vg-start="${G.kind}">${ic('i-redo')}再来一局</button><button class="btn soft" data-vg-menu>换个游戏</button></div>
       </div>
       <div class="vg-lab">错词 ${wrong.length} 个${wrong.length ? ' · 已自动标为「不认识」' : ''}</div>
-      ${wrong.length ? `<div class="vg-wl">${wl(wrong, 'bad')}</div><button class="btn ${allIn ? 'ghost' : 'tone'} vg-add" data-vg-addall ${allIn ? 'disabled' : ''}>${ic(allIn ? 'i-check' : 'i-abc')}${allIn ? '都在生词本里了' : '加入生词本'}</button>` : `<p class="vg-note">全对，漂亮！</p>`}
+      ${wrong.length ? `<div class="vg-wl">${wl(wrong, 'bad')}</div>${allIn ? '' : `<button class="btn tone vg-add" data-vg-addall>${ic('i-abc')}重新加入生词本</button>`}` : `<p class="vg-note">全对，漂亮！</p>`}
       ${right.length ? `<details class="vg-rd"><summary>${ic('i-chev-r')}答对的词 ${right.length} 个</summary><div class="vg-wl">${wl(right, 'ok')}</div></details>` : ''}
     </div>`;
   }
@@ -345,13 +359,19 @@
   function closeCard() { const p = $('#vgPop'); if (p) p.remove(); popId = null; }
 
   /* ---------- 事件 ---------- */
+  // 切到别的应用 / 锁屏：进行中的局自动暂停（回来点「继续上一局」）
+  document.addEventListener('visibilitychange', () => { if (document.hidden && G && G.phase === 'play' && !G.paused) { stopTimers(); G.paused = true; render(box); } });
   document.addEventListener('click', (e) => {
     if (!box || !box.contains(e.target)) return;
     const t = (s) => e.target.closest(s), v = cfg(), S = C().S;
     const sp = t('[data-say]'); if (sp) { C().speak(sp.dataset.say, 0.9); return; }
     const s = t('[data-vg-src]'); if (s) { v.src = s.dataset.vgSrc; C().save(); renderMenu(v); return; }
     const st = t('[data-vg-start]'); if (st) { start(st.dataset.vgStart); window.scrollTo(0, box.closest('#vocab-box').offsetTop - 70); return; }
-    if (t('[data-vg-resume]')) { G.paused = false; if (G.kind !== 'match' && G.answered) nextQ(); else render(box); return; }
+    if (t('[data-vg-resume]')) {
+      G.paused = false;
+      if (G.kind === 'match' && G.cards && G.gone.size === G.cards.length) { G.lock = false; if (G.bi + 1 < G.boards.length) { G.bi++; dealBoard(); render(box); } else finish(); return; }
+      if (G.kind !== 'match' && G.answered) nextQ(); else render(box); return;
+    }
     if (t('[data-vg-drop]')) { G = null; render(box); return; }
     if (t('[data-vg-menu]')) { G = null; render(box); return; }
     if (t('[data-vg-quit]')) { stopTimers(); G.paused = true; render(box); return; }

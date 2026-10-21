@@ -1128,9 +1128,9 @@
   /* ---------- 给单词小游戏（assets/vgame.js）用的接口 ---------- */
   // 游戏标记：答错 → 不认识（今天刷过、清掉认识阶段）；答对且原来是「不认识」→ 升为「模糊」，不直接标认识
   const gameMark = (id, ok) => {
-    const d = lday();
-    if (!ok) { S.vocab[id] = 0; S.vseen[id] = d; delete S.vstage[id]; }
-    else if (S.vocab[id] === 0) { S.vocab[id] = 1; S.vseen[id] = d; }
+    // 不写 S.vseen：游戏里答错的词今天仍会出现在「今日单词」闪卡里，能看到完整例句
+    if (!ok) { S.vocab[id] = 0; delete S.vstage[id]; }
+    else if (S.vocab[id] === 0) { S.vocab[id] = 1; }
     save();
   };
   Object.assign(window.CET6, { VOCAB, ALLWORDS, exOf, hlWord, speak, dailyPlan, isWrong, wordOf, shuffle, gameMark, renderVocab });

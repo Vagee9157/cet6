@@ -1363,3 +1363,11 @@ body.ex-focus .ex-bar{top:env(safe-area-inset-top);margin-top:0}
 .vt-sh{display:flex;align-items:baseline;gap:10px;padding:0 2px}
 .vt-sh b{font-size:14px}
 .vt-sh span{font-size:12.5px;color:var(--ink-mute,var(--ink-dim))}
+/* ===== 小游戏修复 ===== */
+.mc span{overflow-wrap:normal;word-break:normal;hyphens:auto}
+.mc{overflow-wrap:normal}
+@media (max-width:520px){.mc{font-size:12.5px}}
+.vg-tog.sm{min-height:44px}
+@media (pointer:coarse){.seg2 button{min-height:44px}}
+.vg-fb.ok{border-left:3px solid var(--ok)}
+.vg-fb .fo{font-size:13.5px;color:var(--ink-soft);margin-top:4px}
