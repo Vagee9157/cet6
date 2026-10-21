@@ -43,6 +43,9 @@ assets/paper.js         组卷逻辑（打印版排版）
 assets/draw.js          抽题（打印版与在线模考共用，优先抽没做过的、按记录还原同一卷号）
 assets/exam.js          在线模考
 assets/learn.js         学习闭环 window.CET6Learn：预测分 / 今日计划 / 错因 / 错题重测 / 打卡周报
+assets/drills.js        专项训练 window.CET6Drills：定位训练 / 同义替换 / 逐句听写 / 先读选项预判 / 倍速爬坡
+assets/data-paraphrase.js 同义替换库 PARA（tools/build_paraphrase.js 生成，勿手改）
+tools/build_paraphrase.js 从题库解析抽同义替换短语对：node tools/build_paraphrase.js
 assets/style.css        样式（浅色 / 深色）
 ```
 
@@ -78,6 +81,29 @@ assets/style.css        样式（浅色 / 深色）
 - `studyDays()`（由 hist / sets / vseen / wtScore / exams / rt / mastered 日期推算）、`streak()`、`weekReport()`、`weekStart()`
 - 渲染：`planHTML()`、`rankHTML(pr)`、`weekHTML()`、`meTopHTML()`、`causeChartHTML()`、`wrongExtraHTML(w)`、`diagHTML(lv)`、`openRetest()`；首页点击 / 改值交给 `homeClick(e)` / `homeChange(e)`
 - `window.CET6Exam` 新增 `startDiag()`、`diagMinutes()`、`DIAG_SEL`；`window.CET6` 新增 `qLoc(kind, set, i)`（解析引文在原文里的段落 / 录音段）、`clozeCtx`、`goSet`、`renderHome`、`openOutline`、`openVocabDaily`、`openWT`
+
+## 专项训练（数据）
+
+听读页顶部「专项训练」卡，逻辑在 `assets/drills.js`（`window.CET6Drills`），在听读页内打开（`CET6.openDrill(k)`）。
+
+- **定位训练**（`locate`）：题池 = 仔细阅读 `questions[].q` + 段落匹配 `items[].s` 里，解析引号英文能用 app.js `tokIndex` / `findQuote` 在原文找到、且命中不超过 3 句的题（运行时预处理一次）。点句子判对错，错了标出正确句并滚过去；每轮 10 题，计时，优先没做过的（`S.locSeen`）。
+- **同义替换**（`para`）：题库 `assets/data-paraphrase.js` 的 `PARA = [{a: 题干 / 选项短语, b: 原文短语, src: 题目 id, exp}]`，四选一，干扰项依次取同篇其他原文短语、同篇原文里长度相近的片段、别篇短语。做错进 `S.wrong`（`kind:'para'`, `sub:'para'`, key `para:<题目 id>:<a|b 哈希>`），走 `CET6Learn` 的延迟重测（`prep` 把 `kind 'para'` 交给 `CET6Drills.rtItem` 渲染）；答对调 `applyResult([], [key])` 按隔天规则计连对。
+- **逐句听写**（`dict`）：六级题型听力用 `AUDIO` 逐句时间（跳过题目播报，4–30 词的句子）；常速真人用官方逐段时间，超过 30 词的长段按句拆、起止按字数估算（页面有提示）。可重播、0.8× / 1.0×；LCS 词级对比标漏听 / 错听 / 多写；漏听的实词一键加生词本：在单词库（`ALLWORDS`，含简单变形还原）里的标「不认识」，否则存 `S.myWords`（我的 → 生词本显示，可删）。
+- **先读选项预判**：练习页六级题型听力在「考试节奏」下，第一次按播放先进 30 秒读选项（可跳过），每题选预计考点（细节 / 原因 / 态度 / 建议 / 数字），交卷后按题干关键词粗分类对照（`qType`）。
+- **倍速爬坡**：同一篇听力第 2 次自动 1.1×、第 3 次起 1.2×（慢速 VOA 在默认语速上 +0.1 / +0.2，最多 1.4×），播放器显示当前倍速来源；手动点语速以手动为准，`S.rampOff` 关闭。
+
+| 字段 | 格式 | 说明 |
+|---|---|---|
+| `S.drill[日期]` | `{locate:{n,ok}, para:{n,ok}, dict:{n,ok,w,wok}, pre:{n,ok}}` | 每日训练量，保留 60 天。`dict` 的 `n` 句数、`ok` 正确率 ≥90% 的句数、`w` / `wok` 原文词数 / 写对词数；`pre` 预判题数 / 命中数 |
+| `S.myWords` | `[{w, d, src, ctx}]` | 听写收的单词库外生词，最多 500 |
+| `S.dictBad` | `[{id, k, t, acc, d, n}]` | 听写正确率 < 80% 的句子（`k` 句子键：录音段序号，长段拆句为 `段.句`），供后续统一复习，最多 200 |
+| `S.dictPos[题目 id]` / `S.dictLast` / `S.dictG` / `S.dictRate` | 数字 / id / `'cet'`·`'real'` / 0.8·1 | 听写进度、上次那篇、素材组、语速 |
+| `S.locSeen` / `S.paraSeen` | 数组 | 做过的定位题 / 同义替换（出题时排后） |
+| `S.rampOff` | bool | 关闭倍速爬坡 |
+
+**今日计划**：专项阶段（21–60 天）`buildPlan` 会加一项 `{k:'drill', sub: locate / para / dict, min}`（`CET6Drills.planTask`：近两周头号错因 syn → 同义替换、loc → 定位、ear → 听写，否则按提分排行第一的客观题型），完成标准 = 当天该项做满 10 题 / 组 / 句。
+
+**改了题库要重跑同义替换库**：`node tools/build_paraphrase.js`（可重复运行，结果只取决于题库；抽「X 同义替换 / 对应 / 即 / 指 / 替换 Y」「Y 替换为 / 改写为 X」两边都是英文短语的小句，过滤超长和纯虚词，去重）。
 
 **任务预计分钟**：阅读 `set.minutes`；听力 录音时长/60 + 题数×0.3；单词 新词×0.5 + 复习×0.2；写作 / 翻译 30；看考点 10；错题重测 每题 1.5（一次最多 10 道）；完整模考 130。
 

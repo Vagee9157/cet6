@@ -258,7 +258,9 @@
       cand.push(vocab, setTask(topL ? topL.k : 'conv'), setTask(topR ? topR.k : 'mc'), outlineTask(pr), wtTask(wtDay));
     } else if (ph.k === 'focus') {
       const tops = pr.rank.slice(0, 3).map((x) => (x.wt ? wtTask(x.k) : setTask(x.k)));
-      cand.push(tops[0], tops[1], vocab, wtTask(wtDay), tops[2]);
+      // 专项训练（assets/drills.js）：按近两周头号错因 / 提分排行挑定位训练 / 同义替换 / 逐句听写之一，k = 'drill'，sub = locate / para / dict
+      const drill = window.CET6Drills ? window.CET6Drills.planTask(pr) : null;
+      cand.push(tops[0], tops[1], vocab, drill, wtTask(wtDay), tops[2]);
     } else {
       const lastFull = (s.exams || []).filter((x) => x && x.mode === 'full').map((x) => x.d).filter(isDay).sort().pop();
       if (!lastFull || dayDiff(lastFull, d) >= 4) cand.push({ k: 'exam', min: 130, must: 1 });
@@ -305,6 +307,7 @@
       const c = CHAPTERS.find((x) => x.id === t.ch) || CHAPTERS[0], n = Object.keys(s.mastered || {}).filter((k) => k.startsWith(c.id + ':') && s.mastered[k] === d).length;
       return { done: n >= 2, f: Math.min(1, n / 2), title: `看考点：${c.name}`, p: `今天勾了 ${n}/2 条`, mod: 'm-exam' };
     }
+    if (t.k === 'drill') return window.CET6Drills ? window.CET6Drills.taskStatus(t) : { done: false, f: 0, title: '专项训练', p: '', mod: 'm-read' };
     if (t.k === 'exam') {
       const done = (s.exams || []).some((x) => x && x.d === d && x.mode === 'full');
       return { done, f: done ? 1 : 0, title: '完整模考 1 套', p: '冲刺期每周 1–2 套', mod: 'm-exam' };
@@ -344,6 +347,7 @@
     if (t.k === 'wt') return C().openWT(t.sub);
     if (t.k === 'outline') return C().openOutline(t.ch);
     if (t.k === 'exam') return C().show('exam');
+    if (t.k === 'drill') return C().openDrill(t.sub);
   }
   function homeChange(e) {
     const x = e.target.closest('[data-lexam]'); if (!x) return false;
@@ -428,6 +432,7 @@
   function prep(key) {
     if (rt.items[key]) return rt.items[key];
     const w = St().wrong[key]; if (!w) return null;
+    if (w.kind === 'para') { const x = window.CET6Drills ? window.CET6Drills.rtItem(key, w) : null; if (x) rt.items[key] = x; return x; } // 同义替换错题：assets/drills.js 渲染
     const f = C().findSet(wrongSetId(w)); if (!f) return null;
     const i = +String(key).split(':').pop(), set = f.set, kind = f.kind;
     const it = { key, w, kind, set, i };
@@ -466,11 +471,12 @@
     }
     const it = prep(rt.q[rt.i]), done = rt.res !== null, kind = it.kind;
     const mod = kind === 'listen' ? 'm-listen' : 'm-read';
-    const src = `${esc(String(it.w.src || '').replace(/^([^·]+?)\s*·\s*\1\s*·\s*/, '$1 · '))} · 第 ${it.i + 1} ${kind === 'cloze' ? '空' : '题'}`;
+    const src = it.ext ? esc(it.srcLabel) : `${esc(String(it.w.src || '').replace(/^([^·]+?)\s*·\s*\1\s*·\s*/, '$1 · '))} · 第 ${it.i + 1} ${kind === 'cloze' ? '空' : '题'}`;
     let ctx = '', choices = '';
     const btn = (v, label, cls) => `<button class="opt${cls}" data-rtpick="${esc(String(v))}" ${done ? 'disabled' : ''}>${label}</button>`;
     const cls = (v) => (done ? (v === it.ans ? ' right' : v === rt.pick ? ' wrong' : '') : '');
-    if (kind === 'cloze') {
+    if (it.ext) ({ ctx, choices } = it.ext(done, rt.pick));
+    else if (kind === 'cloze') {
       ctx = `<div class="rt-ctx serif">${esc(it.ctx).replace(/_{2,}/g, '<b class="gap">&nbsp;</b>')}</div>`;
       choices = `<div class="bank rt-bank">${it.opts.map(([v, l]) => `<button class="chip${done ? (v === it.ans ? ' rt-right' : v === rt.pick ? ' rt-wrong' : '') : ''}" data-rtpick="${esc(v)}" ${done ? 'disabled' : ''}>${esc(l)}</button>`).join('')}</div>`;
     } else if (kind === 'match') {
@@ -493,7 +499,7 @@
       }
       choices = `<div class="q m-listen"><div class="qt"><span class="n">?</span><span>${esc(it.stem)}</span></div><div class="opts">${it.opts.map(([v, l]) => btn(v, `<span class="k">${'ABCD'[v]}</span><span>${esc(l.slice(3))}</span>`, cls(v))).join('')}</div></div>`;
     }
-    const ansLabel = kind === 'cloze' ? `${it.ans} ${esc(C().clozeWord(it.set, it.ans))}` : kind === 'match' ? `${esc(it.ans)} 段` : `${'ABCD'[it.ans]}`;
+    const ansLabel = it.ext ? it.ansLabel : kind === 'cloze' ? `${it.ans} ${esc(C().clozeWord(it.set, it.ans))}` : kind === 'match' ? `${esc(it.ans)} 段` : `${'ABCD'[it.ans]}`;
     const RES = { clear: '隔天以上连对 2 次，已移出错题本。', next: `答对了，${it.w.streak || 1} 次连对，${esc((St().wrong[it.key] || {}).due ? St().wrong[it.key].due.slice(5) : '')} 再测一次。`, reset: '答错了，明天再测。', none: '' };
     const expT = kind === 'cloze' ? (it.set.exp[it.i] || '') : it.exp || '';
     const res = done ? `<div class="exp rt-res ${rt.res === 'reset' ? 'bad' : 'ok'}"><b class="vd ${rt.res === 'reset' ? 'bad' : 'ok'}">${rt.res === 'reset' ? '✗ 答错' : '✓ 答对'}</b> · 正确答案 ${ansLabel}。${esc(expT)}<div class="rt-sched">${RES[rt.res] || ''}</div>${rt.res === 'reset' ? causeHTML(it.key, kind) : ''}</div>` : '';
