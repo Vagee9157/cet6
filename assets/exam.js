@@ -790,5 +790,7 @@
   window.addEventListener('pagehide', flush);
   // 刷新 / 重开页面：有进行中且不是主动暂停的模考，直接回到考试界面
   try { const S0 = JSON.parse(localStorage.getItem('cet6.v1') || '{}'); if (S0.exam && !S0.exam.paused) mode = 'exam'; } catch {}
-  window.CET6Exam = { render, leave, openReport, audio: AX, preset: (seed) => { presetSeed = seed; mode = 'home'; }, meta, tagOf, startDiag, diagMinutes, DIAG_SEL };
+  // 首页「模考还没做完」横幅：直接进考试
+  const resume = () => { const ee = C().S.exam; if (!ee) return; delete ee.paused; C().save(); mode = 'exam'; render(); window.scrollTo(0, 0); };
+  window.CET6Exam = { resume, render, leave, openReport, audio: AX, preset: (seed) => { presetSeed = seed; mode = 'home'; }, meta, tagOf, startDiag, diagMinutes, DIAG_SEL };
 })();

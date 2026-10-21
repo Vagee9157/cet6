@@ -122,7 +122,9 @@
     const acts = pr.ready
       ? `${nextI >= 0 ? `<button class="btn w" data-lgo="${nextI}">${ic('i-flame')}继续今天的计划</button>` : `<button class="btn w" data-go="practice">${ic('i-ear')}今天完成了，加练一篇</button>`}<button class="btn" data-go="exam">${ic('i-clip')}在线模考</button>`
       : `<button class="btn w" data-diag>${ic('i-target')}做一次诊断（约 ${dMin} 分钟）</button><button class="btn" data-go="exam">${ic('i-clip')}在线模考</button>`;
-    $('#home-box').innerHTML = `
+    // 有暂停 / 进行中的模考：首页顶部提示一条，点了直接回到考试
+    const exOn = S.exam && S.exam.seed ? `<button class="hm-exam-on card m-exam" data-go-exam>${ic('i-clip')}<span><b>${S.exam.diag ? '诊断' : '模考'}还没做完</b>${S.exam.paused ? '已暂停，' : ''}点这里接着做（剩余时间已保存）</span>${ic('i-chev-r')}</button>` : '';
+    $('#home-box').innerHTML = `${exOn}
       <section class="hm-hero">
         <div class="hm-hero-tx">${heroTx}</div>
         <div class="hm-hero-acts">${acts}</div>
@@ -138,7 +140,7 @@
         ${stat('m-read', st.setsDone, '做过的练习')}
         ${stat('m-listen', st.acc === null ? '—' : st.acc, '正确率', st.acc === null ? '' : '%')}
         ${stat('m-write', `<span id="stM">${st.m}</span>`, '考点掌握', '/' + totalPts)}
-        ${(() => { const mm = lastEx && window.CET6Exam && window.CET6Exam.meta ? window.CET6Exam.meta(lastEx) : null; const v = mm && mm.v != null ? mm.v : lastEx ? lastEx.total : null; const cu = lastEx && lastEx.mode === 'custom'; return stat('m-exam', v != null ? Math.round(v) : '—', cu ? '最近模考（折算）' : '最近模考', lastEx ? '/710' : ''); })()}
+        ${(() => { const mm = lastEx && window.CET6Exam && window.CET6Exam.meta ? window.CET6Exam.meta(lastEx) : null; const v = mm && mm.v != null ? mm.v : lastEx ? lastEx.total : null; const cu = lastEx && lastEx.mode === 'custom'; return stat('m-exam', v != null ? Math.round(v) : '—', cu ? '模考（折算）' : '最近模考', lastEx ? '/710' : ''); })()}
       </div>
       <div class="hm-split">
         <div class="hm-split-h"><b>710 分怎么拆</b><small>点一段看策略</small></div>
@@ -155,6 +157,7 @@
       <div id="past-box" hidden></div>`;
     $('#home-box').onchange = (e) => { L.homeChange(e); };
     $('#home-box').onclick = (e) => {
+      if (e.target.closest('[data-go-exam]')) { const ex = S.exam; if (ex) { delete ex.paused; save(); } show('exam'); if (window.CET6Exam && window.CET6Exam.resume) window.CET6Exam.resume(); return; }
       if (e.target.closest('#outline-box,#past-box') ) { /* 考点 / 真题索引有自己的处理 */ } else if (L.homeClick(e)) return;
       // 分值条：只换说明，不重绘整页（手机上折叠面板保持展开）
       // 再点同一段收起说明
@@ -281,11 +284,13 @@
   // 建议每天新词数 = (未学基础 + 核心词 + 0.5 × 未学高频词) / max(1, 剩余天数 − 14)，夹在 10–40；留出考前两周只复习不加新词。当天固定（考试日期改了重算）
   const isHi = (w) => /^高频 ·/.test(w.g);
   function vnewSug() {
-    const d = lday(), L = window.CET6Learn, ex = L ? L.examDate() : '', key = d + '|' + ex;
+    const d = lday(), L = window.CET6Learn, ex = L ? L.examDate() : '', key = d + '|' + ex + '|' + S.dailyMin;
     if (S.vsug && S.vsug.key === key) return S.vsug;
     const left = ALLWORDS.filter((w) => S.vocab[w.id] === undefined), hi = left.filter(isHi).length, core = left.length - hi;
     const days = L ? L.daysLeft() : 180, raw = (core + 0.5 * hi) / Math.max(1, days - 14);
-    S.vsug = { key, n: Math.max(10, Math.min(40, Math.round(raw))), core, hi, days }; save();
+    // 考前两周只复习不加新词；上限跟每天可用时间走（每个新词约 0.5 分钟，最多占一半时间）
+    const dm = [30, 60, 90].includes(S.dailyMin) ? S.dailyMin : 60, top = Math.min(40, Math.round(dm * 0.5 / 0.5 * 0.6));
+    S.vsug = { key, n: days <= 14 ? 0 : Math.max(Math.min(10, top), Math.min(top, Math.round(raw))), core, hi, days }; save();
     return S.vsug;
   }
   const vnewN = () => (S.vnewAuto ? vnewSug().n : S.vnew);
@@ -390,7 +395,7 @@
   function renderVgame() {
     const st = stats(), wrongN = ALLWORDS.filter((x) => isWrong(x.id)).length;
     $('#vocab-box').innerHTML = `
-      <div class="sec-h" style="margin-top:4px"><span class="ico m-vocab">${ic('i-abc')}</span><h2>高频词汇</h2><span class="more">认识 ${st.known} · 生词 ${st.unknown}</span></div>
+      <div class="sec-h" style="margin-top:4px"><span class="ico m-vocab">${ic('i-abc')}</span><h2>六级词汇</h2><span class="more">认识 ${st.known} · 生词 ${st.unknown}</span></div>
       ${vsegHtml(S.vsrc, wrongN, true)}<div id="vgame-box"></div>`;
     $('#vocab-box').onclick = (e) => {
       if (e.target.closest('#vgame-box')) return;
@@ -428,7 +433,7 @@
         : `<div class="empty">${ic('i-party')}这一组都认识了。换一组，或点"只刷生词"复习。</div>`;
     const listRows = daily ? plan.order.map(wordOf).filter(Boolean) : wrong ? (vq.length ? vq : ALLWORDS.filter((x) => isWrong(x.id))) : grp.words.map((x, wi) => wordOf(vg + ':' + wi));
     $('#vocab-box').innerHTML = `
-      <div class="sec-h" style="margin-top:4px"><span class="ico m-vocab">${ic('i-abc')}</span><h2>高频词汇</h2><span class="more">认识 ${st.known} · 生词 ${st.unknown}</span></div>
+      <div class="sec-h" style="margin-top:4px"><span class="ico m-vocab">${ic('i-abc')}</span><h2>六级词汇</h2><span class="more">认识 ${st.known} · 生词 ${st.unknown}</span></div>
       ${vsegHtml(src, wrongN, false)}
       ${daily ? `<div class="vday card"><div class="vday-top"><div><b>今天 ${plan.fresh.length} 个新词 + ${plan.review.length} 个复习</b><span>新词自评三档；复习词先做一道判定题，答对按 3 / 7 / 14 / 30 / 60 天拉长间隔，答错明天再来；考前 3 天内的到期会提前</span></div><div class="vday-n">${pDone}<small>/${pTot}</small></div></div>
         <div class="bar"><i style="width:${pTot ? Math.round(pDone / pTot * 100) : 0}%"></i></div>
@@ -1245,7 +1250,7 @@
     $('#me-box').innerHTML = `
       <div class="me-grid">
         <div class="num m-vocab"><div class="v">${st.known}</div><div class="l">认识的词</div></div>
-        <div class="num m-vocab" style="--brand:var(--red)"><div class="v" style="color:var(--red)">${unknownWords.length + (Array.isArray(S.myWords) ? S.myWords.length : 0)}</div><div class="l">生词本</div></div>
+        <div class="num m-vocab" style="--brand:var(--red)"><div class="v" style="color:var(--red)">${unknownWords.length}</div><div class="l">生词本${Array.isArray(S.myWords) && S.myWords.length ? ` · 另收藏 ${S.myWords.length}` : ''}</div></div>
         <div class="num m-read" style="--brand:var(--red)"><div class="v" style="color:var(--red)">${wrongs.length}</div><div class="l">错题</div></div>
         <div class="num m-read"><div class="v">${st.setsDone}</div><div class="l">做过的练习</div></div>
         <div class="num m-listen"><div class="v">${st.acc === null ? '—' : st.acc + '%'}</div><div class="l">练习正确率</div></div>
@@ -1281,7 +1286,7 @@
       const f = e.target.files[0]; if (!f) return;
       try { const data = JSON.parse(await f.text()); if (!data || data.app !== 'cet6') throw 0;
         if (!confirm(`导入 ${data.at ? new Date(data.at).toLocaleString() : ''} 的备份？会覆盖当前的进度、生词和错题。`)) return;
-        Object.assign(S, data.state); save(); location.reload();
+        Object.keys(S).forEach((k) => delete S[k]); Object.assign(S, data.state); save(); location.reload();
       } catch { alert('不是本站的备份文件。'); }
     };
     $('#me-box').onclick = (e) => {

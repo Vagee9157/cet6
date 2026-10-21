@@ -39,10 +39,11 @@
   }
   // 每天的复习量封顶：按优先级取到约「每天可用时间」的一半（至少 10 项），积压多的往后几天慢慢消化；做完可以再加一批
   function capOf(full) {
-    const q = sess(); if (typeof q.cap === 'number') return q.cap;
-    const budget = [30, 60, 90].includes(St().dailyMin) ? St().dailyMin : 60, lim = budget * 0.5;
-    let n = 0, m = 0; for (const x of full) { if (n >= 10 && m + KIND[x.t].min > lim) break; m += KIND[x.t].min; n++; }
-    q.cap = n; C().save(); return n;
+    const q = sess(), budget = [30, 60, 90].includes(St().dailyMin) ? St().dailyMin : 60, lim = budget * 0.5;
+    if (typeof q.cap === 'number' && q.capB === budget) return q.cap; // 每天可用时间改了就重算
+    q.capB = budget;
+    let n = 0, m = 0; const minN = budget <= 30 ? 6 : 10; for (const x of full) { if (n >= minN && m + KIND[x.t].min > lim) break; m += KIND[x.t].min; n++; }
+    q.cap = n + (q.done || 0); C().save(); return q.cap;
   }
   function todayQ() { const full = queue(); const left = Math.max(0, capOf(full) - sess().done); return { q: full.slice(0, left), full: full.length }; }
   const minOf = (q) => (q.length ? Math.max(1, Math.round(q.reduce((a, x) => a + KIND[x.t].min, 0))) : 0);

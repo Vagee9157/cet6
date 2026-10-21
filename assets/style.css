@@ -1844,3 +1844,12 @@ body:has(.rt-sw[data-rt-tap][aria-pressed="true"]) #practice-box :is(.passage,.s
 .lw-more span{font-size:12px;color:var(--ink-dim);background:var(--paper-2);border-radius:999px;padding:4px 10px;font-weight:600}
 .lw-more span b{color:var(--ink);margin-right:4px;font-variant-numeric:tabular-nums}
 .lw-more .lw-rv{background:none;padding-left:2px}
+/* ===== 整体回归修复 ===== */
+.hs-cell .l{white-space:normal;line-height:1.3}
+@media (max-width:1100px){.rt-lim{grid-template-columns:auto auto 3.4em auto;row-gap:2px}.rt-lim>:nth-child(n+5){grid-column:1/-1}}
+@media (pointer:coarse){.ramp-off,[data-ramp],.sec-h .more{min-height:44px;display:inline-flex;align-items:center}}
+.hm-exam-on{display:flex;align-items:center;gap:10px;width:100%;margin:0 0 14px;padding:12px 16px;text-align:left;border:1.5px solid var(--c);background:var(--cs);font-size:14px}
+.hm-exam-on b{margin-right:6px}
+.hm-exam-on>svg:last-child{margin-left:auto}
+/* 复习判定题进行中：先藏起下面的单词表（带中文释义，会剧透答案） */
+#vocab-box:has(.vq) .vocab-list,#vocab-box:has(.vq) .sec-h:has(+ .vocab-list){display:none}

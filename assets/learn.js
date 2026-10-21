@@ -280,14 +280,16 @@
       cand.push(tops[0], tops[1], vocab, drill, wtTask(wtDay), cards(), tops[2]);
     } else {
       const lastFull = (s.exams || []).filter((x) => x && x.mode === 'full').map((x) => x.d).filter(isDay).sort().pop();
-      if (!lastFull || dayDiff(lastFull, d) >= 4) cand.push({ k: 'exam', min: 130, must: 1 });
+      // 完整模考 130 分钟：每天可用 ≥90 分钟才排（周末可一次做完）；时间少的用写译 + 高分题型代替
+      if (budget >= 90 && (!lastFull || dayDiff(lastFull, d) >= 4)) cand.push({ k: 'exam', min: 130, must: 1 });
       cand.push(wtTask('write'), wtTask('trans'), cards(true), setTask(objRank[0].k), vocab);
     }
-    const tasks = []; let tot = 0; const seen = new Set();
-    cand.filter(Boolean).forEach((c) => {
-      const id = c.k + ':' + (c.sub || '') + ':' + (c.id || ''); if (seen.has(id) || tasks.length >= 5) return;
-      if (c.must || tasks.length < 3 || tot + c.min <= budget * 1.1) { tasks.push(c); tot += c.min; seen.add(id); }
-    });
+    // 先放必做项占住时间，再按顺序把其余任务装进剩下的预算；至少 2 项；最后按原候选顺序排
+    const list = cand.filter(Boolean), idOf = (c) => c.k + ':' + (c.sub || '') + ':' + (c.id || '');
+    const pick = new Set(); let tot = 0;
+    list.forEach((c) => { if (c.must && !pick.has(idOf(c)) && pick.size < 5) { pick.add(idOf(c)); tot += c.min; } });
+    list.forEach((c) => { const id = idOf(c); if (pick.has(id) || pick.size >= 5) return; if (pick.size < 2 || tot + c.min <= budget * 1.1) { pick.add(id); tot += c.min; } });
+    const tasks = [], seen = new Set(); list.forEach((c) => { const id = idOf(c); if (pick.has(id) && !seen.has(id)) { seen.add(id); tasks.push(c); } });
     return tasks;
   }
   function outlineTask(pr) {
@@ -297,7 +299,7 @@
   }
   // 当天固定一份（考试日期 / 每日时间改了就重排）；完成状态每次按真实数据现算
   function planToday() {
-    const s = St(), d = today(), key = `${d}|${dailyMin()}|${examDate()}|rv`;
+    const s = St(), d = today(), key = `${d}|${dailyMin()}|${examDate()}|rv|${(s.exams || []).length}`; // 做完诊断 / 模考后按新数据重排
     if (!s.dayPlan || s.dayPlan.key !== key || !Array.isArray(s.dayPlan.tasks)) { s.dayPlan = { key, d, tasks: buildPlan() }; C().save(); }
     const tasks = s.dayPlan.tasks.map((t) => Object.assign({}, t, taskStatus(t)));
     return { tasks, total: tasks.reduce((a, t) => a + t.min, 0), done: tasks.filter((t) => t.done).length, budget: dailyMin(), phase: phase(), days: daysLeft(), date: examDate() };
@@ -347,7 +349,7 @@
   }
   let setOpen = false;
   function settingsHTML() {
-    return `<div class="card lp-settings"><label class="lp-row"><span>考试日期</span><input type="date" data-lexam value="${esc(examDate())}"><button class="btn ghost" data-lexamreset ${isDay(St().examDate) ? '' : 'disabled'}>恢复默认</button></label>
+    return `<div class="card lp-settings"><label class="lp-row"><span>考试日期</span><input type="date" data-lexam min="${esc(today())}" value="${esc(examDate())}"><button class="btn ghost" data-lexamreset ${isDay(St().examDate) ? '' : 'disabled'}>恢复默认</button></label>
       <div class="lp-row"><span>每天可用</span>${[30, 60, 90].map((m) => `<button class="chip" data-lmin="${m}" aria-pressed="${dailyMin() === m}">${m} 分钟</button>`).join('')}</div>
       <p class="lp-note">默认考试日期是最近的 6 月 / 12 月第二个周六，以准考证为准。计划按剩余天数分阶段：60 天以上打基础，21–60 天专项提分，21 天内冲刺。</p></div>`;
   }
@@ -376,7 +378,7 @@
   }
   function homeChange(e) {
     const x = e.target.closest('[data-lexam]'); if (!x) return false;
-    if (isDay(x.value)) { St().examDate = x.value; C().save(); C().renderHome(); }
+    if (isDay(x.value)) { if (x.value <= today()) { alert('考试日期要选今天以后的日子。'); x.value = examDate(); return true; } St().examDate = x.value; C().save(); C().renderHome(); }
     return true;
   }
 
@@ -567,7 +569,7 @@
     const top = pr.rank.slice(0, 3);
     return `<div class="card dg-card m-exam"><div class="dg-h"><b>诊断结论</b><span>预测 <b class="big">${pr.total}</b> / 710${pr.gap500 ? ` · 离 500 还差 ${pr.gap500} 分` : ' · 已到 500'}</span></div>
       <div class="dg-rows">${rows}</div>
-      <p class="dg-sum"><b>建议重点</b>${top.map((x, i) => `${i + 1}. ${esc(x.name)}（${esc(rankText(x))}）`).join('；')}。今日计划已按这个排好，回首页就能看到。没测到的题型（${esc(pr.low.join('、') || '无')}）先按 60% 估，做几篇后会自动更新。</p>
+      <p class="dg-sum"><b>建议重点</b>${top.map((x, i) => `${i + 1}. ${esc(x.name)}（${esc(rankText(x))}）`).join('；')}。今日计划已按这个重新排好，回首页就能看到。${pr.low.length ? `${esc(pr.low.join('、'))} 目前只做了一两篇，预测会往 60% 拉、偏保守，多做几篇会越来越准。` : ''}</p>
       <div class="dg-acts"><button class="btn primary" data-dghome>${ic('i-flame')}看今日计划</button></div></div>`;
   }
 

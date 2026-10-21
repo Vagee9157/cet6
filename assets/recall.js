@@ -185,7 +185,7 @@
     const learned = cardsOf(kind).filter((c) => b[c.id]).length;
     return `<div class="empty cd-empty">${ic('i-party')}${ses && ses.first ? `这一轮 ${ses.first} 张，一次答对 ${ses.right} 张。` : ''}今天${kind === 'tk' && theme.tk ? `「${esc(theme.tk)}」` : ''}没有到期的${KIND[kind].name}了。
       <span class="cd-stat">已学 ${learned}/${cardsOf(kind).length} · 明天到期 ${tm} 张</span>
-      ${fresh ? `<div class="empty-acts"><button class="btn primary" data-cdmore>${ic('i-redo')}再学 ${kind === 'tk' ? 10 : 5} 张新卡</button></div>` : ''}</div>`;
+      ${(() => { const other = kind === 'tk' ? 'hl' : 'tk', o = counts(other); const go = o.left ? `<button class="btn primary" data-cdother="${other}">${ic('i-chev-r')}接着做${KIND[other].name}（${o.left} 张）</button>` : ''; return go || fresh ? `<div class="empty-acts">${go}${fresh ? `<button class="btn${go ? '' : ' primary'}" data-cdmore>${ic('i-redo')}再学 ${kind === 'tk' ? 10 : 5} 张新卡</button>` : ''}</div>` : ''; })()}</div>`;
   }
   function html(kind) {
     if (!ses || ses.kind !== kind || (kind === 'tk' && ses.th !== theme.tk)) newSession(kind);
@@ -229,6 +229,7 @@
         const j = ses.q.findIndex((x, k) => k > ses.i && x.id === cur.id && x.again); if (j >= 0) ses.q.splice(j, 1);
         ses.res = Object.assign({}, ses.res, { ok: true, level: 'near', miss: [] }); paint(); if (onRerender) onRerender(); return;
       }
+      const co = e.target.closest('[data-cdother]'); if (co) { C().openWT(co.dataset.cdother); return; }
       if (e.target.closest('[data-cdmore]')) { extra[curKind] += curKind === 'tk' ? 10 : 5; ses = null; paint(); if (onRerender) onRerender(); return; }
     };
   }
