@@ -277,7 +277,9 @@
       .sort((a, b) => (S.vseen[a.id] || '').localeCompare(S.vseen[b.id] || '')).slice(0, 30).map((w) => w.id);
     const keep = S.daily && S.daily.d === d ? S.daily : null;
     const taken = new Set(keep ? [...keep.fresh, ...keep.review] : []);
-    const pool = shufBy(ALLWORDS.filter((w) => S.vocab[w.id] === undefined && !taken.has(w.id)), rnd).map((w) => w.id);
+    // 新词先抽「基础 + 核心」，抽完再进「高频」（组名以「高频 ·」开头的是高频档）
+    const fresh0 = shufBy(ALLWORDS.filter((w) => S.vocab[w.id] === undefined && !taken.has(w.id)), rnd);
+    const pool = [...fresh0.filter((w) => !/^高频 ·/.test(w.g)), ...fresh0.filter((w) => /^高频 ·/.test(w.g))].map((w) => w.id);
     // 当天改小「每日新词」：保留已刷过的，未刷的按新数量裁掉；改大则补新词
     const kept = keep ? (extra || S.vnew >= keep.fresh.length ? keep.fresh : (() => { const seen = keep.fresh.filter((id) => S.vseen[id] === d); return [...seen, ...keep.fresh.filter((id) => S.vseen[id] !== d)].slice(0, Math.max(S.vnew, seen.length)); })()) : [];
     const fresh = keep ? [...kept, ...pool.slice(0, extra ? 10 : Math.max(0, S.vnew - kept.length))] : pool.slice(0, S.vnew);
@@ -360,7 +362,10 @@
         <div class="ctl">每日新词 ${[10, 20, 30].map((n) => `<button class="chip" data-vnew="${n}" aria-pressed="${S.vnew === n}">${n}</button>`).join('')}</div></div>` : ''}
       ${wrong ? `<div class="vday card"><div class="vday-top"><div><b>生词本 ${wrongN} 个</b><span>点「不认识」「模糊」的词都在这里，最近标记的排在前面；点「认识」就移出生词本</span></div></div></div>` : ''}
       <div class="vt m-vocab${src !== 'topic' ? ' hide' : ''} ${vtOpen ? 'open' : ''}"><button class="vt-cur" id="vtToggle" aria-expanded="${vtOpen}"><span class="vt-lab">当前主题</span><b>${esc(grp.g)}</b><span class="vt-n">${gDone}/${grp.words.length}</span><span class="vt-sw">${vtOpen ? '收起' : '切换主题'}</span>${ic('i-chev-r')}</button>
-        <div class="vt-grid">${VOCAB.map((g, i) => { const d = g.words.filter((x, wi) => S.vocab[i + ':' + wi] === 2).length; return `<button class="vt-tile" data-vg="${i}" aria-pressed="${i === vg}"><span class="nm">${esc(g.g)}</span><span class="ct">${d}/${g.words.length}</span><span class="bar"><i style="width:${Math.round(d / g.words.length * 100)}%"></i></span></button>`; }).join('')}</div></div>
+        ${(() => { const tile = (g, i) => { const d = g.words.filter((x, wi) => S.vocab[i + ':' + wi] === 2).length; return `<button class="vt-tile" data-vg="${i}" aria-pressed="${i === vg}"><span class="nm">${esc(g.g.replace(/^(核心|高频) · /, ''))}</span><span class="ct">${d}/${g.words.length}</span><span class="bar"><i style="width:${Math.round(d / g.words.length * 100)}%"></i></span></button>`; };
+          // 主题按档分区：基础（原 20 组）/ 核心 / 高频
+          const tiers = [['基础', (g) => !/^(核心|高频) ·/.test(g.g)], ['核心词', (g) => /^核心 ·/.test(g.g)], ['高频词', (g) => /^高频 ·/.test(g.g)]];
+          return tiers.map(([n, f]) => { const ix = VOCAB.map((g, i) => [g, i]).filter(([g]) => f(g)); if (!ix.length) return ''; const tot = ix.reduce((a, [g]) => a + g.words.length, 0), kn = ix.reduce((a, [g, i]) => a + g.words.filter((x, wi) => S.vocab[i + ':' + wi] === 2).length, 0); return `<div class="vt-sec"><div class="vt-sh"><b>${n}</b><span>${ix.length} 组 · 认识 ${kn}/${tot}</span></div><div class="vt-grid">${ix.map(([g, i]) => tile(g, i)).join('')}</div></div>`; }).join(''); })()}</div>
       <div class="flash-wrap">
         <div class="flash-meta">${meta}</div>
         ${w ? `

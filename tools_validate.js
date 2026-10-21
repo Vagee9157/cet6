@@ -1,6 +1,6 @@
 // 题库自检：node tools_validate.js
 const fs=require('fs'),vm=require('vm');
-const files=['assets/data-outline.js','assets/data-vocab.js','assets/data-practice.js','assets/data-listening-2.js','assets/data-reading-2.js','assets/data-writing-2.js','assets/data-vocab-2.js','assets/data-listening-3.js','assets/data-reading-3.js','assets/data-reading-4.js','assets/data-writing-3.js','assets/data-writing-4.js','assets/data-vocab-3.js','assets/data-real.js','assets/data-vocab-ex.js'];
+const files=['assets/data-outline.js','assets/data-vocab.js','assets/data-practice.js','assets/data-listening-2.js','assets/data-reading-2.js','assets/data-writing-2.js','assets/data-vocab-2.js','assets/data-listening-3.js','assets/data-reading-3.js','assets/data-reading-4.js','assets/data-writing-3.js','assets/data-writing-4.js','assets/data-vocab-3.js','assets/data-real.js','assets/data-vocab-ex.js','assets/data-vocab-4.js'];
 const src=files.map(f=>fs.readFileSync(f,'utf8')).join('\n')+'\n;({VOCAB,LISTENING,READING,WRITING,TRANSLATION,CHAPTERS,REAL,VOCAB_EX})';
 const R=vm.runInContext(src,vm.createContext({window:{},console}));
 const errs=[];const e=(m)=>errs.push(m);

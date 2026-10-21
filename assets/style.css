@@ -1356,3 +1356,10 @@ body.ex-focus .ex-bar{top:env(safe-area-inset-top);margin-top:0}
 /* 回归修复：手机上进度数字带单位、练习记录显示题型 */
 @media (max-width:519px){.hs-cell .v small{display:inline!important;font-size:11px}}
 @media (max-width:480px){.hl{grid-template-columns:auto minmax(0,1fr) auto auto}.hl-k{display:inline-block}.hl-m{display:none}}
+/* ===== 单词主题按档分区（基础 / 核心 / 高频）===== */
+.vt-sec{display:none;margin-top:12px}
+.vt.open .vt-sec{display:block}
+.vt-sec .vt-grid{margin-top:6px}
+.vt-sh{display:flex;align-items:baseline;gap:10px;padding:0 2px}
+.vt-sh b{font-size:14px}
+.vt-sh span{font-size:12.5px;color:var(--ink-mute,var(--ink-dim))}
