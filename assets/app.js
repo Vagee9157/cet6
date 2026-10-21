@@ -445,6 +445,7 @@
           // 主题按档分区：基础（原 20 组）/ 核心 / 高频
           const tiers = [['基础', (g) => !/^(核心|高频) ·/.test(g.g)], ['核心词', (g) => /^核心 ·/.test(g.g)], ['高频词', (g) => /^高频 ·/.test(g.g)]];
           return tiers.map(([n, f]) => { const ix = VOCAB.map((g, i) => [g, i]).filter(([g]) => f(g)); if (!ix.length) return ''; const tot = ix.reduce((a, [g]) => a + g.words.length, 0), kn = ix.reduce((a, [g, i]) => a + g.words.filter((x, wi) => S.vocab[i + ':' + wi] === 2).length, 0); return `<div class="vt-sec"><div class="vt-sh"><b>${n}</b><span>${ix.length} 组 · 认识 ${kn}/${tot}</span></div><div class="vt-grid">${ix.map(([g, i]) => tile(g, i)).join('')}</div></div>`; }).join(''); })()}</div>
+      <div class="v-split">
       <div class="flash-wrap">
         <div class="flash-meta">${meta}</div>
         ${w && quizing ? quizHTML(w) : w ? `${vqz ? quizHTML(w) : ''}
@@ -456,11 +457,11 @@
         : empty}
         <div class="flash-sub"><button class="btn ghost" data-undo ${vhist.length ? '' : 'disabled'}>${ic('i-redo')}撤销上一个</button><span class="kbd-hint">${quizing ? (vqz.kind === 'mc' ? '1–4 选择 · Z 撤销' : '回车 提交 · Z 撤销') : vqz ? '回车 下一个 · Z 撤销' : '空格 翻面 · 1 / 2 / 3 标记 · S 朗读 · Z 撤销'}</span></div>
       </div>
-      <div class="sec-h"><h2 style="font-size:16px">${daily ? '今日单词表' : wrong ? '生词表' : '本组单词表'}</h2></div>
-      <div class="vocab-list">${listRows.map((x) => { const s = S.vocab[x.id]; return `<button class="vw ${s === 0 || s === 1 ? 'unknown' : s === 2 ? 'known' : ''}${daily && S.vseen[x.id] === dd ? ' done' : ''}${w && w.id === x.id ? ' cur' : ''}" data-vw="${x.id}"><span class="hd"><span class="w">${esc(x.w)}</span><span class="pos">${esc(x.p)}</span></span><span class="cn">${esc(x.c)}</span></button>`; }).join('')}</div>`;
+      <div class="v-list"><div class="sec-h"><h2 style="font-size:16px">${daily ? '今日单词表' : wrong ? '生词表' : '本组单词表'}</h2></div>
+      <div class="vocab-list">${listRows.map((x) => { const s = S.vocab[x.id]; return `<button class="vw ${s === 0 || s === 1 ? 'unknown' : s === 2 ? 'known' : ''}${daily && S.vseen[x.id] === dd ? ' done' : ''}${w && w.id === x.id ? ' cur' : ''}" data-vw="${x.id}"><span class="hd"><span class="w">${esc(x.w)}</span><span class="pos">${esc(x.p)}</span></span><span class="cn">${esc(x.c)}</span></button>`; }).join('')}</div></div></div>`;
     $('#vocab-box').onclick = (e) => {
       // 点单词表里的词：卡片切到这个词（不在当前队列就插到当前位置），滚回卡片
-      const vw = e.target.closest('[data-vw]'); if (vw) { const id = vw.dataset.vw; const k = vq.findIndex((x, i) => i >= vi && x.id === id); if (k === -1) vq.splice(vi, 0, wordOf(id)); else if (k > vi) { const [x] = vq.splice(k, 1); vq.splice(vi, 0, x); } flipped = false; renderVocab(); $('.flash-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+      const vw = e.target.closest('[data-vw]'); if (vw) { const id = vw.dataset.vw; const k = vq.findIndex((x, i) => i >= vi && x.id === id); if (k === -1) vq.splice(vi, 0, wordOf(id)); else if (k > vi) { const [x] = vq.splice(k, 1); vq.splice(vi, 0, x); } flipped = false; renderVocab(); const fw = $('.flash-wrap'), ft = fw.getBoundingClientRect().top; if (ft < 50 || ft > innerHeight * 0.45) fw.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
       const vs = e.target.closest('[data-vsrc]'); if (vs) { S.vsrc = vs.dataset.vsrc; save(); vq = []; vhist = []; renderVocab(); return; }
       if (e.target.closest('[data-vgame]')) { S.vgame = Object.assign(S.vgame || {}, { on: true }); save(); renderVocab(); return; }
       const vn = e.target.closest('[data-vnew]'); if (vn) { S.vnew = +vn.dataset.vnew; S.vnewAuto = false; save(); vq = []; renderVocab(); return; }
@@ -1102,24 +1103,24 @@
     if (wsub === 'tk' || wsub === 'hl') body = '<div id="cdBox"></div>';
     else if (wsub === 'write') {
       const w = WRITING[wsel]; const shown = !!reveal[w.id];
-      body = `${wtPickHTML(true)}
+      body = `${wtPickHTML(true)}<div class="wt-split"><div class="wt-l">
         <div class="prompt m-write"><div class="lab">题目 · ${esc(w.title.split('·')[0].trim())}</div>${esc(w.prompt)}${w.chart && window.writingChart ? window.writingChart(w.chart) : ''}</div>
-        ${answerBox(w.id, true)}
         <details class="wt-outline m-write"><summary>${ic('i-target')}卡住了？看提纲</summary>
           <div class="steps m-write">${w.outline.map((o, i) => `<div class="st"><span class="n">${i + 1}</span><span>${esc(o)}</span></div>`).join('')}</div></details>
         <div class="reveal"><button class="btn tone m-write" data-reveal="${w.id}" aria-expanded="${shown}">${ic('i-eye')}${shown ? '收起范文' : '对照范文'}</button></div>
         ${shown ? `<div class="sec-h"><span class="ico m-write">${ic('i-eye')}</span><h2 style="font-size:16px">范文</h2><span class="more">高亮 = 可以抄进模板的句式</span></div>
         <div class="sample m-write">${hl(w.sample, w.hl)}</div>
-        <div class="notes m-write">${w.notes.map((n) => `<div class="nt">${ic('i-bulb')}<span>${esc(n)}</span></div>`).join('')}</div>` : ''}`;
+        <div class="notes m-write">${w.notes.map((n) => `<div class="nt">${ic('i-bulb')}<span>${esc(n)}</span></div>`).join('')}</div>` : ''}</div>
+        <div class="wt-r">${answerBox(w.id, true)}</div></div>`;
     } else {
       const t = TRANSLATION[tsel]; const shown = !!reveal[t.id];
       body = `${wtPickHTML(false)}
-        <div class="prompt m-trans"><div class="lab">汉译英 · ${esc(t.theme)}</div><span class="zh" style="font-family:var(--ui);line-height:1.9">${esc(t.zh)}</span></div>
+        <div class="wt-split"><div class="wt-l"><div class="prompt m-trans"><div class="lab">汉译英 · ${esc(t.theme)}</div><span class="zh" style="font-family:var(--ui);line-height:1.9">${esc(t.zh)}</span></div>
         <div class="sec-h"><span class="ico m-trans">${ic('i-abc')}</span><h2 style="font-size:16px">关键词</h2></div>
         <div class="keys">${t.keys.map((k) => { const m = k.match(/^(.*?)\s+([A-Za-z(].*)$/); const zh = m ? m[1] : '', en = m ? m[2] : k; return `<span class="chip">${esc(en)}${zh ? `<i>${esc(zh)}</i>` : ''}</span>`; }).join('')}</div>
-        ${answerBox(t.id, false, enWords(t.en))}
         <div class="reveal"><button class="btn tone m-trans" data-reveal="${t.id}" aria-expanded="${shown}">${ic('i-eye')}${shown ? '收起参考译文' : '对照参考译文'}</button></div>
-        ${shown ? `<div class="sample m-trans">${esc(t.en)}</div><div class="notes m-trans">${t.notes.map((n) => `<div class="nt">${ic('i-bulb')}<span>${esc(n)}</span></div>`).join('')}</div>` : ''}`;
+        ${shown ? `<div class="sample m-trans">${esc(t.en)}</div><div class="notes m-trans">${t.notes.map((n) => `<div class="nt">${ic('i-bulb')}<span>${esc(n)}</span></div>`).join('')}</div>` : ''}</div>
+        <div class="wt-r">${answerBox(t.id, false, enWords(t.en))}</div></div>`;
     }
     $('#wt-box').innerHTML = `<div class="wt-body">${hint && wsub !== 'tk' && wsub !== 'hl' ? wtHintBar(hint) : ''}${tabs + body}</div>`;
     if ($('#cdBox')) RC.mount($('#cdBox'), wsub, () => { const t = $('#wt-box .wt-tabs'); if (t) t.outerHTML = wtTabsHTML(); });

@@ -1153,7 +1153,7 @@ mark.loc{background:color-mix(in srgb,var(--amber) 38%,transparent);color:inheri
 .wt-panel{margin-top:10px;padding:12px;border-radius:var(--r-s);background:var(--paper);box-shadow:var(--shadow)}
 .wt-filt{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:8px}
 .wt-filt>span{font-size:12px;font-weight:800;color:var(--ink-mute,var(--ink-dim));width:3em}
-.wt-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr));gap:8px;max-height:min(60vh,520px);overflow:auto;padding:2px;margin-top:6px}
+.wt-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr));gap:8px;max-height:min(60dvh,520px);overflow:auto;padding:2px;margin-top:6px}
 .wt-item{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;padding:9px 34px 10px 12px;border-radius:12px;background:var(--paper-2);border:1.5px solid transparent;min-height:48px}
 .wt-item:hover{border-color:var(--line-2)}
 .wt-item.on{border-color:var(--c);background:var(--cs)}
@@ -1620,7 +1620,7 @@ body.ex-focus .ex-bar{top:env(safe-area-inset-top);margin-top:0}
 @media (max-width:599px){.drill-grid{gap:6px}.drill{padding:10px 10px;align-items:center;text-align:center}.drill .d{display:none}.drill b{font-size:14px}.drill .t{font-size:11.5px;padding-top:2px}}
 .dl-prog{display:flex;align-items:center;gap:10px;font-size:12.5px;font-weight:700;color:var(--ink-dim);margin-bottom:10px;font-variant-numeric:tabular-nums}
 .dl-prog .bar{flex:1}
-.dl-stem{position:sticky;top:calc(70px + env(safe-area-inset-top));z-index:5;margin-bottom:12px;border-left:4px solid var(--c);max-height:46vh;overflow:auto}
+.dl-stem{position:sticky;top:calc(70px + env(safe-area-inset-top));z-index:5;margin-bottom:12px;border-left:4px solid var(--c);max-height:46dvh;overflow:auto}
 @media (max-width:719px){.dl-stem{top:calc(62px + env(safe-area-inset-top))}}
 .dl-stem .kind{font-size:11.5px;font-weight:800;color:var(--c);letter-spacing:.03em}
 .dl-stem .qt{font-weight:700;font-size:15px;margin:4px 0 2px;line-height:1.55}
@@ -1853,3 +1853,164 @@ body:has(.rt-sw[data-rt-tap][aria-pressed="true"]) #practice-box :is(.passage,.s
 .hm-exam-on>svg:last-child{margin-left:auto}
 /* 复习判定题进行中：先藏起下面的单词表（带中文释义，会剧透答案） */
 #vocab-box:has(.vq) .vocab-list,#vocab-box:has(.vq) .sec-h:has(+ .vocab-list){display:none}
+
+/* ===================================================================
+   iPad 优先适配（平板是一等公民）
+   断点体系（宽度，CSS px）：
+     < 720        手机 / 分屏 1/3（底部 tab 栏）
+     720 – 767    小平板 / 分屏一半（顶栏 tab，单列为主）
+     768 – 1023   平板竖屏（单词卡｜单词表、阅读文｜题、听力交卷后原文｜题 并排；模考左侧窄导航）
+     900+         写译 题目/范文｜作答框 并排
+     1024 – 1279  平板横屏 / 小桌面（首页 hero｜周报 并排、计划 3 列）
+     1280+        桌面
+   触屏判断只看 (pointer:coarse) / (hover:none)，不看 UA（iPadOS 默认用桌面 UA）
+   =================================================================== */
+@media (min-width:1100px){.wrap{max-width:1140px}}
+@media (min-width:1280px){.wrap{max-width:1200px}}
+/* 安全区：横屏 home indicator / 左右圆角，standalone 下底部不被遮 */
+@media (min-width:720px){main{padding-bottom:calc(60px + env(safe-area-inset-bottom))}}
+body.ex-focus main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
+.mini-au{padding-right:max(14px,env(safe-area-inset-right))}
+/* 双击不放大、点按不延迟 */
+button,a,summary,label,.flash,.blank,.vw{touch-action:manipulation}
+
+/* ---------- 单词：平板 卡片｜单词表 并排 ---------- */
+@media (min-width:600px){.vq-opts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:768px){
+  .v-split{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:22px;align-items:start;margin-top:4px}
+  .v-split>.flash-wrap{max-width:none;margin:0;position:sticky;top:calc(76px + env(safe-area-inset-top));max-height:calc(100dvh - 88px - env(safe-area-inset-top));overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;padding:2px 2px 12px}
+  .v-split>.flash-wrap::-webkit-scrollbar{display:none}
+  .v-list>.sec-h{margin-top:0}
+  .v-list .vocab-list{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-top:0}
+  /* 判定题进行中单词表藏起来（防剧透），卡片单列居中 */
+  .v-split:has(.vq){grid-template-columns:minmax(0,1fr)}
+  .v-split:has(.vq)>.flash-wrap{position:static;max-height:none;overflow:visible;max-width:640px;margin:0 auto;width:100%}
+  .v-split:has(.vq)>.v-list{display:none}
+}
+@media (min-width:768px) and (max-height:860px){.v-split .flash .inner,.v-split .face{min-height:260px}}
+
+/* ---------- 听读 ---------- */
+/* 听力单列做题：选项 2×2，一屏多看几题 */
+@media (min-width:768px){
+  #practice-box:not(:has(> .passage + .q-list)) > .q-list .opts{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #practice-box:not(:has(> .passage + .q-list)) > .q-list .opt{align-items:flex-start}
+  .player.au{grid-template-columns:56px minmax(0,1fr) auto}
+  .player.au .ttl{grid-column:2/4}
+  .player.au .seek{grid-column:2/4}
+  .player.au .ctl{grid-column:2/4}
+  .player.au .note{grid-column:2/4}
+}
+/* 听力交卷后：原文｜题目 并排（原来 ≥1024 才并排） */
+@media (min-width:768px){
+  #practice-box#practice-box:has(> .lr-split){max-width:none}
+  .lr-split{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);column-gap:18px;align-items:start}
+  .lr-src{position:sticky;top:calc(76px + env(safe-area-inset-top));max-height:calc(100dvh - 96px - env(safe-area-inset-top));overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+  .lr-src > .sec-h{margin-top:0}
+  .lr-src .script > p{max-width:none}
+}
+/* 选词填空词库：平板上紧凑的两行网格（每格按词长伸缩铺满一行），不横滑 */
+@media (min-width:768px){
+  #practice-box .bank:not(.rt-pick):not(.done){display:flex;flex-wrap:wrap;gap:6px;max-height:none;overflow:visible;padding:8px 0}
+  #practice-box .bank:not(.rt-pick):not(.done) .chip{flex:1 1 auto;justify-content:center;padding:6px 8px;font-size:12.5px;min-height:44px;min-width:0}
+}
+/* 单列阅读（选词填空 / 听力原文）行宽不超过 72ch */
+#practice-box:has(> .prac-head) .passage p,#practice-box:has(> .prac-head) .script > p{max-width:72ch}
+@media (min-width:768px){#practice-box:has(> .prac-head):not(:has(> .passage + .q-list)) > .passage{padding-left:max(18px,calc((100% - 72ch) / 2));padding-right:max(18px,calc((100% - 72ch) / 2))}}
+
+/* ---------- 写译：≥900 题目 / 范文｜作答框 并排 ---------- */
+.wt-split{display:flex;flex-direction:column}
+.wt-l{display:contents}
+.wt-l > *{order:3}
+.wt-l > .prompt,.wt-l > .sec-h:has(+ .keys),.wt-l > .keys{order:1}
+.wt-r{order:2}
+@media (min-width:900px){
+  .wt-body:has(.wt-split){max-width:none}
+  .wt-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:20px;align-items:start}
+  .wt-l{display:block;min-width:0}
+  .wt-l > .prompt{margin-top:0}
+  .wt-r{position:sticky;top:calc(76px + env(safe-area-inset-top));min-width:0}
+  .wt-r > .wt-ans{margin:0;max-height:calc(100dvh - 92px - env(safe-area-inset-top));overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+  .wt-r .wt-ta{height:clamp(260px,calc(100dvh - 300px - env(safe-area-inset-top) - env(safe-area-inset-bottom)),760px);resize:none}
+  .wt-l .sample,.wt-l .prompt{max-width:72ch}
+}
+
+/* ---------- 模考：≥768 左侧导航（可收成窄条） ---------- */
+.ex-rail-t{display:none}
+@media (min-width:768px){
+  .ex-layout{display:grid;grid-template-columns:184px minmax(0,1fr);gap:18px;align-items:start}
+  .ex-side{position:sticky;top:calc(var(--exbar,64px) + 12px + env(safe-area-inset-top));margin:0;max-height:calc(100dvh - var(--exbar,64px) - 24px - env(safe-area-inset-top));overflow:auto;padding:2px}
+  .ex-side .ex-ptabs{grid-template-columns:1fr;margin:0;gap:8px}
+  .ex-side .ex-ptab{padding:10px 12px}
+  .ex-side .ex-ptab .t{font-size:15px}
+  .ex-side .ex-ptab .s{flex-direction:column;line-height:1.35}
+  .ex-side-r{display:block;margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)}
+  .ex-side-r .ex-rtabs{flex-direction:column;flex-wrap:nowrap;gap:6px;margin:0;overflow:visible;padding:0}
+  .ex-side-r .chip{width:100%;justify-content:flex-start;text-align:left;white-space:normal}
+  .ex-side-r .chip .c{margin-left:auto}
+  .ex-main .ex-rtabs{display:none}
+  .ex-rail-t{display:flex;align-items:center;gap:6px;width:100%;min-height:40px;margin:0 0 8px;padding:6px 10px;border-radius:10px;color:var(--ink-mute);font-size:13px;font-weight:700}
+  .ex-rail-t:hover{background:var(--paper-2)}
+  /* 窄条：只留部分编号 + 剩余时间色条 */
+  .ex-rail-min .ex-layout{grid-template-columns:60px minmax(0,1fr)}
+  .ex-rail-min .ex-rail-t{justify-content:center;padding:6px 0}
+  .ex-rail-min .ex-rail-t span{display:none}
+  .ex-rail-min .ex-side .ex-ptab{padding:8px 0;align-items:center;min-height:52px}
+  .ex-rail-min .ex-side .ex-ptab .t{font-size:0;gap:0}
+  .ex-rail-min .ex-side .ex-ptab .t i{display:inline;font-size:15px;color:var(--c)}
+  .ex-rail-min .ex-side .ex-ptab .s{display:none}
+  .ex-rail-min .ex-side-r{display:none}
+  .ex-rail-min .ex-main .ex-rtabs{display:flex}
+  .ex-on .wt-ta{min-height:max(280px,42dvh)}
+}
+@media (min-width:1024px){
+  .ex-layout{grid-template-columns:220px minmax(0,1fr);gap:22px}
+  .ex-rail-min .ex-layout{grid-template-columns:60px minmax(0,1fr)}
+}
+/* 横屏写作 / 翻译：题目｜作答框 并排，作答框用满高度 */
+@media (min-width:1100px) and (min-aspect-ratio:1/1){
+  .ex-on .ex-col{max-width:none;display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:18px;align-items:start}
+  .ex-on .ex-col > .prompt{margin:0;position:sticky;top:calc(var(--exbar,64px) + 12px + env(safe-area-inset-top));max-height:calc(100dvh - var(--exbar,64px) - 28px);overflow:auto}
+  .ex-on .ex-col > .wt-ans{margin:0}
+  .ex-on .ex-col .wt-ta{height:calc(100dvh - var(--exbar,64px) - 120px - env(safe-area-inset-top) - env(safe-area-inset-bottom));min-height:300px;resize:none}
+}
+
+/* ---------- 首页 ---------- */
+/* 计划卡：最后一行不满时拉伸铺满，不留单个空格 */
+@media (min-width:520px){
+  .hm-plan.lp-plan{display:flex;flex-wrap:wrap}
+  .hm-plan.lp-plan > *{flex:1 1 calc(50% - var(--hm-gap,12px));min-width:0}
+}
+@media (min-width:960px){.hm-plan.lp-plan > *{flex-basis:calc(33.33% - var(--hm-gap,12px))}}
+/* 横屏：hero｜周报 并排，计划进首屏 */
+@media (min-width:1024px){
+  #home-box:has(> .hm-hero + .lw-card){display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);column-gap:14px;align-items:stretch}
+  #home-box:has(> .hm-hero + .lw-card) > *{grid-column:1/-1}
+  #home-box > .hm-hero:has(+ .lw-card){grid-column:1;grid-template-columns:1fr;margin-bottom:0}
+  #home-box > .hm-hero + .lw-card{grid-column:2;margin:4px 0 0}
+  #home-box > .hm-hero + .lw-card .lw-nums{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+/* ---------- 触屏：≥44px、按下反馈、hover 内容常显 ---------- */
+@media (pointer:coarse){
+  .cause-row .chip,.rt-tools .chip,.loc-btn,.ex-rail-t,.hm-quick button,.hm-quick a,.wt-outline>summary,.split-bar button{min-height:44px}
+  .loc-btn{padding:4px 14px}
+  .spk.sm,.face .spk.sm,.vq-w .spk,.lw-h .x,.wp-ic{min-width:44px;min-height:44px}
+  .mini-au .play{width:44px;height:44px}
+  .mini-au .chip{min-height:44px}
+  details>summary{min-height:44px}
+  .dl-opts>summary{display:flex;align-items:center}
+  label:has(> input[type=checkbox]),label:has(> input[type=radio]){min-height:44px;display:inline-flex;align-items:center;gap:8px}
+  input[type=checkbox],input[type=radio]{width:20px;height:20px}
+  /* 输入框 ≥16px：iPadOS Safari 聚焦时不自动放大 */
+  input:not([type=checkbox]):not([type=radio]):not([type=range]),textarea,select{font-size:max(16px,1em)}
+  :is(.chip,.opt,.vq-opt,.set,.vw,.hm-mod,.lp-task,.drill,.vt-tile,.vg-game,.rec-card,.ex-ptab,.letters button,.res-nums button,.lr-list li,.vg-opt){transition:transform .1s,background-color .12s,border-color .12s}
+  :is(.chip,.opt,.vq-opt,.set,.vw,.hm-mod,.lp-task,.drill,.vt-tile,.vg-game,.rec-card,.ex-ptab,.letters button,.res-nums button,.vg-opt):active:not(:disabled){transform:scale(.97)}
+  .btn:active:not(:disabled){transform:scale(.96);filter:brightness(.96)}
+}
+/* 外接键盘：按过键就显示快捷键提示（iPad 也是 hover:none，原来一直藏着） */
+html.kbd .flash-sub .kbd-hint,html.kbd .kbd-tip{display:inline}
+html.kbd .dd-kbd{display:revert}
+/* 长按查词：按住期间关掉原生选字，避免和 iPadOS 选择手柄 / 放大镜抢手势 */
+html.rt-hold #practice-box :is(.passage,.script){-webkit-user-select:none;user-select:none}
+.wt-ans{scroll-margin-top:calc(80px + env(safe-area-inset-top))}
+.ex-p-read #exRd > .passage p{margin-left:auto;margin-right:auto}

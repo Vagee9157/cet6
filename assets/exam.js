@@ -516,10 +516,11 @@
     }
     // 左侧（宽屏）/ 顶部（手机）导航：各部分 + 阅读的小节；真考顺序下只显示进度，不能点
     const ptabs = `<div class="ex-ptabs" role="tablist" style="--n:${idx.length}">${idx.map((i) => { const q = PARTS[i]; const st = free ? '' : i < e.part ? ' done' : ''; return `<button class="ex-ptab ${q.mod}${i === e.part ? ' on' : ''}${e.locked[i] ? ' lock' : ''}${st}" role="tab" ${free ? `data-expart="${i}"` : 'disabled'} aria-selected="${i === e.part}"><span class="t"><i>${q.no}</i>${q.n}</span><span class="s">${tabStat(e, i)}</span></button>`; }).join('')}</div>`;
-    const side = `<aside class="ex-side">${ptabs}${p.k === 'read' && Pp.R.length ? `<div class="ex-side-r" id="exSideR">${rtabsHTML(e, Pp)}</div>` : ''}</aside>`;
+    // 平板（≥768px）左侧导航可收成窄条（S.exRail = 'min'），手机上导航在顶部、没有这个按钮
+    const side = `<aside class="ex-side"><button class="ex-rail-t" data-exrail aria-label="${C().S.exRail === 'min' ? '展开导航' : '收起导航'}" aria-expanded="${C().S.exRail !== 'min'}">${ic(C().S.exRail === 'min' ? 'i-chev-r' : 'i-chev-l')}<span>收起</span></button>${ptabs}${p.k === 'read' && Pp.R.length ? `<div class="ex-side-r" id="exSideR">${rtabsHTML(e, Pp)}</div>` : ''}</aside>`;
     const box = $('#exam-box');
     document.body.classList.add('ex-focus');
-    box.innerHTML = `<div class="ex-wrap ex-on ex-p-${p.k}${lk ? ' ex-lockd' : ''}">${bar}<div class="ex-layout">${side}<div class="ex-main">${note}${lockBar}${body}${foot}</div></div></div>`;
+    box.innerHTML = `<div class="ex-wrap ex-on ex-p-${p.k}${lk ? ' ex-lockd' : ''}${C().S.exRail === 'min' ? ' ex-rail-min' : ''}">${bar}<div class="ex-layout">${side}<div class="ex-main">${note}${lockBar}${body}${foot}</div></div></div>`;
     box.onclick = onExamClick; box.oninput = onExamInput; box.onchange = null;
     sizeBar(); startTick();
     if (p.k === 'listen') { if (!lk && !e.lis.done && axSi !== e.lis.i && !axReplay) axLoad(e.lis.i, e.lis.t); paintLis(); }
@@ -613,6 +614,7 @@
   }
   function onExamClick(ev) {
     const t = ev.target, e = E(); if (!e) return;
+    const rl = t.closest('[data-exrail]'); if (rl) { const S0 = C().S; S0.exRail = S0.exRail === 'min' ? '' : 'min'; C().save(); const min = S0.exRail === 'min'; const w = $('#exam-box .ex-wrap'); if (w) w.classList.toggle('ex-rail-min', min); rl.setAttribute('aria-expanded', !min); rl.setAttribute('aria-label', min ? '展开导航' : '收起导航'); rl.innerHTML = `${ic(min ? 'i-chev-r' : 'i-chev-l')}<span>收起</span>`; return; }
     // 暂停并返回：停表、停录音、存好作答和各部分剩余时间，回模考首页（首页点「继续上次模考」接着做）
     if (t.closest('[data-expause]')) { leave(); e.paused = Date.now(); C().save(); mode = 'home'; render(); window.scrollTo(0, 0); return; }
     const nb = t.closest('[data-exnext]'); if (nb) {

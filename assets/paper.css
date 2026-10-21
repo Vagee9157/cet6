@@ -206,3 +206,11 @@ table.score tr.tot td { font-weight: 700; }
 /* 答题卡 1：写作区要放得下 200 词（≥ 20 行），行距收到 6.6mm、准考证号涂卡格压扁一点腾空间 */
 .lines.ticks div { height: 6.6mm; }
 .card .zkz td { height: 2.7mm; line-height: 2.7mm; }
+
+/* iPad / 触屏：工具条按钮 ≥44px，standalone 时顶栏避开状态栏、左右避开圆角 */
+.bar { padding-top: max(10px, env(safe-area-inset-top)); padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+@media screen and (pointer: coarse) {
+  .bar button, .bar a, .bar label { min-height: 44px; }
+  .bar input[type=checkbox] { width: 20px; height: 20px; }
+  .bar input:not([type=checkbox]) { font-size: 16px; }
+}
