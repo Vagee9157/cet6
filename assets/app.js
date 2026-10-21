@@ -104,47 +104,35 @@
   ];
   let splitSel = '';
   const splitInfo = (sp) => `<b>${sp.n} · ${sp.pts} 分</b><span>${sp.tip}</span>`;
-  // 今天的四件事：按真实行为判定完成，点卡片只负责跳转
-  // 单词 = 今日队列刷完；听力 / 阅读 = 当天有该类型交卷记录（S.sets[id].d，旧记录退回 at）；范文 = 当天展开过「对照范文 / 参考译文」（写译页打点 S.plan[日期].wt）
-  function planStatus() {
-    const d = lday(), p = dailyPlan();
-    const kinds = new Set(Object.entries(S.sets).filter(([, s]) => s && (s.d || s.at) === d).map(([id]) => { const f = findSet(id); return f ? (f.kind === 'listen' ? 'listen' : 'read') : ''; }));
-    const vDone = p.order.filter((id) => S.vseen[id] === d).length;
-    return { vDone, vTot: p.order.length, vocab: p.order.length > 0 && vDone >= p.order.length, listen: kinds.has('listen'), read: kinds.has('read'), wt: !!(S.plan[d] && S.plan[d].wt) };
-  }
   const chDone = (c) => c.points.filter((p, i) => S.mastered[ptKey(c, i)]).length;
+  // 首页：hero 显示预测分（assets/learn.js predict）、今日计划（planToday，按考试日期分阶段 + 提分排行生成，完成按真实数据判定）、上周周报、提分排行
   function renderHome() {
-    const st = stats(); const ps = planStatus();
-    // 四件事：标题一行 + 进度一行，长说明去掉
-    const plan = [
-      { id: 'vocab', mod: 'vocab', t: `背 ${S.vnew} 个新词 + 复习`, p: ps.vTot ? `${ps.vDone}/${ps.vTot}` : '今日无词', f: ps.vTot ? ps.vDone / ps.vTot : 1, view: 'vocab' },
-      { id: 'listen', mod: 'listen', t: '做 1 篇听力', p: ps.listen ? '1/1' : '0/1', f: ps.listen ? 1 : 0, view: 'practice', sub: 'listen' },
-      { id: 'read', mod: 'read', t: '做 1 篇阅读', p: ps.read ? '1/1' : '0/1', f: ps.read ? 1 : 0, view: 'practice', sub: 'read' },
-      { id: 'wt', mod: 'write', t: '读 1 篇范文', p: ps.wt ? '1/1' : '0/1', f: ps.wt ? 1 : 0, view: 'wt' },
-    ];
-    const nDone = plan.filter((p) => ps[p.id]).length;
-    const next = plan.find((p) => !ps[p.id]);
+    const st = stats(), L = window.CET6Learn;
+    const hi = L.heroInfo(), pr = hi.pr, sk = hi.streak;
+    const pl = L.planToday(), nextI = pl.tasks.findIndex((t) => !t.done);
+    const dMin = window.CET6Exam && window.CET6Exam.diagMinutes ? window.CET6Exam.diagMinutes() : 60;
     const exams = Array.isArray(S.exams) ? S.exams : [];
     const lastEx = exams.length ? exams[exams.length - 1] : null;
     const sp = SPLIT.find((s) => s.k === splitSel);
     const stat = (cls, v, l, unit) => `<div class="hs-cell ${cls}"><div class="v">${v}${unit ? `<small>${unit}</small>` : ''}</div><div class="l">${l}</div></div>`;
+    const meta = [hi.days >= 0 ? `距考试 <b>${hi.days}</b> 天` : '', sk.n ? `连续学习 <b>${sk.n}</b> 天${sk.todayOn ? '' : '（今天还没学）'}` : ''].filter(Boolean).join(' · ');
+    const heroTx = pr.ready
+      ? `<h1 class="hm-pred">预测 <b>${pr.total}</b><small> / 710</small></h1><p>${pr.gap500 ? `离 500 还差 <b>${pr.gap500}</b> 分` : '预测已过 500，保持住'}${meta ? ' · ' + meta : ''}</p>`
+      : `<h1>目标 <b>500</b>，先测一下现在几分</h1><p>做一次约 ${dMin} 分钟的诊断（讲座、长对话、仔细阅读、段落匹配、翻译各一篇），测完给出预测分、提分重点和每日计划。${meta ? '<br>' + meta : ''}</p>`;
+    const acts = pr.ready
+      ? `${nextI >= 0 ? `<button class="btn w" data-lgo="${nextI}">${ic('i-flame')}继续今天的计划</button>` : `<button class="btn w" data-go="practice">${ic('i-ear')}今天完成了，加练一篇</button>`}<button class="btn" data-go="exam">${ic('i-clip')}在线模考</button>`
+      : `<button class="btn w" data-diag>${ic('i-target')}做一次诊断（约 ${dMin} 分钟）</button><button class="btn" data-go="exam">${ic('i-clip')}在线模考</button>`;
     $('#home-box').innerHTML = `
       <section class="hm-hero">
-        <div class="hm-hero-tx">
-          <h1>目标 <b>500</b>，按分值分配精力</h1>
-          <p>先练稳仔细阅读和讲座，写作翻译用模板保底。</p>
-        </div>
-        <div class="hm-hero-acts">
-          ${next ? `<button class="btn w" data-go="${next.view}" data-plan="${next.id}" data-sub="${next.sub || ''}">${ic('i-flame')}继续今天的任务</button>` : `<button class="btn w" data-go="practice">${ic('i-ear')}开始练习</button>`}
-          <button class="btn" data-go="exam">${ic('i-clip')}在线模考</button>
-        </div>
-        <div class="hm-quick"><span>快捷入口</span><button data-go="vocab">${ic('i-abc')}背单词</button><button data-go="outline">${ic('i-target')}看考点</button><a href="paper.html">${ic('i-pen')}打印模拟卷</a></div>
+        <div class="hm-hero-tx">${heroTx}</div>
+        <div class="hm-hero-acts">${acts}</div>
+        <div class="hm-quick"><span>快捷入口</span><button data-go="vocab">${ic('i-abc')}背单词</button><button data-go="outline">${ic('i-target')}看考点</button>${pr.ready ? `<button data-diag>${ic('i-redo')}重做诊断</button>` : `<a href="paper.html">${ic('i-pen')}打印模拟卷</a>`}</div>
       </section>
-
-      <div class="sec-h hm-h"><span class="ico m-exam">${ic('i-flame')}</span><h2>今天的四件事</h2><span class="more">${nDone}/4 完成</span></div>
-      <div class="hm-plan">${plan.map((p, i) => `<button class="hm-task ${MOD[p.mod]} ${ps[p.id] ? 'done' : ''}" data-plan="${p.id}" data-go="${p.view}" data-sub="${p.sub || ''}"><span class="n">${ps[p.id] ? ic('i-check') : i + 1}</span><b>${esc(p.t)}</b><span class="pg"><span class="bar"><i style="width:${Math.round(p.f * 100)}%"></i></span><span class="tx">${ps[p.id] ? '已完成' : esc(p.p)}</span></span></button>`).join('')}</div>
+      ${L.weekHTML()}
+      ${L.planHTML()}
 
       <div class="sec-h hm-h"><span class="ico m-read">${ic('i-target')}</span><h2>我的进度</h2></div>
+      ${L.rankHTML(pr)}
       <div class="hm-stats">
         ${stat('m-vocab', st.known, '认识的词', '/' + ALLWORDS.length)}
         ${stat('m-read', st.setsDone, '做过的练习')}
@@ -165,7 +153,9 @@
       <div id="outline-anchor"></div>
       <div id="outline-box" hidden></div>
       <div id="past-box" hidden></div>`;
+    $('#home-box').onchange = (e) => { L.homeChange(e); };
     $('#home-box').onclick = (e) => {
+      if (e.target.closest('#outline-box,#past-box') ) { /* 考点 / 真题索引有自己的处理 */ } else if (L.homeClick(e)) return;
       // 分值条：只换说明，不重绘整页（手机上折叠面板保持展开）
       // 再点同一段收起说明
       const sb = e.target.closest('[data-split]'); if (sb) { splitSel = splitSel === sb.dataset.split ? '' : sb.dataset.split; const s2 = SPLIT.find((s) => s.k === splitSel); document.querySelectorAll('[data-split]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.split === splitSel)); const info = $('.hm-split-info'); info.hidden = !s2; info.className = 'hm-split-info ' + (s2 ? MOD[s2.k] : ''); info.innerHTML = s2 ? splitInfo(s2) : ''; return; }
@@ -202,7 +192,7 @@
     // 勾「这条我记住了」：只局部更新标签和进度数字，不重绘、不收起其他卡片、不跳滚动
     $('#outline-box').onchange = (e) => {
       const k = e.target.dataset.master; if (!k) return;
-      if (e.target.checked) S.mastered[k] = 1; else delete S.mastered[k]; save();
+      if (e.target.checked) S.mastered[k] = lday(); else delete S.mastered[k]; save();
       const tt = e.target.closest('details.pt').querySelector('.pt-title'), tg = tt.querySelector('.tag.mst');
       if (e.target.checked && !tg) tt.insertAdjacentHTML('beforeend', MASTER_TAG); else if (!e.target.checked && tg) tg.remove();
       const cc = $('#chCount'); if (cc) cc.textContent = `${chDone(c)}/${c.points.length} 已掌握`;
@@ -635,10 +625,12 @@
     if (f.kind === 'cloze') { let a = 0; while (a < f.set.answers.length - 1 && cur.ans[a]) a++; cur.active = a; }
     startTimer(d ? d.el : 0); renderSet(); jumpTop(0);
   }
-  function recordSet(id, r, t, wrongs, rights, sec) {
-    S.sets[id] = { r, t, at: today(), d: lday(), sec };
-    const f = findSet(id); if (f) { S.hist.push({ id, kind: f.kind, title: f.set.title, r, t, sec, d: lday(), ts: Date.now() }); if (S.hist.length > 600) S.hist = S.hist.slice(-600); }
-    rights.forEach((k) => { delete S.wrong[k]; }); wrongs.forEach((w) => { S.wrong[w.key] = w; });
+  // sub = 题型细分（assets/learn.js subOf），via = 'exam' / 'diag'（模考 / 诊断交卷）；错题的 due / streak / 错因由 CET6Learn.applyResult 维护
+  function recordSet(id, r, t, wrongs, rights, sec, via) {
+    const L = window.CET6Learn, sub = L ? L.subOf(id) : '';
+    S.sets[id] = { r, t, at: today(), d: lday(), sec, sub };
+    const f = findSet(id); if (f) { const h = { id, kind: f.kind, sub, title: f.set.title, r, t, sec, d: lday(), ts: Date.now() }; if (via) h.via = via; S.hist.push(h); if (S.hist.length > 600) S.hist = S.hist.slice(-600); }
+    if (L) L.applyResult(wrongs, rights); else { rights.forEach((k) => { delete S.wrong[k]; }); wrongs.forEach((w) => { S.wrong[w.key] = w; }); }
     delete S.drafts[id]; save();
   }
   // 模考报告里「看解析 / 定位原文 / 听这句」：在听读页按交卷状态打开这一篇（带模考里的作答），返回键回模考报告
@@ -721,6 +713,17 @@
     return s.replace(/\[(\d+)\]/g, (m, n) => (+n === i + 1 ? '____' : clozeWord(set, set.answers[+n - 1]))).replace(/\s+([,.;:!?])/g, '$1');
   }
 
+  // 错题下面一排错因（单选，assets/learn.js 统一处理点击）
+  const causeRow = (key, kind) => (window.CET6Learn ? window.CET6Learn.causeHTML(key, kind) : '');
+  // 解析里引用的原文位置（错题重测定位段落 / 录音片段用）：返回 { units, hits: [单元 k] }
+  function qLoc(kind, set, i) {
+    const units = srcUnits(kind, set); if (!units.length) return null;
+    const toks = tokIndex(units), exp = kind === 'match' ? (set.items[i] && set.items[i].exp) || '' : (set.questions[i] && set.questions[i].exp) || '';
+    const re = /["“]([^"”]{6,})["”]/g; const hits = []; let mm;
+    while ((mm = re.exec(exp))) { const h = findQuote(toks, mm[1]); if (h) { hits.push(units[h.a.ui].k); if (h.b.ui !== h.a.ui) hits.push(units[h.b.ui].k); } }
+    return { units, hits };
+  }
+
   /* ---------- 做题页 ---------- */
   function renderSet() {
     const { kind, set, ans, done } = cur; const mod = kind === 'listen' ? 'm-listen' : 'm-read';
@@ -737,7 +740,7 @@
     const ctx = done ? { kind, units, toks: tokIndex(units) } : null;
     const vd = (ok, p) => `<b class="vd ${ok ? 'ok' : 'bad'}">${ok ? '✓ 答对' : p === undefined ? '✗ 未作答' : '✗ 答错'}</b>`;
     const qcls = (ok) => done ? (ok ? ' is-right' : ' is-wrong') : '';
-    const mcq = (qs) => `<div class="q-list">${qs.map((q, i) => { const p = ans[i]; return `<div class="q ${mod}${qcls(p === q.a)}" id="q-${i}"><div class="qt"><span class="n">${i + 1}</span><span>${esc(q.q)}</span></div><div class="opts">${q.opts.map((o, k) => { let cls = 'opt'; if (done) { if (k === q.a) cls += ' right'; else if (k === p) cls += ' wrong'; } else if (k === p) cls += ' picked'; return `<button class="${cls}" data-q="${i}" data-k="${k}" ${done ? 'disabled' : ''}><span class="k">${K[k]}</span><span>${esc(o)}</span></button>`; }).join('')}</div>${done ? `<div class="exp">${vd(p === q.a, p)} · 正确答案 ${K[q.a]}。${expHTML(q.exp, ctx)}</div>` : ''}</div>`; }).join('')}</div>`;
+    const mcq = (qs) => `<div class="q-list">${qs.map((q, i) => { const p = ans[i]; return `<div class="q ${mod}${qcls(p === q.a)}" id="q-${i}"><div class="qt"><span class="n">${i + 1}</span><span>${esc(q.q)}</span></div><div class="opts">${q.opts.map((o, k) => { let cls = 'opt'; if (done) { if (k === q.a) cls += ' right'; else if (k === p) cls += ' wrong'; } else if (k === p) cls += ' picked'; return `<button class="${cls}" data-q="${i}" data-k="${k}" ${done ? 'disabled' : ''}><span class="k">${K[k]}</span><span>${esc(o)}</span></button>`; }).join('')}</div>${done ? `<div class="exp">${vd(p === q.a, p)} · 正确答案 ${K[q.a]}。${expHTML(q.exp, ctx)}${p !== q.a ? causeRow(set.id + ':' + i, kind) : ''}</div>` : ''}</div>`; }).join('')}</div>`;
     let body = '';
     if (kind === 'listen') {
       if (AUD(set.id)) loadAudio(set.id);
@@ -750,7 +753,7 @@
       body = `${foldWrap(`<div class="passage">${set.text.split('\n').map((p, i) => `<p data-pk="${i}">${esc(p)}</p>`).join('')}</div>`, '原文')}${mcq(set.questions)}`;
     } else if (kind === 'match') {
       body = `${foldWrap(`<div class="passage">${set.paras.map(([l, p]) => `<p data-pk="${l}"><span class="pl">${l}</span>${esc(p)}</p>`).join('')}</div>`, '原文')}
-        <div class="q-list">${set.items.map((it, i) => { const p = ans[i]; return `<div class="q m-read${qcls(p === it.a)}" id="q-${i}"><div class="qt"><span class="n">${i + 1}</span><span>${esc(it.s)}</span></div><div class="letters">${set.paras.map(([l]) => { let cls = ''; if (done) { if (l === it.a) cls = 'right'; else if (l === p) cls = 'wrong'; } else if (l === p) cls = 'picked'; return `<button class="${cls}" data-q="${i}" data-l="${l}" ${done ? 'disabled' : ''}>${l}</button>`; }).join('')}</div>${done ? `<div class="exp">${vd(p === it.a, p)} · 答案 <b>${it.a}</b> 段${p !== undefined && p !== it.a ? `（你选 ${p}）` : ''}。${it.exp ? expHTML(it.exp, ctx) : ''} <button class="loc-btn" data-para="${it.a}">${ic('i-target')}定位到 ${it.a} 段</button></div>` : ''}</div>`; }).join('')}</div>`;
+        <div class="q-list">${set.items.map((it, i) => { const p = ans[i]; return `<div class="q m-read${qcls(p === it.a)}" id="q-${i}"><div class="qt"><span class="n">${i + 1}</span><span>${esc(it.s)}</span></div><div class="letters">${set.paras.map(([l]) => { let cls = ''; if (done) { if (l === it.a) cls = 'right'; else if (l === p) cls = 'wrong'; } else if (l === p) cls = 'picked'; return `<button class="${cls}" data-q="${i}" data-l="${l}" ${done ? 'disabled' : ''}>${l}</button>`; }).join('')}</div>${done ? `<div class="exp">${vd(p === it.a, p)} · 答案 <b>${it.a}</b> 段${p !== undefined && p !== it.a ? `（你选 ${p}）` : ''}。${it.exp ? expHTML(it.exp, ctx) : ''} <button class="loc-btn" data-para="${it.a}">${ic('i-target')}定位到 ${it.a} 段</button>${p !== it.a ? causeRow(set.id + ':' + i, kind) : ''}</div>` : ''}</div>`; }).join('')}</div>`;
     } else if (kind === 'cloze') {
       const used = new Set(Object.values(ans));
       const W = (L) => esc(clozeWord(set, L));
@@ -760,7 +763,7 @@
       body = `<div class="bank${done ? ' done' : ''}">${set.bank.map((b) => { const L = b[0]; return `<button class="chip ${used.has(L) ? 'used' : ''}" data-bank="${L}" ${done ? 'disabled' : ''}>${esc(b)}</button>`; }).join('')}</div>
         ${done ? '' : '<p class="lead">先点空格，再点上面的词；点已填的空可以改。</p>'}
         <div class="passage">${html.split('\n').map((p) => `<p>${p}</p>`).join('')}</div>
-        ${done ? `<div class="q-list cloze-exp">${set.exp.map((e, i) => { const ok = ans[i] === set.answers[i]; return `<div class="exp${qcls(ok)}" id="q-${i}x">${vd(ok, ans[i])} · <b>${i + 1}. ${set.answers[i]} ${W(set.answers[i])}</b>${ok || ans[i] === undefined ? '' : `（你填 ${ans[i]} ${W(ans[i])}）`}　${esc(e)}</div>`; }).join('')}</div>` : ''}`;
+        ${done ? `<div class="q-list cloze-exp">${set.exp.map((e, i) => { const ok = ans[i] === set.answers[i]; return `<div class="exp${qcls(ok)}" id="q-${i}x">${vd(ok, ans[i])} · <b>${i + 1}. ${set.answers[i]} ${W(set.answers[i])}</b>${ok || ans[i] === undefined ? '' : `（你填 ${ans[i]} ${W(ans[i])}）`}　${esc(e)}${ok ? '' : causeRow(set.id + ':' + i, kind)}</div>`; }).join('')}</div>` : ''}`;
     }
     // 真实原文（美国政府机构公有领域文章）注明出处
     if (set.url && kind !== 'listen') body += `<p class="lead src-note">原文：<a href="${esc(set.url)}" target="_blank" rel="noopener">${esc(set.source || set.org)}</a>（美国政府作品，公有领域；仅按篇幅删节，未改写句子）</p>`;
@@ -897,7 +900,7 @@
         <div class="wt-bar"><span class="lab">${isW ? '我的作文' : '我的译文'}</span><span class="wt-clock" id="wtClock"></span><button class="chip" data-wtclock="${id}">${ic('i-timer')}计时 30 分钟</button></div>
         <textarea class="wt-ta" data-wtid="${id}" rows="${isW ? 12 : 9}" spellcheck="false" autocapitalize="sentences" placeholder="${isW ? '先列提纲再动笔，在这里写 150–200 词……' : '先自己译，再对照参考译文……'}">${esc(S.wt[id] || '')}</textarea>
         <div class="wt-count" id="wtCount">${wtCountHTML(id, isW, ref)}</div>
-        ${window.CET6Grade ? `<div class="wt-grade"><button class="btn soft" data-wtgrade="${id}">${ic('i-target')}估分</button><span>规则估分：字数、切题、词汇、句式等，可复制给 AI 细评</span></div><div class="wt-gres" id="wtGrade"></div>` : ''}
+        ${window.CET6Grade ? `<div class="wt-grade"><button class="btn soft" data-wtgrade="${id}">${ic('i-target')}估分</button><span>规则估分：字数、切题、词汇、句式等，可复制给 AI 细评；每次估分都记进预测分</span></div><div class="wt-gres" id="wtGrade"></div>` : ''}
       </div>`;
   }
   // 从首页真题卡点「练写作 / 练翻译」会带 S.wtHint 过来：10 分钟内有效，顶部提示这套真题的题目，并预选最接近的一篇（每个 hint 只预选一次）
@@ -959,7 +962,7 @@
       // 展开范文 / 参考译文才算完成首页的「读 1 篇范文」
       const r = e.target.closest('[data-reveal]'); if (r) { reveal[r.dataset.reveal] = !reveal[r.dataset.reveal]; if (reveal[r.dataset.reveal]) { const d = lday(); S.plan[d] = Object.assign(S.plan[d] || {}, { wt: 1 }); save(); } renderWT(); if (reveal[r.dataset.reveal]) { const sm = $('#wt-box .sample'); if (sm) sm.scrollIntoView({ behavior: 'smooth', block: 'start' }); } return; }
       // 估分：assets/grade.js 规则估分（同模考报告），结果显示在作答框下
-      const gb = e.target.closest('[data-wtgrade]'); if (gb && window.CET6Grade) { const isW = wsub === 'write', item = isW ? WRITING[wsel] : TRANSLATION[tsel], id = gb.dataset.wtgrade; window.CET6Grade.mount($('#wtGrade'), isW ? 'write' : 'trans', item, S.wt[id] || '', { aiIcon: ic('i-clip'), getText: () => S.wt[id] || '' }); return; }
+      const gb = e.target.closest('[data-wtgrade]'); if (gb && window.CET6Grade) { const isW = wsub === 'write', item = isW ? WRITING[wsel] : TRANSLATION[tsel], id = gb.dataset.wtgrade; const gr = window.CET6Grade.mount($('#wtGrade'), isW ? 'write' : 'trans', item, S.wt[id] || '', { aiIcon: ic('i-clip'), getText: () => S.wt[id] || '' }); if (gr && (S.wt[id] || '').trim() && window.CET6Learn) window.CET6Learn.logWt(isW ? 'write' : 'trans', id, gr, 'wt'); return; }
       const c = e.target.closest('[data-wtclock]'); if (c) { const id = c.dataset.wtclock; wtClock = wtClock && wtClock.id === id ? null : { id, end: Date.now() + 30 * 60 * 1000 }; clearInterval(wtTick); syncClock(); if (wtClock) wtTick = setInterval(syncClock, 1000); }
     };
     $('#wt-box').oninput = (e) => {
@@ -1028,6 +1031,7 @@
       ${w.ctx ? `<div class="ctx">${gap(w.ctx)}</div>` : ''}
       <div class="wi-ans">${mine}<div class="wi-right"><span>正确答案</span><b>${esc(w.a)}</b></div></div>
       ${w.e ? `<div class="e">${esc(w.e)}</div>` : ''}
+      ${window.CET6Learn ? window.CET6Learn.wrongExtraHTML(w) : ''}
       <div class="wi-act">${can ? `<button class="btn soft" data-wgo="${esc(wrongSet(w))}">${ic('i-redo')}回原题</button>` : ''}<button class="btn ghost" data-wdel="${esc(w.key)}">${ic('i-check')}已掌握</button></div>
     </div>`;
   }
@@ -1072,6 +1076,7 @@
         <div class="num m-exam"><div class="v">${st.m}/${totalPts}</div><div class="l">考点已掌握</div></div>
       </div>
       <div class="sec-h"><span class="ico m-read">${ic('i-x')}</span><h2>错题本</h2>${wrongs.length ? `<button class="more" data-clear>清空</button>` : ''}</div>
+      ${window.CET6Learn ? window.CET6Learn.meTopHTML() + window.CET6Learn.causeChartHTML() : ''}
       ${wrongs.length ? groups.map(([k, xs]) => `<div class="wrong-grp"><div class="wg-h">${WK[k]}<span>${xs.length}</span></div>${xs.map(wrongHTML).join('')}</div>`).join('') : `<div class="empty">${ic('i-party')}还没有错题。</div>`}
       ${histHTML()}
       <div class="sec-h"><span class="ico m-vocab">${ic('i-abc')}</span><h2>生词本</h2>${unknownWords.length ? `<button class="more" data-go-vocab>去复习 ${ic('i-chev-r')}</button>` : ''}</div>
@@ -1108,6 +1113,7 @@
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `cet6-backup-${today()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); return;
       }
       if (e.target.closest('#files-box')) return;
+      if (e.target.closest('[data-rtgo]') && window.CET6Learn) { window.CET6Learn.openRetest(); return; }
       if (e.target.closest('[data-go-vocab]')) { if (S.vgame) S.vgame.on = false; S.vsrc = 'wrong'; save(); vq = []; show('vocab'); }
       if (e.target.closest('[data-clear]') && confirm('清空错题本？')) { S.wrong = {}; save(); renderMe(); }
       const wg = e.target.closest('[data-wgo]'); if (wg) { goSet(wg.dataset.wgo); return; }
@@ -1120,6 +1126,12 @@
 
   /* ---------- 给模考页（assets/exam.js）用的最小接口 ---------- */
   window.CET6 = { S, save, esc, ic, lday, today, show, findSet, marksOf, wrongsOf, recordSet, reviewSet, clozeWord, enWords, hl, AUD, stopAudio, mmss, isPhone };
+  /* ---------- 给学习闭环（assets/learn.js）用的接口 ---------- */
+  Object.assign(window.CET6, {
+    qLoc, clozeCtx, goSet, renderHome, openOutline: (ch) => { show('home'); openOutline(ch); },
+    openVocabDaily: () => { if (S.vgame) S.vgame.on = false; if (S.vsrc !== 'daily') { S.vsrc = 'daily'; vq = []; } save(); show('vocab'); },
+    openWT: (sub) => { show('wt', true); renderWT(sub); },
+  });
   /* ---------- 给单词小游戏（assets/vgame.js）用的接口 ---------- */
   // 游戏标记：答错 → 不认识（今天刷过、清掉认识阶段）；答对且原来是「不认识」→ 升为「模糊」，不直接标认识
   const gameMark = (id, ok) => {
@@ -1131,6 +1143,7 @@
   Object.assign(window.CET6, { VOCAB, ALLWORDS, exOf, hlWord, speak, dailyPlan, isWrong, wordOf, shuffle, gameMark, renderVocab });
 
   /* ---------- 启动 ---------- */
+  if (window.CET6Learn) window.CET6Learn.init();   // 旧记录补 sub、错题补 due / streak（幂等）
   if ('speechSynthesis' in window) speechSynthesis.getVoices();
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   const start = location.hash.slice(1);

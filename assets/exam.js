@@ -37,6 +37,7 @@
   const isAll = (sel) => SEL_KEYS.every((k) => sel[k]);
   // 模块标签：完整模考 / 听力+阅读 / 听力(讲座)+阅读(仔细阅读)
   function tagOf(x) {
+    if (x && x.diag) return '诊断';
     if (!x || x.mode !== 'custom') return '完整模考';
     const sel = x.sel || {};
     return PARTS.filter((p) => partOn(sel, p.k)).map((p) => { const ks = SECS[p.k]; if (!ks || ks.every((k) => sel[k])) return p.n; return `${p.n}(${ks.filter((k) => sel[k]).map((k) => SEL_NAME[k]).join('·')})`; }).join('+');
@@ -63,21 +64,26 @@
   let tickId = 0, lastTick = 0, saveAt = 0, taT = 0, clozeActive = -1, repY = 0;
   const partY = {};
 
+  // sel[k] 可以是数字：只取这一题型抽到的前 n 篇（诊断用：讲座 1 / 长对话 1 / 仔细阅读 1）
+  const take = (sel, k, xs) => (typeof sel[k] === 'number' ? xs.slice(0, sel[k]) : xs);
+  // 诊断：讲座 1 篇 + 长对话 1 篇 + 仔细阅读 1 篇 + 段落匹配 1 篇 + 翻译（自由顺序，时间按估算）
+  const DIAG_SEL = { write: false, conv: 1, pas: false, lec: 1, cloze: false, match: true, mc: 1, trans: true };
+
   /* ---------- 卷面：题号 / 分节（只排所选题型，题号连续） ---------- */
   function build(ids, sel) {
     const d = CET6Draw.fromIds(ids); if (!d) return null;
     sel = sel || allSel();
     let n = 0; const L = [];
-    [['conv', d.conv], ['pas', d.pas], ['lec', d.lec]].forEach(([sec, xs]) => { if (sel[sec]) xs.forEach((set) => { L.push({ sec, set, n0: n + 1 }); n += set.questions.length; }); });
+    [['conv', d.conv], ['pas', d.pas], ['lec', d.lec]].forEach(([sec, xs]) => { if (sel[sec]) take(sel, sec, xs).forEach((set) => { L.push({ sec, set, n0: n + 1 }); n += set.questions.length; }); });
     const nL = n, R = [];
     const addR = (key, kind, set, t, lab) => { R.push({ key, kind, set, t, n0: n + 1, lab }); n += t; };
     if (sel.cloze) addR('cloze', 'cloze', d.cloze, d.cloze.answers.length, ['Section A', '选词填空']);
     if (sel.match) addR('match', 'match', d.match, d.match.items.length, ['Section B', '段落匹配']);
-    if (sel.mc) d.mc.forEach((s, i) => addR('mc' + i, 'mc', s, s.questions.length, ['Section C', `仔细阅读 ${['One', 'Two', 'Three'][i]}`]));
+    if (sel.mc) take(sel, 'mc', d.mc).forEach((s, i) => addR('mc' + i, 'mc', s, s.questions.length, ['Section C', `仔细阅读 ${['One', 'Two', 'Three'][i]}`]));
     const shown = [...(sel.write ? [d.W.id] : []), ...L.map((x) => x.set.id), ...R.map((x) => x.set.id), ...(sel.trans ? [d.T.id] : [])];
     return { d, L, nL, R, nR: n - nL, sel, shown };
   }
-  const selKey = (sel) => SEL_KEYS.map((k) => (sel && sel[k] ? 1 : 0)).join('');
+  const selKey = (sel) => SEL_KEYS.map((k) => (sel && typeof sel[k] === 'number' ? 'n' + sel[k] : sel && sel[k] ? 1 : 0)).join('');
   const paper = (ids, sel) => { const k = ids.join(',') + '|' + selKey(sel || allSel()); if (k !== pKey) { P = build(ids, sel); pKey = k; } return P; };
   const marks = (kind, set, ans) => C().marksOf({ kind, set, ans: ans || {} });
   // 写作 / 翻译自动估分（只存分数和档，分项建议报告里现算）
@@ -123,9 +129,9 @@
   /* ---------- 时间估算：写作 30、翻译 30；听力 = 所选各段考试节奏录音时长合计 + 2 分钟；阅读 选词 7 / 匹配 15 / 仔细每篇 9 ---------- */
   const audDur = (set) => { const m = C().AUD(set.id); return m && m.dur ? m.dur : words(set.script || '') / 150 * 60 + set.questions.length * 15 + 10; };
   function estimate(d, sel) {
-    const lis = [...(sel.conv ? d.conv : []), ...(sel.pas ? d.pas : []), ...(sel.lec ? d.lec : [])];
+    const lis = [...(sel.conv ? take(sel, 'conv', d.conv) : []), ...(sel.pas ? take(sel, 'pas', d.pas) : []), ...(sel.lec ? take(sel, 'lec', d.lec) : [])];
     const lsec = lis.reduce((a, s) => a + audDur(s), 0);
-    return [sel.write ? 30 : 0, lis.length ? Math.ceil((lsec + 120) / 60) : 0, (sel.cloze ? 7 : 0) + (sel.match ? 15 : 0) + (sel.mc ? 9 * d.mc.length : 0), sel.trans ? 30 : 0];
+    return [sel.write ? 30 : 0, lis.length ? Math.ceil((lsec + 120) / 60) : 0, (sel.cloze ? 7 : 0) + (sel.match ? 15 : 0) + (sel.mc ? 9 * take(sel, 'mc', d.mc).length : 0), sel.trans ? 30 : 0];
   }
   // 各部分时限（秒）：完整模考固定 30/30/40/30；自选按估算，±adj 分钟按比例摊到各部分
   function limits(d, sel, adj, full) {
@@ -274,13 +280,14 @@
   const prefSel = (pf) => (pf.mode === 'full' ? allSel() : pf.sel);
 
   /* ---------- 开始 / 换部分 / 交卷 ---------- */
-  function newExam(seed) {
-    const S = C().S; const fresh = S.drawFresh !== false, pf = pref(), full = pf.mode === 'full';
-    const sel = full ? allSel() : Object.assign({}, pf.sel);
+  function newExam(seed, opt) {
+    const diag = !!(opt && opt.diag);
+    const S = C().S; const fresh = S.drawFresh !== false, pf = pref(), full = !diag && pf.mode === 'full';
+    const sel = diag ? Object.assign({}, DIAG_SEL) : full ? allSel() : Object.assign({}, pf.sel);
     const p = CET6Draw.paperOf(seed, S, fresh);
-    const lim = limits(p.d, sel, pf.adj, full);
+    const lim = limits(p.d, sel, diag ? 0 : pf.adj, full);
     const Pp = build(p.ids, sel);
-    S.exam = { seed: +seed, ids: p.ids, fresh: p.fresh, d: C().lday(), ts: Date.now(), mode: full ? 'full' : 'custom', sel, order: pf.strict ? 'strict' : 'free', part: selIdx(sel)[0], lim, left: lim.slice(), locked: [0, 0, 0, 0], ans: { write: '', trans: '', L: {}, R: {} }, lis: { i: 0, t: 0, played: [], started: false, done: false }, replay: homeReplay, stem: false, rsec: Pp && Pp.R[0] ? Pp.R[0].key : 'cloze', note: '' };
+    S.exam = { diag, seed: +seed, ids: p.ids, fresh: p.fresh, d: C().lday(), ts: Date.now(), mode: full ? 'full' : 'custom', sel, order: pf.strict && !diag ? 'strict' : 'free', part: selIdx(sel)[0], lim, left: lim.slice(), locked: [0, 0, 0, 0], ans: { write: '', trans: '', L: {}, R: {} }, lis: { i: 0, t: 0, played: [], started: false, done: false }, replay: diag ? false : homeReplay, stem: false, rsec: Pp && Pp.R[0] ? Pp.R[0].key : 'cloze', note: '' };
     presetSeed = 0; nextSeed = 0; axSi = -1; axReplay = false; AX.pause(); AX.removeAttribute('src');
     Object.keys(partY).forEach((k) => delete partY[k]);
     C().save(); mode = 'exam'; render(); window.scrollTo(0, 0);
@@ -310,16 +317,20 @@
     const Pp = build(e.ids, e.sel);
     if (!Pp) { delete S.exam; C().save(); mode = 'home'; return render(); }
     // 听力 / 阅读各篇：记进 S.sets（做过）、S.hist（练习记录）、S.wrong（错题，格式与练习交卷一致）
-    const rec1 = (kind, set, ans) => { const ms = marks(kind, set, ans); const { wrongs, rights } = C().wrongsOf(kind, set, ans || {}); wrongs.forEach((w) => { w.exam = e.seed; }); C().recordSet(set.id, ms.filter(Boolean).length, ms.length, wrongs, rights); };
+    const via = e.diag ? 'diag' : 'exam';
+    const rec1 = (kind, set, ans) => { const ms = marks(kind, set, ans); const { wrongs, rights } = C().wrongsOf(kind, set, ans || {}); wrongs.forEach((w) => { w.exam = e.seed; }); C().recordSet(set.id, ms.filter(Boolean).length, ms.length, wrongs, rights, undefined, via); };
     Pp.L.forEach((x, si) => rec1('listen', x.set, e.ans.L[si]));
     Pp.R.forEach((x) => rec1(x.kind, x.set, e.ans.R[x.key]));
     // 作文 / 译文：写译页对应题目还空着就存进去（写译页也算写过）
     S.wt = S.wt || {};
     if (e.sel.write && e.ans.write.trim() && !(S.wt[Pp.d.W.id] || '').trim()) S.wt[Pp.d.W.id] = e.ans.write;
     if (e.sel.trans && e.ans.trans.trim() && !(S.wt[Pp.d.T.id] || '').trim()) S.wt[Pp.d.T.id] = e.ans.trans;
-    const rec = { v: 2, seed: e.seed, d: C().lday(), ts: Date.now(), start: e.ts, ids: e.ids.slice(), shown: Pp.shown, fresh: e.fresh, mode: e.mode, sel: Object.assign({}, e.sel), order: e.order, ans: e.ans, self: { write: null, trans: null }, lim: e.lim.slice(), used: PARTS.map((p, i) => Math.round(e.lim[i] - e.left[i])), auto: !!auto };
+    const rec = { v: 2, diag: !!e.diag, seed: e.seed, d: C().lday(), ts: Date.now(), start: e.ts, ids: e.ids.slice(), shown: Pp.shown, fresh: e.fresh, mode: e.mode, sel: Object.assign({}, e.sel), order: e.order, ans: e.ans, self: { write: null, trans: null }, lim: e.lim.slice(), used: PARTS.map((p, i) => Math.round(e.lim[i] - e.left[i])), auto: !!auto };
     rec.ag = agOf(Pp, rec.ans, rec.sel);
     applySc(rec, scoreOf(Pp, rec.ans, rec.self, rec.ag));
+    // 写译估分记进 S.wtScore（同 ts，报告里手动改档会同步过去）；没写的不记
+    const LN = window.CET6Learn;
+    if (LN) { if (rec.sel.write && rec.ans.write.trim()) LN.logWt('write', Pp.d.W.id, G().writing(rec.ans.write, Pp.d.W), via, rec.ts); if (rec.sel.trans && rec.ans.trans.trim()) LN.logWt('trans', Pp.d.T.id, G().translation(rec.ans.trans, Pp.d.T), via, rec.ts); }
     S.exams = Array.isArray(S.exams) ? S.exams : []; S.exams.push(rec); if (S.exams.length > 60) S.exams = S.exams.slice(-60);
     CET6Draw.recordPaper(e.seed, 'online', e.ids, e.fresh, S);
     delete S.exam; C().save();
@@ -386,6 +397,7 @@
         </ul>
       </div>
       ${cont}
+      ${diagCard()}
       <div class="card ex-start">
         <div class="ex-start-h"><div><b>${e ? '开一套新的' : '开始一套新模考'}</b><span>卷号 <code>${esc(seed)}</code>${presetSeed ? '（打印版带过来的）' : exams.length || e ? '（和上一套零重合）' : ''} · <a href="paper.html?seed=${encodeURIComponent(seed)}">打印这套</a></span></div>
           <button class="btn ghost ex-swap" data-exswap="${esc(seed)}">${ic('i-redo')}换一套</button></div>
@@ -424,6 +436,7 @@
         if (C().S.exam && !twoStep(t.closest('[data-exseed]'), '再点放弃进行中的')) return;
         newExam(+v); return;
       }
+      const dg = t.closest('[data-exdiag]'); if (dg) { if (!C().S.exam || twoStep(dg, '再点一次放弃进行中的，开始诊断')) newExam(getNext(), { diag: true }); return; }
       const rp = t.closest('[data-exrep]'); if (rp) { openReport(+rp.dataset.exrep); }
     };
     box.onchange = (ev) => {
@@ -442,6 +455,26 @@
     btn.dataset.armed = Date.now(); const old = btn.innerHTML; btn.innerHTML = esc(txt); btn.classList.add('armed');
     setTimeout(() => { if (btn.isConnected) { btn.innerHTML = old; btn.classList.remove('armed'); delete btn.dataset.armed; } }, 4000);
     return false;
+  }
+
+  /* ---------- 诊断：入口卡 / 时长 / 从首页开始 ---------- */
+  let diagMinCache = null;
+  function diagMinutes() {
+    const S = C().S, seed = getNext(); if (!seed) return 60;
+    if (diagMinCache && diagMinCache[0] === seed) return diagMinCache[1];
+    const d = CET6Draw.paperOf(seed, S, S.drawFresh !== false).d;
+    const m = Math.round(limits(d, DIAG_SEL, 0, false).reduce((a, b) => a + b, 0) / 60);
+    diagMinCache = [seed, m]; return m;
+  }
+  function diagCard() {
+    const xs = (C().S.exams || []).filter((x) => x && x.diag), last = xs[xs.length - 1];
+    return `<div class="card ex-diag m-exam"><div class="tx"><span class="kind">诊断 · 约 ${diagMinutes()} 分钟</span><b>${last ? '再做一次诊断' : '先做一次诊断'}</b><span>讲座 1 篇 + 长对话 1 篇 + 仔细阅读 1 篇 + 段落匹配 1 篇 + 翻译，测完给出各题型水平、预测分和提分重点，首页每日计划按它排。${last ? `上次 ${esc(last.d)}。` : ''}</span></div>
+      <button class="btn primary" data-exdiag>${ic('i-target')}${last ? '重做诊断' : '开始诊断'}</button></div>`;
+  }
+  // 首页「做一次诊断」：有进行中的模考就停在模考首页（让用户自己选继续还是放弃）
+  function startDiag() {
+    if (C().S.exam) { mode = 'home'; C().show('exam'); const t = $('#exTip'); if (t) t.textContent = '有一套进行中的模考：继续做完，或在上面「诊断」卡片里放弃它再开始诊断。'; return; }
+    C().show('exam', true); newExam(getNext(), { diag: true });
   }
 
   /* ---------- 考试页 ---------- */
@@ -636,6 +669,16 @@
     const s = v >= 500 ? `达到 500 目标，稳住。` : v >= 425 ? `过了 425 线，离 500 还差 ${500 - v} 分。` : `离 425 线还差 ${425 - v} 分。`;
     return sc.full ? s : `所选部分得分率 ${Math.round(sc.rate * 100)}%，按比例折算约 ${v} 分（估算）。${s}`;
   }
+  const cause = (key, kind) => (window.CET6Learn ? window.CET6Learn.causeHTML(key, kind) : '');
+  // 诊断报告顶部：本次各题型得分率 + 预测分 + 建议重点（assets/learn.js diagHTML）
+  function diagBlock(rec, sc) {
+    if (!rec.diag || !window.CET6Learn) return '';
+    const lv = {}; const map = { conv: 'conv', pas: 'passage', lec: 'lecture', mc: 'mc', match: 'match', cloze: 'cloze' };
+    Object.entries(sc.sec).forEach(([k, v]) => { if (v.t) lv[map[k]] = v.r / v.t; });
+    if (rec.sel.trans) lv.trans = wtScore(rec.self, rec.ag, 'trans') / 15;
+    if (rec.sel.write) lv.write = wtScore(rec.self, rec.ag, 'write') / 15;
+    return window.CET6Learn.diagHTML(lv);
+  }
   function renderReport() {
     const rec = repOf(repTs); migrate(rec); const Pp = build(rec.ids, rec.sel);
     const box = $('#exam-box');
@@ -654,14 +697,15 @@
     const lisHTML = Pp.L.map((x, si) => {
       const a = rec.ans.L[si] || {}, ms = marks('listen', x.set, a);
       return `<div class="ex-rset m-listen"><div class="ex-rsh"><span class="kind">${SEC_L[x.sec][0]} · ${SEC_L[x.sec][1]}</span><b>${esc(x.set.title.replace(/^[^·]+·\s*/, ''))}</b><span class="sc">${ms.filter(Boolean).length}/${ms.length}</span><button class="btn soft m-listen" data-exrev="L:${si}">${ic('i-play')}原文 · 听这句</button></div>
-        <div class="ex-qds">${x.set.questions.map((q, qi) => qd(x.n0 + qi, ms[qi], ms[qi] ? `答对 ${K[q.a]}` : `${mine(a[qi], (v) => K[v])} · 答案 ${K[q.a]}`, `<b>${esc(q.q)}</b><br>${K[q.a]}) ${esc(q.opts[q.a])}<br>${esc(q.exp)}`)).join('')}</div></div>`;
+        <div class="ex-qds">${x.set.questions.map((q, qi) => qd(x.n0 + qi, ms[qi], ms[qi] ? `答对 ${K[q.a]}` : `${mine(a[qi], (v) => K[v])} · 答案 ${K[q.a]}`, `<b>${esc(q.q)}</b><br>${K[q.a]}) ${esc(q.opts[q.a])}<br>${esc(q.exp)}${ms[qi] ? '' : cause(x.set.id + ':' + qi, 'listen')}`)).join('')}</div></div>`;
     }).join('');
     const rdHTML = Pp.R.map((x) => {
       const a = rec.ans.R[x.key] || {}, ms = marks(x.kind, x.set, a), s = x.set;
       const rows = ms.map((ok, i) => {
-        if (x.kind === 'cloze') { const ans = s.answers[i]; return qd(x.n0 + i, ok, ok ? `答对 ${ans} ${esc(clozeWord(s, ans))}` : `${a[i] ? '你填 ' + a[i] + ' ' + esc(clozeWord(s, a[i])) : '未作答'} · 答案 ${ans} ${esc(clozeWord(s, ans))}`, esc(s.exp[i] || '')); }
-        if (x.kind === 'match') { const it = s.items[i]; return qd(x.n0 + i, ok, ok ? `答对 ${esc(it.a)} 段` : `${a[i] ? '你选 ' + esc(a[i]) + ' 段' : '未作答'} · 答案 ${esc(it.a)} 段`, `<b>${esc(it.s)}</b>${it.exp ? '<br>' + esc(it.exp) : ''}`); }
-        const q = s.questions[i]; return qd(x.n0 + i, ok, ok ? `答对 ${K[q.a]}` : `${mine(a[i], (v) => K[v])} · 答案 ${K[q.a]}`, `<b>${esc(q.q)}</b><br>${K[q.a]}) ${esc(q.opts[q.a])}<br>${esc(q.exp)}`);
+        const cz = ok ? '' : cause(s.id + ':' + i, x.kind);
+        if (x.kind === 'cloze') { const ans = s.answers[i]; return qd(x.n0 + i, ok, ok ? `答对 ${ans} ${esc(clozeWord(s, ans))}` : `${a[i] ? '你填 ' + a[i] + ' ' + esc(clozeWord(s, a[i])) : '未作答'} · 答案 ${ans} ${esc(clozeWord(s, ans))}`, esc(s.exp[i] || '') + cz); }
+        if (x.kind === 'match') { const it = s.items[i]; return qd(x.n0 + i, ok, ok ? `答对 ${esc(it.a)} 段` : `${a[i] ? '你选 ' + esc(a[i]) + ' 段' : '未作答'} · 答案 ${esc(it.a)} 段`, `<b>${esc(it.s)}</b>${it.exp ? '<br>' + esc(it.exp) : ''}${cz}`); }
+        const q = s.questions[i]; return qd(x.n0 + i, ok, ok ? `答对 ${K[q.a]}` : `${mine(a[i], (v) => K[v])} · 答案 ${K[q.a]}`, `<b>${esc(q.q)}</b><br>${K[q.a]}) ${esc(q.opts[q.a])}<br>${esc(q.exp)}${cz}`);
       }).join('');
       return `<div class="ex-rset m-read"><div class="ex-rsh"><span class="kind">${x.lab[0]} · ${esc(x.lab[1])}</span><b>${esc(s.title.replace(/^[^·]+·\s*/, ''))}</b><span class="sc">${ms.filter(Boolean).length}/${ms.length}</span><button class="btn soft m-read" data-exrev="R:${x.key}">${ic('i-target')}原文 · 定位</button></div><div class="ex-qds">${rows}</div></div>`;
     }).join('');
@@ -686,6 +730,7 @@
         <p>${esc(verdict(sc))}</p>
         <p class="res-time">${ic('i-timer')}${esc(rec.d)} · 用时 ${Math.round(used / 60)} 分钟${rec.auto ? ' · 到点自动交卷' : ''}</p>
         <div class="ex-lines"><span class="${sc.scaled >= 425 ? 'ok' : ''}">425 ${sc.scaled >= 425 ? '✓' : ''}</span><span class="${sc.scaled >= 500 ? 'ok' : ''}">500 ${sc.scaled >= 500 ? '✓' : ''}</span></div></div>
+      ${diagBlock(rec, sc)}
       <div class="card ex-parts">
         ${sc.parts.write != null ? prow('写作', 'm-write', sc.parts.write, sc.pmax.write, wtSub('write')) : ''}
         ${sc.parts.listen != null ? prow('听力', 'm-listen', sc.parts.listen, sc.pmax.listen, secSub(SECS.listen)) : ''}
@@ -706,9 +751,11 @@
     box.onclick = (ev) => {
       const t = ev.target;
       if (t.closest('[data-exhome]')) { mode = 'home'; render(); window.scrollTo(0, 0); return; }
+      if (t.closest('[data-dghome]')) { mode = 'home'; C().show('home'); return; }
       const dl = t.closest('[data-exdel]'); if (dl) { if (twoStep(dl, '再点一次删除（不能恢复）')) delRec(rec); return; }
       const sf = t.closest('[data-exself]'), sc0 = t.closest('[data-exselfclr]'); if (sf || sc0) {
         if (sf) { const [k, v] = sf.dataset.exself.split(':'); rec.self[k] = +v; } else rec.self[sc0.dataset.exselfclr] = null;
+        if (window.CET6Learn) ['write', 'trans'].forEach((k) => { if (rec.sel[k]) window.CET6Learn.setWtManual(k === 'write' ? W.id : T.id, rec.ts, rec.self[k]); });
         applySc(rec, scoreOf(Pp, rec.ans, rec.self, rec.ag)); C().save();
         keepY(renderReport); return;
       }
@@ -742,5 +789,5 @@
   window.addEventListener('pagehide', flush);
   // 刷新 / 重开页面：有进行中且不是主动暂停的模考，直接回到考试界面
   try { const S0 = JSON.parse(localStorage.getItem('cet6.v1') || '{}'); if (S0.exam && !S0.exam.paused) mode = 'exam'; } catch {}
-  window.CET6Exam = { render, leave, openReport, audio: AX, preset: (seed) => { presetSeed = seed; mode = 'home'; }, meta, tagOf };
+  window.CET6Exam = { render, leave, openReport, audio: AX, preset: (seed) => { presetSeed = seed; mode = 'home'; }, meta, tagOf, startDiag, diagMinutes, DIAG_SEL };
 })();
