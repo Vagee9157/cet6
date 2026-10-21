@@ -717,7 +717,7 @@
       return `<div class="ex-self ${mod}"><div class="sec-h"><span class="ico ${mod}">${ic(isW ? 'i-pen' : 'i-swap')}</span><h2>${title}</h2><span class="more">${m == null ? `自动估分 ${a} 分` : `手动 ${m} 分`} × 7.1 = ${fmt1((m == null ? a : m) * 7.1)}</span></div>
       <div class="ex-cmp"><div class="card"><div class="lab">${isW ? '我的作文' : '我的译文'} · ${words(text)} 词</div><div class="ex-mine">${text.trim() ? esc(text) : '<i>（没写）</i>'}</div></div>
       <div class="card"><div class="lab">${isW ? '范文' : '参考译文'}</div><div class="sample ${mod}">${ref}</div></div></div>
-      <div class="card ex-ag" data-grk="${k}">${G().panelHTML(agFull[k], { ai: true, manual: true, aiIcon: ic('i-clip') })}</div>
+      <div class="card ex-ag" data-grk="${k}">${G().panelHTML(agFull[k], { ai: true, manual: true, aiIcon: ic('i-clip') })}${C().openWTItem && text.trim() ? `<div class="ex-rw"><button class="btn soft ${mod}" data-exrewrite="${k}">${ic('i-pen')}去写译页改写这篇</button><span>带上这篇${isW ? '作文' : '译文'}，按最弱一项改一处再估分</span></div>` : ''}</div>
       <div class="ex-mbar"><span>${m == null ? `现在按<b>自动估分 ${a} 分</b>计。对照范文觉得不准，就在下面手动改档（以手动为准）。` : `自动估 <b>${a}</b> 分 · 手动 <b>${m}</b> 分，按手动计。`}</span>${m != null ? `<button class="chip" data-exselfclr="${k}">${ic('i-redo')}改回自动估分</button>` : ''}</div>
       ${bandsHTML(k, m, bands)}</div>`;
     };
@@ -759,6 +759,7 @@
         applySc(rec, scoreOf(Pp, rec.ans, rec.self, rec.ag)); C().save();
         keepY(renderReport); return;
       }
+      const rw = t.closest('[data-exrewrite]'); if (rw) { const k = rw.dataset.exrewrite; C().openWTItem(k, k === 'write' ? W.id : T.id, rec.ans[k]); return; }
       const ai = t.closest('[data-graicopy]'); if (ai) {
         const k = ai.closest('[data-grk]').dataset.grk, el = ai.closest('[data-grk]');
         G().copyText(G().aiPrompt(k, k === 'write' ? W : T, rec.ans[k]), (ok) => { const st = el.querySelector('.gr-cp'); if (st) st.textContent = ok ? '已复制，粘贴给任意 AI 即可' : ''; });

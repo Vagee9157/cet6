@@ -407,6 +407,8 @@
 
   window.CET6Game = {
     render,
+    // 单词复习判定题（app.js）复用：干扰项与近义排除
+    distractors, overlap,
     // 离开单词页：停计时、暂停当前局，退出小游戏模式（下次点「小游戏」可以继续）
     leave() {
       closeCard();

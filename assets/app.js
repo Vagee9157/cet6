@@ -250,14 +250,25 @@
   S.vseen = S.vseen || {}; S.vsrc = S.vsrc || 'daily'; S.vnew = S.vnew || 20; S.vstage = S.vstage || {};
   const isWrong = (id) => S.vocab[id] === 0 || S.vocab[id] === 1;
   const wordOf = (id) => ALLWORDS.find((x) => x.id === id);
-  // 到期规则：不认识隔 1 天、模糊隔 2 天；认识的按 S.vstage（连续认识次数）第 1 次后 7 天、第 2 次后 21 天再抽查，第 3 次认识后不再出现
-  // 旧数据只有 S.vseen 没有 S.vstage：按第 1 次认识算（7 天后抽查一次）
-  const KNOWN_GAP = [0, 7, 21];
+  // 到期规则：不认识隔 1 天、模糊隔 2 天；认识的按 S.vstage（连续答对 / 认识次数）取 VGAP：第 1 次后 3 天、再 7 / 14 / 30 / 60 天，第 6 次后不再出现
+  // 到期日不超过考试日期：考前 3 天内的到期提前到考前第 3 天（CET6Recall.capDue）
+  const VGAP = [1, 3, 7, 14, 30, 60];
+  // 旧数据（S.vsv 缺省）按旧间隔 7 / 21 天记的阶段：1 → 2（7 天）、2 → 3（14 天）、≥3（已毕业）→ 5（60 天后考前再查一次）；只有 S.vseen 没有阶段的认识词按 1 → 2
+  if (S.vsv !== 2) { Object.keys(S.vocab).forEach((id) => { if (S.vocab[id] === 2) { const st = S.vstage[id] || 1; S.vstage[id] = st >= 3 ? 5 : st + 1; } }); S.vsv = 2; save(); }
+  const addDay = (d, n) => { const [y, m, dd] = d.split('-').map(Number); return lday(new Date(y, m - 1, dd + n)); };
+  function vdueDay(id) {
+    const m = S.vocab[id], seen = S.vseen[id]; if (!seen) return null;
+    const gap = m === 0 ? 1 : m === 1 ? 2 : m === 2 ? VGAP[S.vstage[id] || 1] : undefined;
+    if (!gap) return null;
+    const raw = addDay(seen, gap);
+    return window.CET6Recall ? window.CET6Recall.capDue(seen, raw) : raw;
+  }
   function isDue(id, d) {
     const m = S.vocab[id], seen = S.vseen[id];
-    if (m === 0 || m === 1) return !seen || (seen < d && dayDiff(seen, d) >= (m === 0 ? 1 : 2));
-    if (m === 2) { const st = S.vstage[id] || 1; return !!seen && st < KNOWN_GAP.length && dayDiff(seen, d) >= KNOWN_GAP[st]; }
-    return false;
+    if ((m === 0 || m === 1) && !seen) return true;
+    if (m !== 0 && m !== 1 && m !== 2) return false;
+    if (m !== 2 && !(seen < d)) return false;
+    const due = vdueDay(id); return !!due && due <= d;
   }
   function dailyPlan(extra) {
     const d = lday();
@@ -278,7 +289,7 @@
     return S.daily;
   }
   function buildQueue() {
-    vi = 0; flipped = false;
+    vi = 0; flipped = false; vqz = null;
     if (S.vsrc === 'daily') { const p = dailyPlan(); const d = lday(); vq = p.order.filter((id) => S.vseen[id] !== d).map(wordOf).filter(Boolean); return; }
     // 生词本：全部「不认识 + 模糊」，最近标记的排前面，同一天内随机
     if (S.vsrc === 'wrong') { vq = shuffle(ALLWORDS.filter((w) => isWrong(w.id))).sort((a, b) => (S.vseen[b.id] || '').localeCompare(S.vseen[a.id] || '')); return; }
@@ -288,22 +299,69 @@
     vq = vmode === 'review' ? unknown : [...fresh, ...unknown];
   }
   // 标记：0 不认识 / 1 模糊 / 2 认识。「再过一遍」模式只更新认识程度，不改今天的已刷记录（S.vseen / S.vstage）
-  function vmark(k) {
-    const w = vq[vi]; if (!w) return; const d = lday();
+  function vapply(w, k) {
+    const d = lday();
     vhist.push({ id: w.id, v: S.vocab[w.id], s: S.vseen[w.id], st: S.vstage[w.id] }); if (vhist.length > 50) vhist.shift();
     if (!vagain) {
       if (k === 2) { if (!(S.vocab[w.id] === 2 && S.vseen[w.id] === d)) S.vstage[w.id] = (S.vstage[w.id] || 0) + 1; } else delete S.vstage[w.id];
       S.vseen[w.id] = d;
     }
-    S.vocab[w.id] = k; save(); vi++; flipped = false; renderVocab();
+    S.vocab[w.id] = k; save();
   }
+  function vmark(k) {
+    const w = vq[vi]; if (!w) return;
+    vapply(w, k); vi++; flipped = false; vqz = null; renderVocab();
+  }
+  /* ---------- 复习词的提取测试：到期复习词先过一道判定题，再看卡片 ----------
+     今日单词的复习词（不是第一次见的新词）、生词本里的词：英→中四选一（干扰项复用小游戏的近义排除），
+     生词本默认改为看中文拼英文（S.vqk = 'spell' / 'mc'，易混词和长短语仍用四选一）。答对 = 认识（升一级），答错 = 不认识（阶段清零、明天再来）；
+     新词第一次见仍用自评三档；「再过一遍」不出判定题 */
+  let vqz = null;
+  const canSpell = (w) => !/\s\/\s/.test(w.w) && w.w.length <= 24;
+  function needQuiz(w) {
+    if (!w || vagain) return false;
+    if (S.vsrc === 'daily') { const p = dailyPlan(); return p.review.includes(w.id) && S.vseen[w.id] !== lday(); }
+    return S.vsrc === 'wrong';
+  }
+  function makeQuiz(w) {
+    const spell = S.vsrc === 'wrong' && (S.vqk || 'spell') === 'spell' && canSpell(w);
+    if (spell) return { id: w.id, kind: 'spell', res: null };
+    const G = window.CET6Game, ds = G && G.distractors ? G.distractors(w, 3) : shuffle(ALLWORDS.filter((x) => x.id !== w.id && x.c !== w.c)).slice(0, 3);
+    const opts = shuffle([w, ...ds]);
+    return { id: w.id, kind: 'mc', opts: opts.map((x) => x.c), a: opts.indexOf(w), res: null };
+  }
+  // 拼写判定：大小写、首尾空格、弯引号不计较；短语开头的 be 可省
+  const spellNorm = (t) => String(t || '').toLowerCase().replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim().replace(/^be /, '');
+  function quizAnswer(ok, pick, input) {
+    const w = vq[vi]; if (!w || !vqz || vqz.res) return;
+    vqz.res = ok ? 'ok' : 'bad'; vqz.pick = pick; vqz.input = input;
+    vapply(w, ok ? 2 : 0); flipped = true; renderVocab();
+    const nx = $('[data-vqnext]'); if (nx) nx.focus({ preventScroll: true });
+  }
+  function quizHTML(w) {
+    const q = vqz;
+    if (!q.res) {
+      const head = q.kind === 'mc'
+        ? `<div class="vq-lab">复习判定 · 选出中文意思</div><div class="vq-w">${esc(w.w)}<button class="spk sm" data-say="${esc(w.w)}" aria-label="朗读">${ic('i-vol')}</button></div><span class="pos">${esc(w.p)}</span>`
+        : `<div class="vq-lab">复习判定 · 看中文拼英文</div><div class="vq-cn">${esc(w.c)}</div><span class="pos">${esc(w.p)}</span><div class="vq-hint">首字母 <b>${esc(w.w[0])}</b> · ${w.w.replace(/[^A-Za-z]/g, '').length} 个字母${/\s/.test(w.w) ? ` · ${w.w.trim().split(/\s+/).length} 个词` : ''}</div>`;
+      const body = q.kind === 'mc'
+        ? `<div class="vq-opts">${q.opts.map((c, i) => `<button class="vq-opt" data-vqpick="${i}"><span class="k">${i + 1}</span><span>${esc(c)}</span></button>`).join('')}</div>`
+        : `<form class="vq-form" data-vqform><input class="vq-in" name="a" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="拼出这个词" aria-label="拼写"><button class="btn primary" type="submit">${ic('i-check')}提交</button></form>`;
+      return `<div class="vq card">${head}${body}<div class="vq-sub"><button class="btn ghost" data-vqskip>不认识，看答案</button>${S.vsrc === 'wrong' && canSpell(w) ? `<button class="btn ghost" data-vqk>${q.kind === 'spell' ? '改成四选一' : '改成拼写'}</button>` : ''}</div></div>`;
+    }
+    const ok = q.res === 'ok';
+    const mine = q.kind === 'mc' ? (q.pick != null && q.pick !== q.a ? `你选：${esc(q.opts[q.pick])}` : '') : q.input ? `你写：${esc(q.input)}` : '';
+    return `<div class="vq-res ${ok ? 'ok' : 'bad'}" role="status"><b>${ok ? `${ic('i-check')}答对了，升一级` : `${ic('i-x')}${q.pick == null && !q.input ? '记为不认识' : '答错了，记为不认识'}`}</b><span>${mine}</span><span class="nx">${ok ? `下次 ${esc(vdueDay(w.id) || '')} 再查` : '阶段清零，明天再来'}</span></div>`;
+  }
+  const quizNext = () => `<div class="vq-next"><button class="btn primary" data-vqnext>${ic('i-chev-r')}下一个</button>${vqz.res === 'ok' ? '<button class="btn ghost" data-vqfuzzy>蒙对的，记模糊</button>' : ''}</div>`;
   // 撤销上一个：恢复那个词标记前的状态，并把它放回当前卡片
   function vundo() {
     const h = vhist.pop(); if (!h) return;
     const put = (o, k, v) => { if (v === undefined) delete o[k]; else o[k] = v; };
     put(S.vocab, h.id, h.v); put(S.vseen, h.id, h.s); put(S.vstage, h.id, h.st); save();
-    if (vi > 0 && vq[vi - 1] && vq[vi - 1].id === h.id) vi--; else vq.splice(Math.min(vi, vq.length), 0, wordOf(h.id));
-    flipped = false; renderVocab();
+    if (vq[vi] && vq[vi].id === h.id) { /* 判定题答完还没点下一个：留在这张，重新出题 */ }
+    else if (vi > 0 && vq[vi - 1] && vq[vi - 1].id === h.id) vi--; else vq.splice(Math.min(vi, vq.length), 0, wordOf(h.id));
+    flipped = false; vqz = null; renderVocab();
   }
   // 单词页分段控件：今日单词 / 按主题 / 生词本 / 小游戏（小游戏用 S.vgame.on，不占 S.vsrc；逻辑在 assets/vgame.js）
   const vsegHtml = (src, wrongN, gm) => `<div class="vsrc seg2" role="tablist"><button role="tab" data-vsrc="daily" aria-selected="${!gm && src === 'daily'}">今日单词</button><button role="tab" data-vsrc="topic" aria-selected="${!gm && src === 'topic'}">按主题</button><button role="tab" data-vsrc="wrong" aria-selected="${!gm && src === 'wrong'}">生词本 ${wrongN}</button>${window.CET6Game ? `<button role="tab" data-vgame aria-selected="${gm}">小游戏</button>` : ''}</div>`;
@@ -327,11 +385,14 @@
     // 生词本一轮刷完停在完成页（不自动重排）；其他模式队列空了就重建
     if (!vq.length || vi >= vq.length) { if (!(wrong && vq.length && vi >= vq.length)) { vagain = false; buildQueue(); } }
     const w = vq[vi];
+    // 复习判定题：同一张卡答完前后都保留 vqz（答完 S.vseen 已是今天，不能再用 needQuiz 判断）
+    if (!w) vqz = null; else if (!(vqz && vqz.id === w.id)) vqz = needQuiz(w) ? makeQuiz(w) : null;
+    const quizing = !!(vqz && !vqz.res); if (quizing) flipped = false;
     const plan = daily ? dailyPlan() : null, dd = lday();
     const pDone = plan ? plan.order.filter((id) => S.vseen[id] === dd).length : 0, pTot = plan ? plan.order.length : 0;
     const againN = plan ? plan.order.filter(isWrong).length : 0;
     const wrongN = ALLWORDS.filter((x) => isWrong(x.id)).length;
-    const hint = `<span class="fm-hint">${ic('i-flip')}点卡片看释义</span>`;
+    const hint = quizing ? '<span class="fm-hint">先答题再看卡片</span>' : `<span class="fm-hint">${ic('i-flip')}点卡片看释义</span>`;
     const meta = daily
       ? `<span>${w ? `${esc(w.g)} · ${vagain ? '<b class="tag-rev">再过一遍</b>' : plan.review.includes(w.id) ? '<b class="tag-rev">复习</b>' : '新词'}` : ''}</span>${w ? hint : ''}<span>${vq.length ? `剩 ${vq.length - vi}` : ''}</span>`
       : wrong
@@ -347,10 +408,10 @@
     $('#vocab-box').innerHTML = `
       <div class="sec-h" style="margin-top:4px"><span class="ico m-vocab">${ic('i-abc')}</span><h2>高频词汇</h2><span class="more">认识 ${st.known} · 生词 ${st.unknown}</span></div>
       ${vsegHtml(src, wrongN, false)}
-      ${daily ? `<div class="vday card"><div class="vday-top"><div><b>今天 ${plan.fresh.length} 个新词 + ${plan.review.length} 个复习</b><span>新词随机抽取、当天固定；「不认识」明天再出现，「模糊」隔一天，「认识」7 天、21 天后各抽查一次</span></div><div class="vday-n">${pDone}<small>/${pTot}</small></div></div>
+      ${daily ? `<div class="vday card"><div class="vday-top"><div><b>今天 ${plan.fresh.length} 个新词 + ${plan.review.length} 个复习</b><span>新词自评三档；复习词先做一道判定题，答对按 3 / 7 / 14 / 30 / 60 天拉长间隔，答错明天再来；考前 3 天内的到期会提前</span></div><div class="vday-n">${pDone}<small>/${pTot}</small></div></div>
         <div class="bar"><i style="width:${pTot ? Math.round(pDone / pTot * 100) : 0}%"></i></div>
         <div class="ctl">每日新词 ${[10, 20, 30].map((n) => `<button class="chip" data-vnew="${n}" aria-pressed="${S.vnew === n}">${n}</button>`).join('')}</div></div>` : ''}
-      ${wrong ? `<div class="vday card"><div class="vday-top"><div><b>生词本 ${wrongN} 个</b><span>点「不认识」「模糊」的词都在这里，最近标记的排在前面；点「认识」就移出生词本</span></div></div></div>` : ''}
+      ${wrong ? `<div class="vday card"><div class="vday-top"><div><b>生词本 ${wrongN} 个</b><span>点「不认识」「模糊」的词都在这里，最近标记的排在前面；每个词先${(S.vqk || 'spell') === 'spell' ? '看中文拼英文' : '做四选一'}，答对就移出生词本</span></div></div></div>` : ''}
       <div class="vt m-vocab${src !== 'topic' ? ' hide' : ''} ${vtOpen ? 'open' : ''}"><button class="vt-cur" id="vtToggle" aria-expanded="${vtOpen}"><span class="vt-lab">当前主题</span><b>${esc(grp.g)}</b><span class="vt-n">${gDone}/${grp.words.length}</span><span class="vt-sw">${vtOpen ? '收起' : '切换主题'}</span>${ic('i-chev-r')}</button>
         ${(() => { const tile = (g, i) => { const d = g.words.filter((x, wi) => S.vocab[i + ':' + wi] === 2).length; return `<button class="vt-tile" data-vg="${i}" aria-pressed="${i === vg}"><span class="nm">${esc(g.g.replace(/^(核心|高频) · /, ''))}</span><span class="ct">${d}/${g.words.length}</span><span class="bar"><i style="width:${Math.round(d / g.words.length * 100)}%"></i></span></button>`; };
           // 主题按档分区：基础（原 20 组）/ 核心 / 高频
@@ -358,14 +419,14 @@
           return tiers.map(([n, f]) => { const ix = VOCAB.map((g, i) => [g, i]).filter(([g]) => f(g)); if (!ix.length) return ''; const tot = ix.reduce((a, [g]) => a + g.words.length, 0), kn = ix.reduce((a, [g, i]) => a + g.words.filter((x, wi) => S.vocab[i + ':' + wi] === 2).length, 0); return `<div class="vt-sec"><div class="vt-sh"><b>${n}</b><span>${ix.length} 组 · 认识 ${kn}/${tot}</span></div><div class="vt-grid">${ix.map(([g, i]) => tile(g, i)).join('')}</div></div>`; }).join(''); })()}</div>
       <div class="flash-wrap">
         <div class="flash-meta">${meta}</div>
-        ${w ? `
+        ${w && quizing ? quizHTML(w) : w ? `${vqz ? quizHTML(w) : ''}
         <div class="flash ${flipped ? 'flipped' : ''}" id="flash"><div class="inner">
           <div class="face front"><button class="spk" data-say="${esc(w.w)}" aria-label="朗读">${ic('i-vol')}</button><div class="w">${esc(w.w)}</div><span class="pos">${esc(w.p)}</span></div>
           <div class="face back"><div class="bk-hd"><span class="bw">${esc(w.w)}</span><span class="pos">${esc(w.p)}</span></div><div class="cn">${esc(w.c)}</div><ol class="exs">${exOf(w).map(([en, zh]) => `<li><button class="spk sm" data-say="${esc(en)}" aria-label="朗读例句">${ic('i-vol')}</button><div class="ex">${hlWord(esc(en), w.w)}</div><div class="zh">${esc(zh)}</div></li>`).join('')}</ol></div>
         </div></div>
-        <div class="flash-acts"><button class="btn no" data-mark="0">${ic('i-x')}不认识</button><button class="btn so" data-mark="1">模糊</button><button class="btn ok" data-mark="2">${ic('i-check')}认识</button></div>`
+        ${vqz ? quizNext() : `<div class="flash-acts"><button class="btn no" data-mark="0">${ic('i-x')}不认识</button><button class="btn so" data-mark="1">模糊</button><button class="btn ok" data-mark="2">${ic('i-check')}认识</button></div>`}`
         : empty}
-        <div class="flash-sub"><button class="btn ghost" data-undo ${vhist.length ? '' : 'disabled'}>${ic('i-redo')}撤销上一个</button><span class="kbd-hint">空格 翻面 · 1 / 2 / 3 标记 · S 朗读 · Z 撤销</span></div>
+        <div class="flash-sub"><button class="btn ghost" data-undo ${vhist.length ? '' : 'disabled'}>${ic('i-redo')}撤销上一个</button><span class="kbd-hint">${quizing ? (vqz.kind === 'mc' ? '1–4 选择 · Z 撤销' : '回车 提交 · Z 撤销') : vqz ? '回车 下一个 · Z 撤销' : '空格 翻面 · 1 / 2 / 3 标记 · S 朗读 · Z 撤销'}</span></div>
       </div>
       <div class="sec-h"><h2 style="font-size:16px">${daily ? '今日单词表' : wrong ? '生词表' : '本组单词表'}</h2></div>
       <div class="vocab-list">${listRows.map((x) => { const s = S.vocab[x.id]; return `<button class="vw ${s === 0 || s === 1 ? 'unknown' : s === 2 ? 'known' : ''}${daily && S.vseen[x.id] === dd ? ' done' : ''}${w && w.id === x.id ? ' cur' : ''}" data-vw="${x.id}"><span class="hd"><span class="w">${esc(x.w)}</span><span class="pos">${esc(x.p)}</span></span><span class="cn">${esc(x.c)}</span></button>`; }).join('')}</div>`;
@@ -384,8 +445,19 @@
       if (e.target.closest('#vmode')) { vmode = vmode === 'review' ? 'flash' : 'review'; vq = []; renderVocab(); return; }
       const sp = e.target.closest('[data-say]'); if (sp) { e.stopPropagation(); speak(sp.dataset.say, 0.9); return; }
       const mk = e.target.closest('[data-mark]'); if (mk) { vmark(+mk.dataset.mark); return; }
+      const qp = e.target.closest('[data-vqpick]'); if (qp && vqz) { const i = +qp.dataset.vqpick; quizAnswer(i === vqz.a, i); return; }
+      if (e.target.closest('[data-vqskip]')) { quizAnswer(false, null, ''); return; }
+      if (e.target.closest('[data-vqk]')) { S.vqk = (S.vqk || 'spell') === 'spell' ? 'mc' : 'spell'; save(); vqz = null; renderVocab(); return; }
+      if (e.target.closest('[data-vqnext]')) { vi++; flipped = false; vqz = null; renderVocab(); return; }
+      if (e.target.closest('[data-vqfuzzy]')) { const w0 = vq[vi]; if (w0) { S.vocab[w0.id] = 1; delete S.vstage[w0.id]; save(); } vi++; flipped = false; vqz = null; renderVocab(); return; }
       if (e.target.closest('#flash')) { flipped = !flipped; $('#flash').classList.toggle('flipped', flipped); }
     };
+    $('#vocab-box').onsubmit = (e) => {
+      const f = e.target.closest('[data-vqform]'); if (!f) return; e.preventDefault();
+      const w0 = vq[vi], v = f.elements.a.value; if (!w0 || !v.trim()) return;
+      quizAnswer(spellNorm(v) === spellNorm(w0.w), null, v.trim());
+    };
+    const qi = $('.vq-in'); if (qi && matchMedia('(hover:hover) and (pointer:fine)').matches) qi.focus({ preventScroll: true });
   }
   // 电脑键盘：空格翻面，1/2/3 = 不认识/模糊/认识，S 朗读，Z 撤销（只在单词页、焦点不在输入框时生效）
   document.addEventListener('keydown', (e) => {
@@ -393,6 +465,13 @@
     if (S.vgame && S.vgame.on) return; // 小游戏有自己的按键（assets/vgame.js）
     if (e.target.closest && e.target.closest('input,textarea,select,[contenteditable="true"]')) return;
     const k = e.key.toLowerCase(), fl = $('#flash');
+    if (vqz && vq[vi] && vqz.id === vq[vi].id) {   // 判定题：1–4 选择，答完回车 / 空格进下一个
+      if (k === 'z') { e.preventDefault(); vundo(); return; }
+      if (!vqz.res) { if (vqz.kind === 'mc' && /^[1-4]$/.test(k)) { e.preventDefault(); quizAnswer(+k - 1 === vqz.a, +k - 1); } return; }
+      if ((k === 'enter' || k === ' ') && !(e.target.closest && e.target.closest('button'))) { e.preventDefault(); vi++; flipped = false; vqz = null; renderVocab(); }
+      if (k === 's') speak(vq[vi].w, 0.9);
+      return;
+    }
     if (k === ' ') { if (!fl) return; e.preventDefault(); flipped = !flipped; fl.classList.toggle('flipped', flipped); return; }
     if (k === '1' || k === '2' || k === '3') { if (!vq[vi] || !fl) return; e.preventDefault(); vmark(+k - 1); return; }
     if (k === 's') { if (vq[vi] && fl) speak(vq[vi].w, 0.9); return; }
@@ -906,6 +985,7 @@
         <textarea class="wt-ta" data-wtid="${id}" rows="${isW ? 12 : 9}" spellcheck="false" autocapitalize="sentences" placeholder="${isW ? '先列提纲再动笔，在这里写 150–200 词……' : '先自己译，再对照参考译文……'}">${esc(S.wt[id] || '')}</textarea>
         <div class="wt-count" id="wtCount">${wtCountHTML(id, isW, ref)}</div>
         ${window.CET6Grade ? `<div class="wt-grade"><button class="btn soft" data-wtgrade="${id}">${ic('i-target')}估分</button><span>规则估分：字数、切题、词汇、句式等，可复制给 AI 细评；每次估分都记进预测分</span></div><div class="wt-gres" id="wtGrade"></div>` : ''}
+        ${window.CET6Recall ? `<div class="wt-trend" id="wtTrend">${window.CET6Recall.trendHTML(id)}</div>` : ''}
       </div>`;
   }
   // 从首页真题卡点「练写作 / 练翻译」会带 S.wtHint 过来：10 分钟内有效，顶部提示这套真题的题目，并预选最接近的一篇（每个 hint 只预选一次）
@@ -922,13 +1002,40 @@
     const parts = [h.writing && h.writing.zh ? `<span><b>作文</b> ${esc(h.writing.zh)}</span>` : '', h.translation && h.translation.zh ? `<span><b>翻译</b> ${esc(h.translation.zh)}${h.translation.theme ? `（${esc(h.translation.theme)}）` : ''}</span>` : ''].filter(Boolean);
     return `<div class="wt-hintbar m-exam"><div class="tx"><div class="hd">这套真题${h.label ? `（${esc(h.label)}）` : ''}</div>${parts.join('')}<div class="ft">下面已选好同类型的一篇，照着练。</div></div><button class="x" data-hintx aria-label="关闭提示">${ic('i-x')}</button></div>`;
   }
+  // 关键词卡 / 模板句：assets/recall.js（window.CET6Recall），标签上是今日待做（到期 + 新卡额度）
+  function wtTabsHTML() {
+    const RC = window.CET6Recall, cdN = (k) => { const c = RC.counts(k); return c.left ? `<b class="cd-badge">${c.left}</b>` : ''; };
+    return `<div class="wt-tabs"><button class="chip m-write" data-wsub="write" aria-pressed="${wsub === 'write'}"><span class="dot"></span>写作</button><button class="chip m-trans" data-wsub="trans" aria-pressed="${wsub === 'trans'}"><span class="dot"></span>翻译</button>${RC ? `<button class="chip m-trans" data-wsub="tk" aria-pressed="${wsub === 'tk'}">${ic('i-abc')}关键词卡${cdN('tk')}</button><button class="chip m-write" data-wsub="hl" aria-pressed="${wsub === 'hl'}">${ic('i-pen')}模板句${cdN('hl')}</button>` : ''}</div>`;
+  }
+  // 估分：assets/grade.js 规则估分（同模考报告），结果显示在作答框下；log=false 只显示不记录（从模考报告跳过来时，那次估分已经记过）
+  // 下面接 CET6Recall：历次估分「初稿 → 最近」趋势、标出最低一项、给一条改写任务
+  function wtGradeNow(id, log) {
+    const isW = wsub === 'write', item = isW ? WRITING[wsel] : TRANSLATION[tsel], kind = isW ? 'write' : 'trans', text = S.wt[id] || '';
+    const gr = window.CET6Grade.mount($('#wtGrade'), kind, item, text, { aiIcon: ic('i-clip'), getText: () => S.wt[id] || '' });
+    if (log && gr && text.trim() && window.CET6Learn) window.CET6Learn.logWt(kind, id, gr, 'wt');
+    const R = window.CET6Recall, tr = $('#wtTrend');
+    if (R && gr && tr) { R.markLow($('#wtGrade'), gr); delete tr.dataset.stale; tr.innerHTML = text.trim() ? R.trendHTML(id, { gr, kind, item, text }) : R.trendHTML(id); }
+    return gr;
+  }
+  // 从模考报告「去写译页改写这篇」：选中这道题；写译页这题空着就填入模考作答，有别的作答先问；直接显示估分和改写任务
+  function openWTItem(kind, id, text) {
+    const list = kind === 'write' ? WRITING : TRANSLATION, i = list.findIndex((x) => x.id === id); if (i < 0) return false;
+    if (kind === 'write') wsel = i; else tsel = i;
+    const t = String(text || '');
+    if (t.trim() && (S.wt[id] || '').trim() !== t.trim()) { if (!(S.wt[id] || '').trim() || confirm('写译页这道题已有另一份作答，用模考这篇替换吗？（取消则保留写译页原来的）')) { S.wt[id] = t; save(); } }
+    delete S.wtHint; show('wt', true); renderWT(kind);
+    if ((S.wt[id] || '').trim() && window.CET6Grade) wtGradeNow(id, false);
+    const ta = $('#wt-box .wt-ans'); if (ta) ta.scrollIntoView({ block: 'start' });
+    return true;
+  }
   function renderWT(sub) {
     if (sub) { wsub = sub; window.scrollTo(0, 0); }
     const hint = wtHintFresh(); if (hint) applyWtHint(hint);
-    const tabs = `<div class="wt-tabs"><button class="chip m-write" data-wsub="write" aria-pressed="${wsub === 'write'}"><span class="dot"></span>写作</button><button class="chip m-trans" data-wsub="trans" aria-pressed="${wsub === 'trans'}"><span class="dot"></span>翻译</button></div>`;
-    const done = (id) => wrote(id) ? `<span class="wt-done" title="写过">${ic('i-check')}</span>` : '';
+    if (!window.CET6Recall && (wsub === 'tk' || wsub === 'hl')) wsub = 'write';
+    const RC = window.CET6Recall, tabs = wtTabsHTML();
     let body = '';
-    if (wsub === 'write') {
+    if (wsub === 'tk' || wsub === 'hl') body = '<div id="cdBox"></div>';
+    else if (wsub === 'write') {
       const w = WRITING[wsel]; const shown = !!reveal[w.id];
       body = `${wtPickHTML(true)}
         <div class="prompt m-write"><div class="lab">题目 · ${esc(w.title.split('·')[0].trim())}</div>${esc(w.prompt)}${w.chart && window.writingChart ? window.writingChart(w.chart) : ''}</div>
@@ -949,7 +1056,8 @@
         <div class="reveal"><button class="btn tone m-trans" data-reveal="${t.id}" aria-expanded="${shown}">${ic('i-eye')}${shown ? '收起参考译文' : '对照参考译文'}</button></div>
         ${shown ? `<div class="sample m-trans">${esc(t.en)}</div><div class="notes m-trans">${t.notes.map((n) => `<div class="nt">${ic('i-bulb')}<span>${esc(n)}</span></div>`).join('')}</div>` : ''}`;
     }
-        $('#wt-box').innerHTML = `<div class="wt-body">${hint ? wtHintBar(hint) : ''}${tabs + body}</div>`;
+    $('#wt-box').innerHTML = `<div class="wt-body">${hint && wsub !== 'tk' && wsub !== 'hl' ? wtHintBar(hint) : ''}${tabs + body}</div>`;
+    if ($('#cdBox')) RC.mount($('#cdBox'), wsub, () => { const t = $('#wt-box .wt-tabs'); if (t) t.outerHTML = wtTabsHTML(); });
     clearInterval(wtTick); syncClock(); if (wtClock) wtTick = setInterval(syncClock, 1000);
     $('#wt-box').onclick = (e) => {
       const s = e.target.closest('[data-wsub]'); if (s) { wtPick.kind = 'all'; wtPick.src = 'all'; return renderWT(s.dataset.wsub); }
@@ -967,7 +1075,7 @@
       // 展开范文 / 参考译文才算完成首页的「读 1 篇范文」
       const r = e.target.closest('[data-reveal]'); if (r) { reveal[r.dataset.reveal] = !reveal[r.dataset.reveal]; if (reveal[r.dataset.reveal]) { const d = lday(); S.plan[d] = Object.assign(S.plan[d] || {}, { wt: 1 }); save(); } renderWT(); if (reveal[r.dataset.reveal]) { const sm = $('#wt-box .sample'); if (sm) sm.scrollIntoView({ behavior: 'smooth', block: 'start' }); } return; }
       // 估分：assets/grade.js 规则估分（同模考报告），结果显示在作答框下
-      const gb = e.target.closest('[data-wtgrade]'); if (gb && window.CET6Grade) { const isW = wsub === 'write', item = isW ? WRITING[wsel] : TRANSLATION[tsel], id = gb.dataset.wtgrade; const gr = window.CET6Grade.mount($('#wtGrade'), isW ? 'write' : 'trans', item, S.wt[id] || '', { aiIcon: ic('i-clip'), getText: () => S.wt[id] || '' }); if (gr && (S.wt[id] || '').trim() && window.CET6Learn) window.CET6Learn.logWt(isW ? 'write' : 'trans', id, gr, 'wt'); return; }
+      const gb = e.target.closest('[data-wtgrade]'); if (gb && window.CET6Grade) { wtGradeNow(gb.dataset.wtgrade, true); return; }
       const c = e.target.closest('[data-wtclock]'); if (c) { const id = c.dataset.wtclock; wtClock = wtClock && wtClock.id === id ? null : { id, end: Date.now() + 30 * 60 * 1000 }; clearInterval(wtTick); syncClock(); if (wtClock) wtTick = setInterval(syncClock, 1000); }
     };
     $('#wt-box').oninput = (e) => {
@@ -975,7 +1083,8 @@
       const had = wrote(id); S.wt[id] = e.target.value; if (!S.wt[id]) delete S.wt[id];
       const isW = wsub === 'write'; $('#wtCount').innerHTML = wtCountHTML(id, isW, isW ? 0 : enWords(TRANSLATION[tsel].en));
       if (had !== wrote(id)) { const chip = $(`#wt-box [aria-pressed="true"][data-${isW ? 'wsel' : 'tsel'}]`); if (chip) { const m = chip.querySelector('.wt-done'); if (m) m.remove(); else chip.insertAdjacentHTML('beforeend', `<span class="wt-done" title="写过">${ic('i-check')}</span>`); } }
-      const gr = $('#wtGrade'); if (gr && gr.innerHTML) gr.innerHTML = '';   // 改了作答，旧估分作废
+      const gr = $('#wtGrade'); if (gr && gr.innerHTML) gr.innerHTML = '';   // 改了作答，旧估分作废（S.wtScore 历史保留）
+      const tr = $('#wtTrend'); if (tr && tr.innerHTML && !tr.dataset.stale && window.CET6Recall) { tr.dataset.stale = '1'; tr.innerHTML = window.CET6Recall.trendHTML(id, { stale: true }); }
       clearTimeout(wtSaveT); wtSaveT = setTimeout(save, 400);
     };
   }
@@ -1135,7 +1244,7 @@
   Object.assign(window.CET6, {
     qLoc, clozeCtx, goSet, renderHome, openOutline: (ch) => { show('home'); openOutline(ch); },
     openVocabDaily: () => { if (S.vgame) S.vgame.on = false; if (S.vsrc !== 'daily') { S.vsrc = 'daily'; vq = []; } save(); show('vocab'); },
-    openWT: (sub) => { show('wt', true); renderWT(sub); },
+    openWT: (sub) => { show('wt', true); renderWT(sub); }, openWTItem,
   });
   /* ---------- 给单词小游戏（assets/vgame.js）用的接口 ---------- */
   // 游戏标记：答错 → 不认识（今天刷过、清掉认识阶段）；答对且原来是「不认识」→ 升为「模糊」，不直接标认识
@@ -1156,7 +1265,10 @@
   const setM = start.match(/^set=([\w-]+)$/);
   // #exam=<卷号>：打印版「在线做这套」，到模考页并填好卷号
   const exM = start.match(/^exam=(\d+)$/);
-  if (exM && window.CET6Exam) { window.CET6Exam.preset(+exM[1]); show('exam'); }
+  // #wt=<题目 id>：写译页直接打开这道题
+  const wtM = start.match(/^wt=([\w-]+)$/), wtK = wtM ? (WRITING.some((x) => x.id === wtM[1]) ? 'write' : TRANSLATION.some((x) => x.id === wtM[1]) ? 'trans' : '') : '';
+  if (wtK) openWTItem(wtK, wtM[1]);
+  else if (exM && window.CET6Exam) { window.CET6Exam.preset(+exM[1]); show('exam'); }
   else if (!(setM && goSet(setM[1]))) show(VIEWS.includes(start) ? start : 'home');
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

@@ -199,6 +199,7 @@
     (s.exams || []).forEach((x) => { if (x && isDay(x.d)) set.add(x.d); });
     (s.rt || []).forEach((x) => { if (x && isDay(x.d)) set.add(x.d); });
     Object.values(s.mastered || {}).forEach((v) => { if (isDay(v)) set.add(v); });
+    Object.values(s.cards || {}).forEach((c) => { if (c && isDay(c.last)) set.add(c.last); });   // 关键词卡 / 模板句
     return set;
   }
   // 连续学习天数：今天还没学时从昨天往回数（今天学了就 +1）
@@ -252,17 +253,20 @@
     const setTask = (sub) => { const set = pickSet(sub); return set ? { k: 'set', sub, id: set.id, min: setMin(set) } : null; };
     const wtDay = +d.slice(-2) % 2 ? 'trans' : 'write';
     const wtTask = (k) => ({ k: 'wt', sub: k, min: 30 });
+    // 关键词卡 / 模板句（assets/recall.js）：今天有到期或新卡额度就排。打基础期有到期复习才往前放；专项期跟在写译后；冲刺期必做
+    const ci = window.CET6Recall ? window.CET6Recall.planInfo() : null;
+    const cards = (must) => (ci && ci.left ? { k: 'cards', sub: ci.sub, min: ci.min, must: must ? 1 : 0 } : null);
     const objRank = pr.rank.filter((x) => !x.wt);
     const topL = objRank.find((x) => x.part === 'listen'), topR = objRank.find((x) => x.part === 'read');
     if (ph.k === 'base') {
-      cand.push(vocab, setTask(topL ? topL.k : 'conv'), setTask(topR ? topR.k : 'mc'), outlineTask(pr), wtTask(wtDay));
+      cand.push(vocab, ci && ci.due ? cards() : null, setTask(topL ? topL.k : 'conv'), setTask(topR ? topR.k : 'mc'), outlineTask(pr), wtTask(wtDay), cards());
     } else if (ph.k === 'focus') {
       const tops = pr.rank.slice(0, 3).map((x) => (x.wt ? wtTask(x.k) : setTask(x.k)));
-      cand.push(tops[0], tops[1], vocab, wtTask(wtDay), tops[2]);
+      cand.push(tops[0], tops[1], vocab, wtTask(wtDay), cards(), tops[2]);
     } else {
       const lastFull = (s.exams || []).filter((x) => x && x.mode === 'full').map((x) => x.d).filter(isDay).sort().pop();
       if (!lastFull || dayDiff(lastFull, d) >= 4) cand.push({ k: 'exam', min: 130, must: 1 });
-      cand.push(wtTask('write'), wtTask('trans'), setTask(objRank[0].k), vocab);
+      cand.push(wtTask('write'), wtTask('trans'), cards(true), setTask(objRank[0].k), vocab);
     }
     const tasks = []; let tot = 0; const seen = new Set();
     cand.filter(Boolean).forEach((c) => {
@@ -300,6 +304,11 @@
     if (t.k === 'wt') {
       const done = Object.values(s.wtScore || {}).some((arr) => (Array.isArray(arr) ? arr : []).some((x) => x && x.kind === t.sub && dOf(x.ts) === d));
       return { done, f: done ? 1 : 0, title: t.sub === 'write' ? '写 1 篇作文并估分' : '译 1 段并估分', p: '写完点「估分」', mod: t.sub === 'write' ? 'm-write' : 'm-trans' };
+    }
+    if (t.k === 'cards') {
+      const ci = window.CET6Recall ? window.CET6Recall.planInfo() : null; if (!ci) return { done: false, f: 0, title: '关键词卡 / 模板句', p: '', mod: 'm-trans' };
+      const n = Math.min(ci.left, 40);
+      return { done: !ci.left && ci.did > 0, f: ci.did + ci.left ? ci.did / (ci.did + n) : 1, title: ci.left ? `关键词卡 / 模板句 ${ci.left} 张` : '关键词卡 / 模板句', p: ci.left ? `到期 ${ci.due} · 新卡 ${ci.left - ci.due}${ci.did ? ` · 今天已练 ${ci.did}` : ''}` : ci.did ? `今天已练 ${ci.did} 张` : '今天没有到期的', mod: t.sub === 'hl' ? 'm-write' : 'm-trans' };
     }
     if (t.k === 'outline') {
       const c = CHAPTERS.find((x) => x.id === t.ch) || CHAPTERS[0], n = Object.keys(s.mastered || {}).filter((k) => k.startsWith(c.id + ':') && s.mastered[k] === d).length;
@@ -342,6 +351,7 @@
     if (t.k === 'vocab') return C().openVocabDaily();
     if (t.k === 'set') { const st = St(); const id = st.sets[t.id] && taskStatus(t).done ? t.id : (pickSet(t.sub) || {}).id || t.id; return C().goSet(id); }
     if (t.k === 'wt') return C().openWT(t.sub);
+    if (t.k === 'cards') { const ci = window.CET6Recall && window.CET6Recall.planInfo(); return C().openWT(ci ? (ci.tk.left || !ci.hl.left ? 'tk' : 'hl') : 'tk'); }
     if (t.k === 'outline') return C().openOutline(t.ch);
     if (t.k === 'exam') return C().show('exam');
   }

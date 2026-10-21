@@ -296,5 +296,5 @@ ${std}
     };
     return r;
   }
-  g.CET6Grade = { writing, translation, bandOf, bandDesc, panelHTML, aiPrompt, copyText, mount, W_BANDS, T_BANDS, keyAlts, enCount };
+  g.CET6Grade = { writing, translation, bandOf, bandDesc, panelHTML, aiPrompt, copyText, mount, W_BANDS, T_BANDS, keyAlts, enCount, stem, sentences, paras };
 })(window);
