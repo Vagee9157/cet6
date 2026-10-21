@@ -8,7 +8,7 @@
 
 | 板块 | 内容 |
 |---|---|
-| 首页 | 710 分拆解条（点一段看策略）、今天的四件事、各模块考点与解题套路（听力 / 阅读 / 写作 / 翻译 / 词汇 / 考试结构） |
+| 首页 | 预测分（离 500 差几分 · 距考试天数 · 连续学习天数）、首次诊断入口、今日计划（按考试日期分阶段 + 提分排行生成，带预计分钟）、上周周报、提分排行、710 分拆解条（点一段看策略）、各模块考点与解题套路（听力 / 阅读 / 写作 / 翻译 / 词汇 / 考试结构） |
 | 单词 | 590 个高频词按 20 个主题分组（主题网格，点开切换），翻转闪卡 + 朗读，背面每词 3 个例句带中文翻译、可逐句朗读；认识 / 模糊 / 不认识三档，不认识的进生词本 |
 | 听读 | **常速真人听力**（NASA「Houston We Have a Podcast」/ NOAA「Ocean Podcast」访谈片段，3.5–5 分钟、每分钟约 150–180 词，与真题语速相当；按六级长对话 / 讲座题型配题，原文逐段时间与录音对齐）；**慢速真人听力 30 篇**（VOA Learning English，默认 1.2 倍速）；六级题型听力 28 篇（长对话 8 / 篇章 8 / 讲座 12），全部配神经网络语音录音（Kokoro，对话男女分角色），可选"只听原文"或"考试节奏"（真题格式播报题目 + 每题 12 秒作答），交卷后原文逐句高亮、点句重听、阅读（仔细阅读 / 段落匹配 / 选词填空，点选作答，计时；标「真实原文」的取自 NIH、NASA、NOAA 等美国政府机构文章，公有领域，只删节不改写）；宽屏左文右题 |
 | 写译 | 写作 14 篇（议论 / 名言 / 图表 / 应用文）提纲 + 范文（加分句高亮）；翻译 18 段（文化 / 经济社会 / 历史 / 地理 / 科技 / 教育）关键词 + 参考译文 |
@@ -42,8 +42,44 @@ assets/app.js           主站逻辑
 assets/paper.js         组卷逻辑（打印版排版）
 assets/draw.js          抽题（打印版与在线模考共用，优先抽没做过的、按记录还原同一卷号）
 assets/exam.js          在线模考
+assets/learn.js         学习闭环 window.CET6Learn：预测分 / 今日计划 / 错因 / 错题重测 / 打卡周报
 assets/style.css        样式（浅色 / 深色）
 ```
+
+## 学习闭环（数据）
+
+测 → 诊断 → 排优先级 → 延迟重测，逻辑在 `assets/learn.js`（`window.CET6Learn`），状态都在 localStorage `cet6.v1` 的 `S` 里。启动时 `CET6Learn.init()` 做一次幂等迁移（旧记录补 `sub`、错题补 `due` / `streak`、补空容器），旧数据不会报错。
+
+**题型 key（sub）**：`conv` 长对话 / `passage` 听力篇章 / `lecture` 讲座 / `slowreal` 慢速 VOA / `cloze` 选词填空 / `match` 段落匹配 / `mc` 仔细阅读；写译用 `write` / `trans`。真人常速听力按 `r.type` 归 `conv` / `lecture`；慢速 VOA 记 `slowreal`，**不计入预测**（语速约 100 词/分，明显慢于考试，会把听力预测抬高）。模考内部用 `pas` / `lec`，对外统一成上面的 key。
+
+| 字段 | 格式 | 说明 |
+|---|---|---|
+| `S.hist[i].sub` / `S.sets[id].sub` | 题型 key | `recordSet(id, r, t, wrongs, rights, sec, via)` 写入；旧记录用 `subOf(id)` 补 |
+| `S.hist[i].via` | `'exam'` / `'diag'` | 模考 / 诊断交卷时带上；练习交卷没有 |
+| `S.wtScore[题目id]` | `[{ts, kind, score, band, via, items, manual?}]` | 写译估分。`score` 0–15，`band` 档（14/11/8/5/2/0），`kind` write/trans，`via` wt（写译页「估分」）/ exam / diag，`items` `[[分项名, 0–10]]`，`manual` 模考报告手动改的档（以它为准）；每题最多 10 条；空白作答不记 |
+| `S.examDate` | `'YYYY-MM-DD'` | 考试日期；缺省 = 今天之后最近的 6 月 / 12 月第二个周六（`defaultExamDate()`） |
+| `S.dailyMin` | 30 / 60 / 90 | 每天可用分钟，缺省 60 |
+| `S.dayPlan` | `{key, d, tasks}` | 今日计划，`key = 日期|dailyMin|examDate`，变了就重排；`tasks[i] = {k, sub?, id?, ch?, min, must?}`，`k` ∈ retest / vocab / set / wt / outline / exam |
+| `S.wrong[key]` 新增 | `sub`, `cause`, `cd`, `due`, `streak`, `last` | `cause` ∈ loc 定位错 / syn 同义替换没认出 / vocab 生词卡住 / trap 被干扰项骗 / ear 没听清 / time 时间不够（`CAUSE_BY` 按题型给子集），`cd` 标错因日期；`due` 下次重测日期，`streak` 隔天连对次数，`last` 最近一次作答日期 |
+| `S.causeLog[key]` | `{c, d, sub}` | 错因日志（错题移出后仍保留，周统计用），最多 500 条 |
+| `S.rt` | `[{d, ts, key, ok, sub}]` | 错题重测记录（打卡 / 周报题量用），最多 600 条 |
+| `S.weekSeen` | 周一日期 | 已关闭的周报 |
+| `S.exams[i].diag` / `S.exam.diag` | bool | 诊断卷；`sel` 里数字表示该题型只取前 n 篇（诊断 `{conv:1, lec:1, mc:1, match:true, trans:true}`） |
+| `S.mastered[k]` | 勾选日期（旧值 1） | 「看考点」任务按当天勾了几条判完成 |
+
+**重测规则**：交卷答错（练习 / 模考 / 诊断）→ `streak=0`、`due=明天`，保留已选错因；之后答对（重做整套或单题重测）只有与 `last` 隔 ≥1 天才 `streak+1`，间隔 `GAPS=[1,3,7]` 按 streak 取，`streak` 到 `CLEAR_AT=2` 移出错题本；重测答错重置为 1 天。同一天重做答对不计数也不删除。
+
+**CET6Learn 接口**
+
+- `predict({asOf}?)` → `{total, parts, types, rank, ready, hasDiag, gap500, low}`。每题型取最近 8 次（写译 5 次）按 0.8^i 衰减、按题数加权，再向 60% 收缩（客观题 4 题、写译 0.5 篇的先验）；题量 < 8 题 / 写译 < 2 篇标 `low`（数据不足）。`types[k] = {name, part, max, pts, rate, n, low, pt, room, key}`，满分按官方 710 结构（长对话 8×7.1、篇章 7×7.1、讲座 10×14.2、选词 10×3.55、匹配 10×7.1、仔细 10×14.2、写译 15 档×7.1）。`rank` 按 `pt × (1 − rate)` 降序 = 提分排行；`ready` = 做过诊断或 ≥4 个题型有数据。
+- `subOf(id)`、`logWt(kind, id, gradeResult, via, ts?)`、`setWtManual(id, ts, v)`
+- `applyResult(wrongs, rights)`（recordSet 调）、`retestAnswer(key, ok)`、`dueList()`、`setCause(key, c)`、`causeHTML(key, kind)`（任意页面插入即可用，点击由全局委托处理）
+- `examDate()`、`dailyMin()`、`daysLeft()`、`phase()`（>60 天 base 打基础 / 21–60 focus 专项 / <21 sprint 冲刺）、`planToday()` → `{tasks(含 done/f/title), total, budget, phase, days}`
+- `studyDays()`（由 hist / sets / vseen / wtScore / exams / rt / mastered 日期推算）、`streak()`、`weekReport()`、`weekStart()`
+- 渲染：`planHTML()`、`rankHTML(pr)`、`weekHTML()`、`meTopHTML()`、`causeChartHTML()`、`wrongExtraHTML(w)`、`diagHTML(lv)`、`openRetest()`；首页点击 / 改值交给 `homeClick(e)` / `homeChange(e)`
+- `window.CET6Exam` 新增 `startDiag()`、`diagMinutes()`、`DIAG_SEL`；`window.CET6` 新增 `qLoc(kind, set, i)`（解析引文在原文里的段落 / 录音段）、`clozeCtx`、`goSet`、`renderHome`、`openOutline`、`openVocabDaily`、`openWT`
+
+**任务预计分钟**：阅读 `set.minutes`；听力 录音时长/60 + 题数×0.3；单词 新词×0.5 + 复习×0.2；写作 / 翻译 30；看考点 10；错题重测 每题 1.5（一次最多 10 道）；完整模考 130。
 
 ## 加题
 
