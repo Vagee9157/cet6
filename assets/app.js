@@ -512,8 +512,13 @@
     // 整个文件取下来再播：离线缓存能存住，拖动进度也不受网络影响
     try { const r = await fetch(m.src); if (!r.ok) throw 0; auUrl = URL.createObjectURL(await r.blob()); if (auId === id) AU.src = auUrl; }
     catch { if (auId === id) AU.src = m.src; }
-    AU.playbackRate = m.real ? realRateOf(m) : (S.rate || 1);
+    applyRate(m);
   }
+  // 实际语速：倍速爬坡（assets/drills.js rampOf，同一篇第 2 次 1.1×、第 3 次 1.2×）优先，手动点过语速就按手动
+  const baseRate = (m) => (m.real ? realRateOf(m) : (S.rate || 1));
+  const effRate = (m) => (cur && cur.ramp && !cur.rampManual && cur.set && AUD(cur.set.id) === m ? cur.ramp.r : baseRate(m));
+  function applyRate(m) { if (!m) return; const r = effRate(m); AU.defaultPlaybackRate = r; AU.playbackRate = r; }
+  const rateSrc = (m) => (window.CET6Drills && cur && !cur.back ? window.CET6Drills.rateSrcHTML(cur.ramp, cur.rampManual, effRate(m)) : '');
   function syncPlayer() {
     const m = auMeta(); if (!m) return;
     const icon = ic(AU.paused ? 'i-play' : 'i-pause');
@@ -541,25 +546,25 @@
   });
   ['play', 'pause', 'ended', 'loadedmetadata'].forEach((ev) => AU.addEventListener(ev, syncPlayer));
   function stopAudio() { AU.pause(); if (window.speechSynthesis) speechSynthesis.cancel(); }
-  function auToggle() { if (AU.paused) { if (AU.currentTime >= auEnd() - 0.6) AU.currentTime = 0; AU.play().catch(() => {}); } else AU.pause(); }
+  function auToggle() { if (AU.paused && cur && !cur.done && window.CET6Drills && window.CET6Drills.preGate(cur, AU.currentTime, auToggle)) return; if (AU.paused) { if (AU.currentTime >= auEnd() - 0.6) AU.currentTime = 0; AU.play().catch(() => {}); } else AU.pause(); }
   function auSeek(t) { const m = auMeta(); if (!m) return; AU.currentTime = Math.max(0, Math.min(auEnd() - 0.1, t)); if (auLoop >= 0) { const i = segAt(m, AU.currentTime); if (i >= 0) auLoop = i; } syncPlayer(); }
   // 精听控制：−5s / +5s / 单句循环（真人和录音播放器共用）
   const fineHTML = () => `<div class="ctl au-fine"><button class="chip" data-skip="-5" aria-label="后退 5 秒">−5s</button><button class="chip" data-skip="5" aria-label="前进 5 秒">+5s</button><button class="chip" data-loop aria-pressed="${auLoop >= 0}">${ic('i-redo')}单句循环</button><span class="kbd-tip">键盘：空格 播放/暂停，← → 跳 5 秒</span></div>`;
   const miniHTML = () => `<div class="mini-au" id="miniAu" hidden><button class="play" id="miniBtn" data-au aria-label="播放 / 暂停">${ic(AU.paused ? 'i-play' : 'i-pause')}</button><div class="mtx"><span id="miniTxt">0:00</span><div class="seek" data-seek><i id="miniBar"></i></div></div><button class="chip" data-skip="-5" aria-label="后退 5 秒">−5s</button><button class="chip" data-skip="5" aria-label="前进 5 秒">+5s</button></div>`;
   function playerHTML(set) {
     const m = AUD(set.id);
-    if (m && m.real) { const rr = realRateOf(m); const rates = m.slow ? [1, 1.1, 1.2, 1.3, 1.4] : [0.8, 0.9, 1, 1.1, 1.2]; return `<div class="player au"><button class="play" id="auBtn" data-au>${ic(AU.paused ? 'i-play' : 'i-pause')}</button>
+    if (m && m.real) { const rr = effRate(m); const rates = m.slow ? [1, 1.1, 1.2, 1.3, 1.4] : [0.8, 0.9, 1, 1.1, 1.2]; return `<div class="player au"><button class="play" id="auBtn" data-au>${ic(AU.paused ? 'i-play' : 'i-pause')}</button>
       <div class="ttl"><span id="auTtl">点击播放录音</span><span class="tm" id="auTime">0:00 / ${fmt(m.dur)}</span></div>
       <div class="seek" data-seek><i id="auBar"></i></div>
       ${fineHTML()}
-      <div class="ctl">语速 ${rates.map((r) => `<button class="chip" data-rrate="${r}" aria-pressed="${rr === r}">${r}×</button>`).join('')}</div>
+      <div class="ctl">语速 ${rates.map((r) => `<button class="chip" data-rrate="${r}" aria-pressed="${rr === r}">${r}×</button>`).join('')}</div>${rateSrc(m)}
       <div class="note">${m.slow ? '真人朗读，来自美国之音学英语频道（VOA Learning English，公有领域）。原速约每分钟 100 词，比六级慢；默认 1.2 倍接近考试语速，练熟后可调到 1.3–1.4 倍。题目是本站按六级讲座题型自编的。' : `真人原声，截自${esc(set.show || set.org)}（美国政府作品，公有领域），原速约每分钟 ${Math.round(set.words / set.dur * 60)} 词，跟六级真题语速相当，建议 1.0 倍直接听。题目是本站按六级${set.type === 'lecture' ? '讲座' : '长对话'}题型自编的。`}</div></div>`; }
     if (!m) return `<div class="player"><button class="play" data-play>${ic(cur.playing ? 'i-pause' : 'i-play')}</button><div class="ttl">${cur.playing ? '正在朗读…' : '点击播放录音（浏览器朗读）'}</div><div class="ctl">语速 ${[0.9, 1, 1.1, 1.2].map((r) => `<button class="chip" data-rate="${r}" aria-pressed="${(S.rate || 1) === r}">${r}×</button>`).join('')}</div><div class="note">这篇还没有录音，暂用浏览器朗读。</div></div>`;
     return `<div class="player au"><button class="play" id="auBtn" data-au>${ic(AU.paused ? 'i-play' : 'i-pause')}</button>
       <div class="ttl"><span id="auTtl">点击播放录音</span><span class="tm" id="auTime">0:00 / ${fmt(auEnd())}</span></div>
       <div class="seek" data-seek><i id="auBar"></i></div>
       ${fineHTML()}
-      <div class="ctl">语速 ${[0.9, 1, 1.1, 1.2].map((r) => `<button class="chip" data-rate="${r}" aria-pressed="${(S.rate || 1) === r}">${r}×</button>`).join('')}</div>
+      <div class="ctl">语速 ${[0.9, 1, 1.1, 1.2].map((r) => `<button class="chip" data-rate="${r}" aria-pressed="${effRate(m) === r}">${r}×</button>`).join('')}</div>${rateSrc(m)}
       <div class="ctl">${[['text', '只听原文'], ['exam', '考试节奏（含题目播报）']].map(([k, l]) => `<button class="chip" data-aumode="${k}" aria-pressed="${(S.auMode || 'text') === k}">${l}</button>`).join('')}</div>
       <div class="note">真题每段只放一遍。考试节奏会在原文后按真题格式播报题目、每题留 12 秒作答。交卷后可以点原文任意一句从那里重听。</div></div>`;
   }
@@ -652,6 +657,7 @@
     }
     box.innerHTML = `
       <div class="wt-tabs"><button class="chip m-listen" data-sub="listen" aria-pressed="${psub === 'listen'}"><span class="dot"></span>听力</button><button class="chip m-read" data-sub="read" aria-pressed="${psub === 'read'}"><span class="dot"></span>阅读</button></div>
+      ${window.CET6Drills ? window.CET6Drills.entryHTML() : ''}
       <div class="ex-entry m-exam"><div class="tx"><span class="kind">整卷模拟 · 130 分钟</span><b>完整六级模拟卷</b><span class="meta">写作 + 听力 + 阅读 + 翻译，和真题同结构同题量，按 710 分换算</span></div><div class="acts"><button class="btn tone" data-goexam>${ic('i-clip')}在线模考</button><a class="btn" href="paper.html">${ic('i-pen')}打印版</a></div></div>
       ${psub === 'listen' ? `
         <p class="lead">全部配录音：六级题型练习用神经网络语音分角色录制，另有 NASA / NOAA / VOA 的真人原声。答完再对着原文精听。</p>
@@ -666,6 +672,7 @@
     box.onclick = (e) => {
       const t = e.target.closest('[data-sub]'); if (t) return renderPracticeHome(t.dataset.sub);
       if (e.target.closest('[data-goexam]')) return show('exam');
+      const dr = e.target.closest('[data-drill]'); if (dr) return openDrill(dr.dataset.drill);
       const rk = e.target.closest('[data-rpk]'); if (rk) { S.rpick[psub] = rk.dataset.rpk; save(); const y = window.scrollY; renderPracticeHome(); window.scrollTo(0, y); return; }
       const rg = e.target.closest('[data-rpgo]'); if (rg) return rpickGo(rg.dataset.rpgo);
       const o = e.target.closest('[data-open]'); if (o) openSet(o.dataset.open);
@@ -707,6 +714,7 @@
     const d = !fresh && S.drafts[id];
     cur = { ...f, ans: d ? { ...d.ans } : {}, done: false, playing: false, restored: !!(d && Object.keys(d.ans || {}).length) };
     if (f.kind === 'cloze') { let a = 0; while (a < f.set.answers.length - 1 && cur.ans[a]) a++; cur.active = a; }
+    const am = f.kind === 'listen' && AUD(id); if (am && window.CET6Drills) cur.ramp = window.CET6Drills.rampOf(id, baseRate(am), !!am.slow);
     startTimer(d ? d.el : 0); renderSet(); jumpTop(0);
   }
   // sub = 题型细分（assets/learn.js subOf），via = 'exam' / 'diag'（模考 / 诊断交卷）；错题的 due / streak / 错因由 CET6Learn.applyResult 维护
@@ -815,7 +823,7 @@
     const total = kind === 'cloze' ? set.answers.length : kind === 'match' ? set.items.length : set.questions.length;
     const answered = Object.keys(ans).length;
     const back = `<div class="prac-head"><button class="btn ghost" data-back>${ic('i-chev-l')}返回</button><h2>${esc(set.title)}</h2>${kind === 'listen' || cur.back ? '' : `<span class="timer" id="timer"><small>已用</small><b id="timerVal">00:00</b>${set.minutes ? `<small>/ 建议 ${set.minutes} 分钟</small>` : ''}</span>`}</div>`;
-    const K = ['A', 'B', 'C', 'D'];
+    const K = ['A', 'B', 'C', 'D'], DR = window.CET6Drills;
     // 交卷后：手机上原文收进 <details>，先看到对错；选词填空的对错就在原文里，不收
     const fold = done && isPhone() && kind !== 'cloze';
     const foldWrap = (inner, label) => fold ? `<details class="src-fold ${mod}"><summary>${ic('i-eye')}<b>${label}</b><span>展开</span>${ic('i-chev-r')}</summary>${inner}</details>` : inner;
@@ -824,14 +832,14 @@
     const ctx = done ? { kind, units, toks: tokIndex(units) } : null;
     const vd = (ok, p) => `<b class="vd ${ok ? 'ok' : 'bad'}">${ok ? '✓ 答对' : p === undefined ? '✗ 未作答' : '✗ 答错'}</b>`;
     const qcls = (ok) => done ? (ok ? ' is-right' : ' is-wrong') : '';
-    const mcq = (qs) => `<div class="q-list">${qs.map((q, i) => { const p = ans[i]; return `<div class="q ${mod}${qcls(p === q.a)}" id="q-${i}"><div class="qt"><span class="n">${i + 1}</span><span>${esc(q.q)}</span></div><div class="opts">${q.opts.map((o, k) => { let cls = 'opt'; if (done) { if (k === q.a) cls += ' right'; else if (k === p) cls += ' wrong'; } else if (k === p) cls += ' picked'; return `<button class="${cls}" data-q="${i}" data-k="${k}" ${done ? 'disabled' : ''}><span class="k">${K[k]}</span><span>${esc(o)}</span></button>`; }).join('')}</div>${done ? `<div class="exp">${vd(p === q.a, p)} · 正确答案 ${K[q.a]}。${expHTML(q.exp, ctx)}${p !== q.a ? causeRow(set.id + ':' + i, kind) : ''}</div>` : ''}</div>`; }).join('')}</div>`;
+    const mcq = (qs) => `<div class="q-list">${qs.map((q, i) => { const p = ans[i]; return `<div class="q ${mod}${qcls(p === q.a)}" id="q-${i}"><div class="qt"><span class="n">${i + 1}</span><span>${esc(q.q)}</span></div>${DR && kind === 'listen' ? DR.preQHTML(cur, i) : ''}<div class="opts">${q.opts.map((o, k) => { let cls = 'opt'; if (done) { if (k === q.a) cls += ' right'; else if (k === p) cls += ' wrong'; } else if (k === p) cls += ' picked'; return `<button class="${cls}" data-q="${i}" data-k="${k}" ${done ? 'disabled' : ''}><span class="k">${K[k]}</span><span>${esc(o)}</span></button>`; }).join('')}</div>${done ? `<div class="exp">${vd(p === q.a, p)} · 正确答案 ${K[q.a]}。${expHTML(q.exp, ctx)}${DR && kind === 'listen' ? DR.preExpHTML(cur, i) : ''}${p !== q.a ? causeRow(set.id + ':' + i, kind) : ''}</div>` : ''}</div>`; }).join('')}</div>`;
     let body = '';
     if (kind === 'listen') {
-      if (AUD(set.id)) loadAudio(set.id);
+      if (AUD(set.id)) { loadAudio(set.id); applyRate(AUD(set.id)); }
       const trHead = `<div class="sec-h"><span class="ico m-listen">${ic('i-eye')}</span><h2>原文</h2><span class="more">点句子从那里重听</span>${done ? '' : `<button class="btn ghost" data-tr style="margin-left:8px">${ic('i-x')}收起</button>`}</div>`;
       if (done) body = `${playerHTML(set)}<div class="lr-split"><div class="lr-src">${fold ? foldWrap(transcriptHTML(set), '原文（点句子重听）') : trHead + transcriptHTML(set)}</div><div class="lr-qs">${mcq(set.questions)}</div></div>`;
       else body = `${playerHTML(set)}
-        ${cur.showTr ? `${trHead}<p class="lead">提示：先盲听做题再看原文，练习效果最好。</p>${transcriptHTML(set)}` : `<div class="tr-toggle"><button class="btn soft m-listen" data-tr>${ic('i-eye')}查看原文</button><span>建议先盲听做题，卡住了再打开</span></div>`}${mcq(set.questions)}`;
+        ${cur.showTr ? `${trHead}<p class="lead">提示：先盲听做题再看原文，练习效果最好。</p>${transcriptHTML(set)}` : `<div class="tr-toggle"><button class="btn soft m-listen" data-tr>${ic('i-eye')}查看原文</button><span>建议先盲听做题，卡住了再打开</span></div>`}${DR ? DR.preBarHTML(cur) : ''}${mcq(set.questions)}`;
       if (AUD(set.id)) body += miniHTML();
     } else if (kind === 'mc') {
       body = `${foldWrap(`<div class="passage">${set.text.split('\n').map((p, i) => `<p data-pk="${i}">${esc(p)}</p>`).join('')}</div>`, '原文')}${mcq(set.questions)}`;
@@ -857,6 +865,7 @@
       resHtml = `<div class="result ${mod}"><div class="score">${r}<small> / ${total}</small></div><p>${r === total ? '全对，稳。' : r >= total * 0.7 ? '达标了，看看错的那几题的解析。' : '把错题的定位句和选项改写对照着看一遍。'}</p>
         ${cur.sec !== undefined ? `<p class="res-time">${ic('i-timer')}用时 ${mmss(cur.sec)}${kind !== 'listen' && set.minutes ? ` · 建议 ${set.minutes} 分钟${cur.sec > set.minutes * 60 ? '，超时了' : ''}` : ''}</p>` : ''}
         <div class="res-nums">${marks.map((ok, i) => `<button class="${ok ? 'ok' : 'bad'}" data-jump="${i}" aria-label="第 ${i + 1} 题${ok ? '答对' : '答错'}">${i + 1}<i>${ok ? '✓' : '✗'}</i></button>`).join('')}</div>
+        ${DR && kind === 'listen' ? DR.preSumHTML(cur) : ''}
         ${r < total ? `<label class="ow-sw"><input type="checkbox" data-onlywrong ${cur.onlyWrong ? 'checked' : ''}>只看错题</label>` : ''}</div>`;
     }
     const restore = cur.restored && !done ? `<div class="restore-note">${ic('i-redo')}<span>已恢复上次未交卷的作答（${answered}/${total}）</span><button class="btn ghost" data-redo>清空重做</button></div>` : '';
@@ -866,6 +875,8 @@
     box.innerHTML = back + restore + resHtml + body + bar;
     box.classList.toggle('only-wrong', !!(done && cur.onlyWrong));
     box.onclick = (e) => {
+      if (DR && DR.preClick(e, cur)) return;
+      const rpb = e.target.closest('[data-ramp]'); if (rpb) { S.rampOff = rpb.dataset.ramp === 'off'; save(); const m0 = AUD(set.id); cur.ramp = DR.rampOf(set.id, baseRate(m0), !!m0.slow); cur.rampManual = false; applyRate(m0); return renderSet(); }
       if (e.target.closest('[data-back]')) { if (cur.back) { const b = cur.back; cur = null; return b(); } stashDraft(); return renderPracticeHome(null, true); }
       if (e.target.closest('[data-redo]')) return openSet(set.id, true);
       const nx = e.target.closest('[data-next]'); if (nx) return openSet(nx.dataset.next);
@@ -877,12 +888,12 @@
       const sk = e.target.closest('[data-seek]'); if (sk) { const r = sk.getBoundingClientRect(); auSeek(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * auEnd()); return; }
       const sp = e.target.closest('[data-skip]'); if (sp) { auSeek(AU.currentTime + +sp.dataset.skip); return; }
       if (e.target.closest('[data-loop]')) { const m = auMeta(); if (!m) return; auLoop = auLoop >= 0 ? -1 : (auIdx >= 0 ? auIdx : Math.max(0, m.segs.findIndex((g) => g[2] !== 'Q'))); document.querySelectorAll('[data-loop]').forEach((b) => b.setAttribute('aria-pressed', auLoop >= 0)); syncPlayer(); return; }
-      const rr = e.target.closest('[data-rrate]'); if (rr) { const v = +rr.dataset.rrate; const mm = auMeta(); if (mm && !mm.slow) S.normRate = v; else S.realRate = v; AU.playbackRate = v; save(); document.querySelectorAll('[data-rrate]').forEach((b) => b.setAttribute('aria-pressed', +b.dataset.rrate === v)); return; }
+      const rr = e.target.closest('[data-rrate]'); if (rr) { const v = +rr.dataset.rrate; const mm = auMeta(); if (mm && !mm.slow) S.normRate = v; else S.realRate = v; cur.rampManual = true; AU.defaultPlaybackRate = AU.playbackRate = v; save(); updRateSrc(); document.querySelectorAll('[data-rrate]').forEach((b) => b.setAttribute('aria-pressed', +b.dataset.rrate === v)); return; }
       const am = e.target.closest('[data-aumode]'); if (am) { S.auMode = am.dataset.aumode; save(); document.querySelectorAll('[data-aumode]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.aumode === S.auMode)); syncPlayer(); return; }
       if (e.target.closest('[data-tr]')) { cur.showTr = !cur.showTr; renderSet(); return; }
       const sg = e.target.closest('.seg[data-t]'); if (sg) { if (auLoop >= 0) auLoop = +sg.dataset.i; AU.currentTime = +sg.dataset.t; AU.play().catch(() => {}); return; }
       const pl = e.target.closest('[data-play]'); if (pl) { if (cur.playing) { speechSynthesis.cancel(); cur.playing = false; } else { const u = speak(set.script.replace(/^\s*[MW]:\s*/gm, '')); cur.playing = true; if (u) u.onend = () => { cur.playing = false; const b = $('[data-play]'); if (b) { b.innerHTML = ic('i-play'); $('.player .ttl').textContent = '再听一遍'; } }; } $('[data-play]').innerHTML = ic(cur.playing ? 'i-pause' : 'i-play'); $('.player .ttl').textContent = cur.playing ? '正在朗读…' : '点击播放录音'; return; }
-      const rt = e.target.closest('[data-rate]'); if (rt) { S.rate = +rt.dataset.rate; AU.playbackRate = S.rate; save(); document.querySelectorAll('[data-rate]').forEach((b) => b.setAttribute('aria-pressed', +b.dataset.rate === S.rate)); return; }
+      const rt = e.target.closest('[data-rate]'); if (rt) { S.rate = +rt.dataset.rate; cur.rampManual = true; AU.defaultPlaybackRate = AU.playbackRate = S.rate; save(); updRateSrc(); document.querySelectorAll('[data-rate]').forEach((b) => b.setAttribute('aria-pressed', +b.dataset.rate === S.rate)); return; }
       if (done) return;
       const o = e.target.closest('.opt[data-q]'); if (o) { ans[+o.dataset.q] = +o.dataset.k; return renderSet(); }
       const l = e.target.closest('.letters button[data-q]'); if (l) { ans[+l.dataset.q] = l.dataset.l; return renderSet(); }
@@ -893,6 +904,17 @@
     tickTimer();
     if (done) clearInterval(timerId);
     if (kind === 'listen') { syncPlayer(); watchMini(); }
+  }
+  const updRateSrc = () => { const el = $('#rateSrc'), m = cur && AUD(cur.set.id); if (el && m) el.outerHTML = rateSrc(m); };
+  // 专项训练（assets/drills.js）：在听读页里打开，返回键回列表
+  function openDrill(k) {
+    if (!window.CET6Drills) return;
+    if (cur && !cur.done) stashDraft();
+    if (!cur && !$('#view-practice').hidden) listY[psub] = window.scrollY;
+    cur = null; stopAudio(); clearInterval(timerId);
+    if (miniIO) { miniIO.disconnect(); miniIO = null; }
+    $('#practice-box').classList.remove('only-wrong');
+    window.CET6Drills.open(k); jumpTop(0);
   }
   // 播放器滚出视口时显示吸顶迷你播放条
   function watchMini() {
@@ -1132,7 +1154,7 @@
 
   /* ================= 我的 ================= */
   // 错题：新数据带 {key, src, q, a, e, mine, setId, kind, ctx}；旧数据只有 key/src/q/a/e，setId / kind 从 key、src 推出来
-  const WK = { listen: '听力', mc: '仔细阅读', match: '段落匹配', cloze: '选词填空' };
+  const WK = { listen: '听力', mc: '仔细阅读', match: '段落匹配', cloze: '选词填空', para: '同义替换' };
   const wrongKind = (w) => w.kind && WK[w.kind] ? w.kind : /听力/.test(w.src || '') ? 'listen' : /选词/.test(w.src || '') ? 'cloze' : /匹配/.test(w.src || '') ? 'match' : 'mc';
   const wrongSet = (w) => w.setId || String(w.key || '').split(':')[0];
   function wrongHTML(w) {
@@ -1180,10 +1202,11 @@
     const unknownWords = ALLWORDS.filter((w) => S.vocab[w.id] === 0 || S.vocab[w.id] === 1);
     const groups = Object.keys(WK).map((k) => [k, wrongs.filter((w) => wrongKind(w) === k)]).filter(([, xs]) => xs.length);
     const VN = 20, vShow = meVocabAll ? unknownWords : unknownWords.slice(0, VN);
+    const myWordsH = window.CET6Drills ? window.CET6Drills.myWordsHTML() : ''; // 逐句听写收的词库外生词（S.myWords）
     $('#me-box').innerHTML = `
       <div class="me-grid">
         <div class="num m-vocab"><div class="v">${st.known}</div><div class="l">认识的词</div></div>
-        <div class="num m-vocab" style="--brand:var(--red)"><div class="v" style="color:var(--red)">${unknownWords.length}</div><div class="l">生词本</div></div>
+        <div class="num m-vocab" style="--brand:var(--red)"><div class="v" style="color:var(--red)">${unknownWords.length + (Array.isArray(S.myWords) ? S.myWords.length : 0)}</div><div class="l">生词本</div></div>
         <div class="num m-read" style="--brand:var(--red)"><div class="v" style="color:var(--red)">${wrongs.length}</div><div class="l">错题</div></div>
         <div class="num m-read"><div class="v">${st.setsDone}</div><div class="l">做过的练习</div></div>
         <div class="num m-listen"><div class="v">${st.acc === null ? '—' : st.acc + '%'}</div><div class="l">练习正确率</div></div>
@@ -1195,7 +1218,8 @@
       ${histHTML()}
       <div class="sec-h"><span class="ico m-vocab">${ic('i-abc')}</span><h2>生词本</h2>${unknownWords.length ? `<button class="more" data-go-vocab>去复习 ${ic('i-chev-r')}</button>` : ''}</div>
       ${unknownWords.length ? `<div class="me-vtags">${vShow.map((w) => `<div class="mv"><b>${esc(w.w)}</b><span>${esc(w.c)}</span></div>`).join('')}</div>
-        ${unknownWords.length > VN ? `<div class="reveal" style="margin-top:10px"><button class="btn ghost" data-vall>${meVocabAll ? '收起' : `展开全部 ${unknownWords.length} 个`}</button></div>` : ''}` : `<div class="empty">${ic('i-party')}还没有生词。去"单词"页刷闪卡，点"不认识"的会收进来。</div>`}
+        ${unknownWords.length > VN ? `<div class="reveal" style="margin-top:10px"><button class="btn ghost" data-vall>${meVocabAll ? '收起' : `展开全部 ${unknownWords.length} 个`}</button></div>` : ''}` : myWordsH ? '' : `<div class="empty">${ic('i-party')}还没有生词。去"单词"页刷闪卡，点"不认识"的会收进来。</div>`}
+      ${myWordsH}
       <div class="sec-h"><span class="ico m-vocab">${ic('i-redo')}</span><h2>数据与备份</h2></div>
       <div class="card" style="margin-bottom:12px">
         <p class="lead" style="margin:0 0 10px" id="storageLine">正在读取存储状态…</p>
@@ -1232,6 +1256,7 @@
       if (e.target.closest('[data-clear]') && confirm('清空错题本？')) { S.wrong = {}; save(); renderMe(); }
       const wg = e.target.closest('[data-wgo]'); if (wg) { goSet(wg.dataset.wgo); return; }
       const xr = e.target.closest('[data-exrep]'); if (xr && window.CET6Exam) { show('exam', true); window.CET6Exam.openReport(+xr.dataset.exrep); return; }
+      const mw = e.target.closest('[data-mwdel]'); if (mw && window.CET6Drills) { window.CET6Drills.delMyWord(mw.dataset.mwdel); const y = window.scrollY; renderMe(); window.scrollTo(0, y); return; }
       const wd = e.target.closest('[data-wdel]'); if (wd) { delete S.wrong[wd.dataset.wdel]; save(); const y = window.scrollY; renderMe(); window.scrollTo(0, y); return; }
       if (e.target.closest('[data-hall]')) { histAll = !histAll; const y = window.scrollY; renderMe(); window.scrollTo(0, y); return; }
       if (e.target.closest('[data-vall]')) { meVocabAll = !meVocabAll; const y = window.scrollY; renderMe(); window.scrollTo(0, y); }
@@ -1245,6 +1270,11 @@
     qLoc, clozeCtx, goSet, renderHome, openOutline: (ch) => { show('home'); openOutline(ch); },
     openVocabDaily: () => { if (S.vgame) S.vgame.on = false; if (S.vsrc !== 'daily') { S.vsrc = 'daily'; vq = []; } save(); show('vocab'); },
     openWT: (sub) => { show('wt', true); renderWT(sub); }, openWTItem,
+  });
+  /* ---------- 给专项训练（assets/drills.js）用的接口 ---------- */
+  Object.assign(window.CET6, {
+    tokIndex, findQuote, practiceHome: () => renderPracticeHome(null, true), rerenderSet: () => { if (cur) renderSet(); },
+    openDrill: (k) => { psub = k === 'dict' ? 'listen' : 'read'; show('practice', true); openDrill(k); },
   });
   /* ---------- 给单词小游戏（assets/vgame.js）用的接口 ---------- */
   // 游戏标记：答错 → 不认识（今天刷过、清掉认识阶段）；答对且原来是「不认识」→ 升为「模糊」，不直接标认识
