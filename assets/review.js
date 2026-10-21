@@ -37,6 +37,14 @@
     if (Dr() && Dr().dictDue) Dr().dictDue().forEach((d) => add({ t: 'dict', key: d.key, id: d.key, due: d.due, w: 1 }));
     return out.sort((a, b) => b.score - a.score || KIND[a.t].ord - KIND[b.t].ord || a.due.localeCompare(b.due));
   }
+  // 每天的复习量封顶：按优先级取到约「每天可用时间」的一半（至少 10 项），积压多的往后几天慢慢消化；做完可以再加一批
+  function capOf(full) {
+    const q = sess(); if (typeof q.cap === 'number') return q.cap;
+    const budget = [30, 60, 90].includes(St().dailyMin) ? St().dailyMin : 60, lim = budget * 0.5;
+    let n = 0, m = 0; for (const x of full) { if (n >= 10 && m + KIND[x.t].min > lim) break; m += KIND[x.t].min; n++; }
+    q.cap = n; C().save(); return n;
+  }
+  function todayQ() { const full = queue(); const left = Math.max(0, capOf(full) - sess().done); return { q: full.slice(0, left), full: full.length }; }
   const minOf = (q) => (q.length ? Math.max(1, Math.round(q.reduce((a, x) => a + KIND[x.t].min, 0))) : 0);
   function observe(left) {
     const s = St(); if (!s.rvLog || typeof s.rvLog !== 'object' || Array.isArray(s.rvLog)) s.rvLog = {};
@@ -48,10 +56,12 @@
     return r;
   }
   function info() {
-    const q = queue(), by = { word: 0, rt: 0, card: 0, dict: 0 };
+    const { q, full } = todayQ(), by = { word: 0, rt: 0, card: 0, dict: 0 };
     q.forEach((x) => { by[x.t]++; });
     const r = observe(q.length);
-    return { n: q.length, min: minOf(q), by, q, total: r.n, done: r.n - r.left };
+    // 已做 / 总数按今天实际作答算（rvLog 只给周报用），封顶后不会出现「已做」比到期还多的情况
+    const dn = sess().done;
+    return { n: q.length, min: minOf(q), by, q, total: dn + q.length, done: dn, full };
   }
   const byText = (by) => [['word', '单词'], ['rt', '错题'], ['card', '卡片'], ['dict', '听写']].filter(([k]) => by[k]).map(([k, n]) => `${n} ${by[k]}`).join(' · ');
   // 首页今日计划第一项
@@ -60,7 +70,7 @@
     return {
       done: !x.n, f: x.total ? x.done / x.total : 1, min: x.n ? x.min : t.min,
       title: x.n ? `今日复习 ${x.n} 项 · 约 ${x.min} 分钟` : '今日复习',
-      p: x.n ? `${byText(x.by)}${x.done ? ` · 已做 ${x.done}` : ''}` : x.done ? `今天复习了 ${x.done} 项` : '今天没有到期的', mod: 'm-vocab',
+      p: x.n ? `${byText(x.by)}${x.done ? ` · 已做 ${x.done}` : ''}${x.full > x.n ? ` · 共 ${x.full} 项到期，按优先级今天先做这些` : ''}` : x.done ? `今天复习了 ${x.done} 项` : '今天没有到期的', mod: 'm-vocab',
     };
   }
 
@@ -68,7 +78,7 @@
   let F = null;
   function sess() { const s = St(), t = today(); if (!s.rvq || s.rvq.d !== t || !Array.isArray(s.rvq.skip)) s.rvq = { d: t, skip: [], done: 0, ok: 0 }; return s.rvq; }
   function build() {
-    const q = queue(), sk = new Set(sess().skip);
+    const q = todayQ().q, sk = new Set(sess().skip);
     F = { list: [...q.filter((x) => !sk.has(x.key)), ...q.filter((x) => sk.has(x.key))], i: 0, ok: 0, n: 0, kb: null };
   }
   function open() {
@@ -78,16 +88,16 @@
   function exit(to) { cleanup(); F = null; C().show(to || 'home'); }
   function paint() {
     const box = $('#home-box'); if (!F || !box) return;
-    const live = new Set(queue().map((x) => x.key));
+    const live = new Set(todayQ().q.map((x) => x.key));
     while (F.i < F.list.length && !live.has(F.list[F.i].key)) F.i++;
-    const r = observe(live.size), done = r.n - r.left;
+    observe(live.size); const done = sess().done, r = { n: done + live.size };
     const head = `<div class="prac-head rv-head"><button class="btn ghost" data-rvx>${ic('i-chev-l')}先退出</button><h2>今日复习</h2><span class="rv-n tabular">${done} / ${r.n}</span></div>
-      <div class="rv-prog"><span class="bar"><i style="width:${r.n ? Math.round(done / r.n * 100) : 100}%"></i></span><span class="tx">${live.size ? `还剩 ${live.size} 项 · 约 ${minOf([...queue()])} 分钟 · 进度自动保存` : '全部完成'}</span></div>`;
+      <div class="rv-prog"><span class="bar"><i style="width:${r.n ? Math.round(done / r.n * 100) : 100}%"></i></span><span class="tx">${live.size ? `还剩 ${live.size} 项 · 约 ${minOf(todayQ().q)} 分钟 · 进度自动保存` : '全部完成'}</span></div>`;
     box.onchange = null;
     if (F.i >= F.list.length) {
       const left = live.size;
       box.innerHTML = `<div class="rv-wrap">${head}<div class="result m-vocab"><div class="score">${F.ok}<small> / ${F.n}</small></div><p>${left ? `这一轮做完了，还有 ${left} 项是跳过的。` : F.n ? '今天到期的复习全部做完。答对的按各自的间隔往后排，答错的明天再来。' : '今天没有到期的复习。'}</p></div>
-        <div class="submit-bar done-bar">${left ? `<button class="btn primary" data-rvagain>${ic('i-redo')}做跳过的 ${left} 项</button>` : ''}<button class="btn${left ? '' : ' primary'}" data-rvhome>回首页</button></div></div>`;
+        <div class="submit-bar done-bar">${left ? `<button class="btn primary" data-rvagain>${ic('i-redo')}做跳过的 ${left} 项</button>` : ''}${!left && queue().length ? `<button class="btn primary" data-rvmore>${ic('i-redo')}再复习一批（还有 ${queue().length} 项到期）</button>` : ''}<button class="btn${left ? '' : ' primary'}" data-rvhome>回首页</button></div></div>`;
       box.onclick = click; F.kb = null; return;
     }
     const it = F.list[F.i], K = KIND[it.t];
@@ -113,6 +123,7 @@
   }
   function click(e) {
     if (e.target.closest('[data-rvx]') || e.target.closest('[data-rvhome]')) { exit('home'); return; }
+    if (e.target.closest('[data-rvmore]')) { const q = sess(); q.cap = (q.cap || 0) + 10; C().save(); build(); paint(); window.scrollTo(0, 0); return; }
     if (e.target.closest('[data-rvagain]')) { sess().skip = []; C().save(); build(); paint(); window.scrollTo(0, 0); }
   }
   // 切 tab：停掉音频、退出流程（进度已在各自数据里）
@@ -122,7 +133,7 @@
     if (e.target.closest && e.target.closest('input,textarea,select')) return;
     F.kb(e);
   });
-  document.addEventListener('visibilitychange', () => { if (document.hidden && window.CET6) { try { observe(queue().length); } catch (e) { /* 忽略 */ } } });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && window.CET6) { try { observe(todayQ().q.length); } catch (e) { /* 忽略 */ } } });
 
   /* ---------- 单词判定题（规则与单词页一致：英→中四选一；生词本里的词默认看中文拼英文） ---------- */
   const spellNorm = (t) => String(t || '').toLowerCase().replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim().replace(/^be /, '');
