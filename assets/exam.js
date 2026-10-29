@@ -142,7 +142,7 @@
   }
 
   /* ---------- 听力录音：每段整条文件（原文 + 题目播报 + 每题 12 秒停顿），按顺序各放一遍 ---------- */
-  const AX = new Audio(); AX.preload = 'auto';
+  const AX = new Audio(); AX.preload = 'auto'; if (window.CET6Sound) window.CET6Sound.register(AX);
   let axSi = -1, axReplay = false, axNextT = 0;
   const E = () => C().S.exam;
   const audOf = (si) => P && P.L[si] && C().AUD(P.L[si].set.id);

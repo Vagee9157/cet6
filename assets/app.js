@@ -87,6 +87,8 @@
     return { known, unknown, seen, setsDone, m, acc: t ? Math.round(r / t * 100) : null };
   }
   function speak(text, rate) {
+    // iPad / iPhone 稳定出声的处理都在 assets/sound.js（首触解锁、避开 cancel 后立即念被吞、念不出给提示）
+    if (window.CET6Sound) return window.CET6Sound.speak(text, rate || S.rate || 1);
     if (!('speechSynthesis' in window)) return alert('这个浏览器不支持语音朗读');
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text); u.lang = 'en-US'; u.rate = rate || S.rate || 1;
@@ -529,7 +531,7 @@
   const realSegs = (r) => { if (r.segs) return r.segs;  const ps = r.script.split('\n').filter(Boolean); const n = ps.map((p) => p.split(/\s+/).length); const tot = n.reduce((a, b) => a + b, 0) || 1; let acc = 0; return ps.map((p, i) => { const st = acc / tot * r.dur; acc += n[i]; return [Math.round(st * 10) / 10, Math.round(acc / tot * r.dur * 10) / 10, '', p]; }); };
   const REALMAP = Object.fromEntries(REALS.map((r) => [r.id, { src: r.src, dur: r.dur, q: r.dur, segs: realSegs(r), real: true, slow: realSlow(r) }]));
   const AUD = (id) => (HAS_AUDIO && AUDIO[id]) || REALMAP[id] || null;
-  const AU = new Audio(); AU.preload = 'auto';
+  const AU = new Audio(); AU.preload = 'auto'; if (window.CET6Sound) window.CET6Sound.register(AU);
   let auId = null, auUrl = null, auIdx = -1, auLoop = -1;
   const fmt = (x) => { x = Math.max(0, Math.floor(x || 0)); return `${Math.floor(x / 60)}:${String(x % 60).padStart(2, '0')}`; };
   const auMeta = () => (auId ? AUD(auId) : null);
@@ -540,7 +542,8 @@
     if (auUrl) { URL.revokeObjectURL(auUrl); auUrl = null; }
     const m = AUD(id);
     // 整个文件取下来再播：离线缓存能存住，拖动进度也不受网络影响
-    try { const r = await fetch(m.src); if (!r.ok) throw 0; auUrl = URL.createObjectURL(await r.blob()); if (auId === id) AU.src = auUrl; }
+    // 用户在整段载完前就点了播放（auToggle 已直接用原地址开播），就别再换 src 打断
+    try { const r = await fetch(m.src); if (!r.ok) throw 0; auUrl = URL.createObjectURL(await r.blob()); if (auId === id && (AU.paused || !AU.getAttribute('src'))) { const t = AU.currentTime; AU.src = auUrl; if (t) try { AU.currentTime = t; } catch (e) { /* ignore */ } } }
     catch { if (auId === id) AU.src = m.src; }
     applyRate(m);
   }
@@ -575,8 +578,8 @@
     syncPlayer();
   });
   ['play', 'pause', 'ended', 'loadedmetadata'].forEach((ev) => AU.addEventListener(ev, syncPlayer));
-  function stopAudio() { AU.pause(); if (window.speechSynthesis) speechSynthesis.cancel(); }
-  function auToggle() { if (AU.paused && cur && !cur.done && window.CET6Drills && window.CET6Drills.preGate(cur, AU.currentTime, auToggle)) return; if (AU.paused) { if (AU.currentTime >= auEnd() - 0.6) AU.currentTime = 0; AU.play().catch(() => {}); } else AU.pause(); }
+  function stopAudio() { AU.pause(); if (window.CET6Sound) window.CET6Sound.stop(); else if (window.speechSynthesis) speechSynthesis.cancel(); }
+  function auToggle() { if (AU.paused && cur && !cur.done && window.CET6Drills && window.CET6Drills.preGate(cur, AU.currentTime, auToggle)) return; if (AU.paused) { if (!AU.getAttribute('src') && auId && AUD(auId)) AU.src = AUD(auId).src; if (AU.currentTime >= auEnd() - 0.6) AU.currentTime = 0; AU.play().catch(() => {}); } else AU.pause(); }
   function auSeek(t) { const m = auMeta(); if (!m) return; AU.currentTime = Math.max(0, Math.min(auEnd() - 0.1, t)); if (auLoop >= 0) { const i = segAt(m, AU.currentTime); if (i >= 0) auLoop = i; } syncPlayer(); }
   // 精听控制：−5s / +5s / 单句循环（真人和录音播放器共用）
   const fineHTML = () => `<div class="ctl au-fine"><button class="chip" data-skip="-5" aria-label="后退 5 秒">−5s</button><button class="chip" data-skip="5" aria-label="前进 5 秒">+5s</button><button class="chip" data-loop aria-pressed="${auLoop >= 0}">${ic('i-redo')}单句循环</button><span class="kbd-tip">键盘：空格 播放/暂停，← → 跳 5 秒</span></div>`;

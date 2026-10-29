@@ -2014,3 +2014,9 @@ html.kbd .dd-kbd{display:revert}
 html.rt-hold #practice-box :is(.passage,.script){-webkit-user-select:none;user-select:none}
 .wt-ans{scroll-margin-top:calc(80px + env(safe-area-inset-top))}
 .ex-p-read #exRd > .passage p{margin-left:auto;margin-right:auto}
+/* ===== 声音：单词卡背面点击 / 朗读失败提示 ===== */
+/* Safari 里 backface-visibility:hidden 的背面仍会抢点击：没翻到的那一面不接收点击，背面例句的喇叭才点得到 */
+.flash:not(.flipped) .face.back,.flash.flipped .face.front{pointer-events:none}
+.flash.flipped .face.back,.flash:not(.flipped) .face.front{pointer-events:auto}
+.snd-toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translate(-50%,20px);max-width:min(92vw,520px);padding:12px 16px;border-radius:14px;background:var(--ink);color:var(--bg);font-size:14px;line-height:1.5;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:100}
+.snd-toast.on{opacity:1;transform:translate(-50%,0)}

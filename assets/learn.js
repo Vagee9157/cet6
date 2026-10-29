@@ -440,7 +440,7 @@
   }
 
   /* ---------- 错题重测：单题渲染、作答即判 ---------- */
-  const RA = new Audio(); RA.preload = 'auto';
+  const RA = new Audio(); RA.preload = 'auto'; if (window.CET6Sound) window.CET6Sound.register(RA);
   let rt = null, raRange = null;
   RA.addEventListener('timeupdate', () => { if (raRange && RA.currentTime >= raRange[1]) RA.pause(); paintRA(); });
   ['play', 'pause', 'ended'].forEach((ev) => RA.addEventListener(ev, paintRA));

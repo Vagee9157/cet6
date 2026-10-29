@@ -230,7 +230,7 @@
     });
     return DPOOL;
   }
-  const DA = new Audio(); DA.preload = 'auto';
+  const DA = new Audio(); DA.preload = 'auto'; if (window.CET6Sound) window.CET6Sound.register(DA);
   let Dd = null, daRange = null;
   DA.addEventListener('timeupdate', () => { if (daRange && DA.currentTime >= daRange[1]) DA.pause(); });
   ['play', 'pause', 'ended'].forEach((ev) => DA.addEventListener(ev, () => { const b = $('#ddPlay'); if (b) b.innerHTML = `${ic(DA.paused ? 'i-play' : 'i-pause')}${DA.paused ? '播放这句' : '暂停'}`; }));
