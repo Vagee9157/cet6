@@ -19,6 +19,11 @@
   const ALLWORDS = VOCAB.flatMap((g, gi) => g.words.map((w, wi) => ({ id: gi + ':' + wi, g: g.g, w: w[0], p: w[1], c: w[2], e: w[3] })));
   // 单词例句：VOCAB_EX（data-vocab-ex.js）每词 3 句带中文；缺数据时退回原例句
   const exOf = (w) => (typeof VOCAB_EX !== 'undefined' && VOCAB_EX[w.w]) || [[w.e, '']];
+  // 多义项：VOCAB_SENSES（data-vocab-senses.js）每词按词性分组 [词性, 释义, 熟词生义?1]；缺数据时退回单条释义
+  const sensesOf = (w) => (typeof VOCAB_SENSES !== 'undefined' && VOCAB_SENSES[w.w]) || [[w.p, w.c]];
+  const posAll = (w) => [...new Set(sensesOf(w).map((x) => x[0]))].join(' ');
+  const sensesHTML = (w) => `<ul class="senses">${sensesOf(w).map(([p, c, r]) => `<li${r ? ' class="rare"' : ''}><span class="pos">${esc(p)}</span><span class="sc">${esc(c)}${r ? '<em class="rt">熟词生义</em>' : ''}</span></li>`).join('')}</ul>`;
+  const sensesLine = (w) => sensesOf(w).map(([p, c, r]) => p + ' ' + c + (r ? '（生义）' : '')).join('　');
   // 高亮目标词：易混词按 " / " 拆开逐个高亮；短语去掉开头的 be，逐词匹配、词间允许夹 1–2 个词（take sth into account）；
   // 动词首词按规则变形 + 不规则变形表（came / ran / laid …）匹配；单词先精确匹配词形，找不到再退回词干
   const IRR = { come: 'came', run: 'ran', go: 'went|gone|goes', wear: 'wore|worn', bring: 'brought', take: 'took|taken', give: 'gave|given', make: 'made', have: 'had|has|having', hold: 'held', keep: 'kept', lay: 'laid', lie: 'lay|lain|lying', seek: 'sought', bear: 'bore|borne|born', get: 'got|gotten', stand: 'stood', find: 'found', think: 'thought', catch: 'caught', teach: 'taught', buy: 'bought', fight: 'fought', sell: 'sold', tell: 'told', say: 'said', pay: 'paid', mean: 'meant', send: 'sent', spend: 'spent', build: 'built', lend: 'lent', lose: 'lost', leave: 'left', feel: 'felt', deal: 'dealt', dwell: 'dwelt', meet: 'met', lead: 'led', feed: 'fed', flee: 'fled', win: 'won', hang: 'hung', bind: 'bound', strike: 'struck', stick: 'stuck', rise: 'rose|risen', arise: 'arose|arisen', write: 'wrote|written', drive: 'drove|driven', ride: 'rode|ridden', break: 'broke|broken', speak: 'spoke|spoken', choose: 'chose|chosen', freeze: 'froze|frozen', steal: 'stole|stolen', forget: 'forgot|forgotten', fall: 'fell|fallen', grow: 'grew|grown', know: 'knew|known', throw: 'threw|thrown', draw: 'drew|drawn', withdraw: 'withdrew|withdrawn', see: 'saw|seen', foresee: 'foresaw|foreseen', begin: 'began|begun', drink: 'drank|drunk', sink: 'sank|sunk', shrink: 'shrank|shrunk', swim: 'swam|swum', eat: 'ate|eaten', hide: 'hid|hidden', forbid: 'forbade|forbidden', shake: 'shook|shaken', undertake: 'undertook|undertaken', overcome: 'overcame', become: 'became', understand: 'understood', withstand: 'withstood', undergo: 'underwent|undergone', strive: 'strove|striven', light: 'lit', shed: 'shed', put: 'put', set: 'set', cut: 'cut', let: 'let', spread: 'spread', cast: 'cast', cost: 'cost', hurt: 'hurt', quit: 'quit', split: 'split', upset: 'upset', burst: 'burst' };
@@ -445,22 +450,22 @@
       <div class="vt m-vocab${src !== 'topic' ? ' hide' : ''} ${vtOpen ? 'open' : ''}"><button class="vt-cur" id="vtToggle" aria-expanded="${vtOpen}"><span class="vt-lab">当前主题</span><b>${esc(grp.g)}</b><span class="vt-n">${gDone}/${grp.words.length}</span><span class="vt-sw">${vtOpen ? '收起' : '切换主题'}</span>${ic('i-chev-r')}</button>
         ${(() => { const tile = (g, i) => { const d = g.words.filter((x, wi) => S.vocab[i + ':' + wi] === 2).length; return `<button class="vt-tile" data-vg="${i}" aria-pressed="${i === vg}"><span class="nm">${esc(g.g.replace(/^(核心|高频) · /, ''))}</span><span class="ct">${d}/${g.words.length}</span><span class="bar"><i style="width:${Math.round(d / g.words.length * 100)}%"></i></span></button>`; };
           // 主题按档分区：基础（原 20 组）/ 核心 / 高频
-          const tiers = [['基础', (g) => !/^(核心|高频) ·/.test(g.g)], ['核心词', (g) => /^核心 ·/.test(g.g)], ['高频词', (g) => /^高频 ·/.test(g.g)]];
+          const tiers = [['基础', (g) => !/^(核心 ·|高频 ·|熟词生义)/.test(g.g)], ['核心词', (g) => /^核心 ·/.test(g.g)], ['高频词', (g) => /^高频 ·/.test(g.g)], ['熟词生义', (g) => /^熟词生义/.test(g.g)]];
           return tiers.map(([n, f]) => { const ix = VOCAB.map((g, i) => [g, i]).filter(([g]) => f(g)); if (!ix.length) return ''; const tot = ix.reduce((a, [g]) => a + g.words.length, 0), kn = ix.reduce((a, [g, i]) => a + g.words.filter((x, wi) => S.vocab[i + ':' + wi] === 2).length, 0); return `<div class="vt-sec"><div class="vt-sh"><b>${n}</b><span>${ix.length} 组 · 认识 ${kn}/${tot}</span></div><div class="vt-grid">${ix.map(([g, i]) => tile(g, i)).join('')}</div></div>`; }).join(''); })()}</div>
       <div class="v-split">
       <div class="flash-wrap">
         <div class="flash-meta">${meta}</div>
         ${w && quizing ? quizHTML(w) : w ? `${vqz ? quizHTML(w) : ''}
         <div class="flash ${flipped ? 'flipped' : ''}" id="flash"><div class="inner">
-          <div class="face front"><button class="spk" data-say="${esc(w.w)}" aria-label="朗读">${ic('i-vol')}</button><div class="w">${esc(w.w)}</div><span class="pos">${esc(w.p)}</span></div>
-          <div class="face back"><div class="bk-hd"><span class="bw">${esc(w.w)}</span><span class="pos">${esc(w.p)}</span></div><div class="cn">${esc(w.c)}</div><ol class="exs">${exOf(w).map(([en, zh]) => `<li><button class="spk sm" data-say="${esc(en)}" aria-label="朗读例句">${ic('i-vol')}</button><div class="ex">${hlWord(esc(en), w.w)}</div><div class="zh">${esc(zh)}</div></li>`).join('')}</ol></div>
+          <div class="face front"><button class="spk" data-say="${esc(w.w)}" aria-label="朗读">${ic('i-vol')}</button><div class="w">${esc(w.w)}</div><span class="pos">${esc(posAll(w))}</span></div>
+          <div class="face back"><div class="bk-hd"><span class="bw">${esc(w.w)}</span></div>${sensesHTML(w)}<ol class="exs">${exOf(w).map(([en, zh]) => `<li><button class="spk sm" data-say="${esc(en)}" aria-label="朗读例句">${ic('i-vol')}</button><div class="ex wtap">${hlWord(esc(en), w.w)}</div><div class="zh">${esc(zh)}</div></li>`).join('')}</ol><div class="ex-tip">点例句里的单词可以查释义</div></div>
         </div></div>
         ${vqz ? quizNext() : `<div class="flash-acts"><button class="btn no" data-mark="0">${ic('i-x')}不认识</button><button class="btn so" data-mark="1">模糊</button><button class="btn ok" data-mark="2">${ic('i-check')}认识</button></div>`}`
         : empty}
         <div class="flash-sub"><button class="btn ghost" data-undo ${vhist.length ? '' : 'disabled'}>${ic('i-redo')}撤销上一个</button><span class="kbd-hint">${quizing ? (vqz.kind === 'mc' ? '1–4 选择 · Z 撤销' : '回车 提交 · Z 撤销') : vqz ? '回车 下一个 · Z 撤销' : '空格 翻面 · 1 / 2 / 3 标记 · S 朗读 · Z 撤销'}</span></div>
       </div>
       <div class="v-list"><div class="sec-h"><h2 style="font-size:16px">${daily ? '今日单词表' : wrong ? '生词表' : '本组单词表'}</h2></div>
-      <div class="vocab-list">${listRows.map((x) => { const s = S.vocab[x.id]; return `<button class="vw ${s === 0 || s === 1 ? 'unknown' : s === 2 ? 'known' : ''}${daily && S.vseen[x.id] === dd ? ' done' : ''}${w && w.id === x.id ? ' cur' : ''}" data-vw="${x.id}"><span class="hd"><span class="w">${esc(x.w)}</span><span class="pos">${esc(x.p)}</span></span><span class="cn">${esc(x.c)}</span></button>`; }).join('')}</div></div></div>`;
+      <div class="vocab-list">${listRows.map((x) => { const s = S.vocab[x.id]; return `<button class="vw ${s === 0 || s === 1 ? 'unknown' : s === 2 ? 'known' : ''}${daily && S.vseen[x.id] === dd ? ' done' : ''}${w && w.id === x.id ? ' cur' : ''}" data-vw="${x.id}"><span class="hd"><span class="w">${esc(x.w)}</span><span class="pos">${esc(posAll(x))}</span></span><span class="cn">${esc(sensesLine(x))}</span></button>`; }).join('')}</div></div></div>`;
     $('#vocab-box').onclick = (e) => {
       // 点单词表里的词：卡片切到这个词（不在当前队列就插到当前位置），滚回卡片
       const vw = e.target.closest('[data-vw]'); if (vw) { const id = vw.dataset.vw; const k = vq.findIndex((x, i) => i >= vi && x.id === id); if (k === -1) vq.splice(vi, 0, wordOf(id)); else if (k > vi) { const [x] = vq.splice(k, 1); vq.splice(vi, 0, x); } flipped = false; renderVocab(); const fw = $('.flash-wrap'), ft = fw.getBoundingClientRect().top; if (ft < 50 || ft > innerHeight * 0.45) fw.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
@@ -1334,7 +1339,7 @@
     else if (S.vocab[id] === 0) { S.vocab[id] = 1; }
     save();
   };
-  Object.assign(window.CET6, { VOCAB, ALLWORDS, exOf, hlWord, speak, dailyPlan, isWrong, wordOf, shuffle, gameMark, renderVocab });
+  Object.assign(window.CET6, { VOCAB, ALLWORDS, exOf, sensesOf, sensesHTML, sensesLine, posAll, hlWord, speak, dailyPlan, isWrong, wordOf, shuffle, gameMark, renderVocab });
   /* ---------- 给今日复习流程（assets/review.js）用的接口 ---------- */
   // vreview：复习判定题作答（与单词页判定题同一套规则：答对 = 认识升一级，答错 = 不认识、阶段清零）；vfuzzy：「蒙对的，记模糊」
   Object.assign(window.CET6, {

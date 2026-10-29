@@ -179,7 +179,9 @@
   }
 
   /* ================= 原文点词 ================= */
-  const AREA = '#practice-box .passage, #practice-box .script';
+  const AREA = '#practice-box .passage, #practice-box .script, .wtap';
+  // .wtap：单词卡 / 复习卡 / 小游戏词卡里的例句，单击就查词（句子短、没有点句重听）
+  const TAP = '.wtap';
   const WCH = /[A-Za-z'’-]/;
   function caretAt(x, y) {
     if (document.caretPositionFromPoint) { const p = document.caretPositionFromPoint(x, y); return p && { node: p.offsetNode, off: p.offset }; }
@@ -198,7 +200,7 @@
     try { const rg = document.createRange(); rg.setStart(c.node, a); rg.setEnd(c.node, b); const rc = rg.getBoundingClientRect(); if (rc.width && (x < rc.left - 6 || x > rc.right + 6 || y < rc.top - 6 || y > rc.bottom + 6)) return null; } catch {}
     let w = t.slice(a, b).replace(/^['’-]+|['’-]+$/g, '').replace(/['’]s$/i, '');
     if (w.length < 2 || !/[A-Za-z]/.test(w)) return null;
-    const host = c.node.parentElement.closest('.seg, p') || area;
+    const host = c.node.parentElement.closest('.seg, p, .wtap') || area;
     let pre = 0; try { const r = document.createRange(); r.setStart(host, 0); r.setEnd(c.node, a); pre = r.toString().length; } catch {}
     return { w, ctx: sentenceOf(host.textContent || '', pre), x, y };
   }
@@ -219,16 +221,19 @@
     }
     return id ? C().wordOf(id) : null;
   }
+  // 单词库以外的词：例句小词典 VOCAB_GLOSS（data-vocab-gloss.js，按词形查）
+  const glossOf = (w) => { if (typeof VOCAB_GLOSS === 'undefined') return ''; const k = w.toLowerCase().replace(/’/g, "'"); const tries = [k, k.replace(/'s$/, ''), k.replace(/s$/, ''), k.replace(/es$/, ''), k.replace(/ies$/, 'y'), k.replace(/ed$/, ''), k.replace(/d$/, ''), k.replace(/ing$/, ''), k.replace(/ing$/, 'e')]; for (const t of tries) if (VOCAB_GLOSS[t]) return t === k ? VOCAB_GLOSS[t] : `${t}（原形）  ${VOCAB_GLOSS[t]}`; return ''; };
   const curSetId = () => (C().curSet ? C().curSet() : '');
   let pop = null, popW = null;
   function hidePop() { if (pop) pop.hidden = true; popW = null; }
   function popHTML(info) {
-    const s = St(), v = lookup(info.w);
+    const s = St(), v = lookup(info.w), gl = v ? '' : glossOf(info.w);
     const inMy = !v && (s.myWords || []).some((x) => x && x.w.toLowerCase() === info.w.toLowerCase());
     const st = v ? s.vocab[v.id] : undefined, inBook = v ? st === 0 || st === 1 : inMy;
     const ctx = info.ctx ? esc(info.ctx).replace(new RegExp(`\\b(${info.w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})\\b`, 'i'), '<mark>$1</mark>') : '';
     return `<div class="wp-h"><b class="wp-w">${esc(info.w)}</b><button class="wp-ic" data-wp-say aria-label="朗读">${ic('i-vol')}</button><button class="wp-ic wp-x" data-wp-x aria-label="关闭">${ic('i-x')}</button></div>
-      ${v ? `<div class="wp-d">${v.w.toLowerCase() !== info.w.toLowerCase() ? `<span class="wp-base">原形 <b>${esc(v.w)}</b></span>` : ''}<span class="pos">${esc(v.p)}</span> ${esc(v.c)}</div>${st === 2 ? '<div class="wp-st">单词库里已标「认识」</div>' : ''}`
+      ${v ? `<div class="wp-d">${v.w.toLowerCase() !== info.w.toLowerCase() ? `<span class="wp-base">原形 <b>${esc(v.w)}</b></span>` : ''}${C().sensesHTML ? C().sensesHTML(v) : `<span class="pos">${esc(v.p)}</span> ${esc(v.c)}`}</div>${st === 2 ? '<div class="wp-st">单词库里已标「认识」</div>' : ''}`
+        : gl ? `<div class="wp-d wp-gl">${gl.split(/\s{2,}/).map(esc).join('<br>')}</div><div class="wp-d dim">不在单词库里，加入生词本会连同这句原文一起存下。</div>`
         : `<div class="wp-d dim">单词库里没有这个词。加入生词本会连同这句原文一起存下，「我的 · 生词本」里能看到。</div>`}
       ${ctx ? `<div class="wp-ctx">${ctx}</div>` : ''}
       <div class="wp-acts">${inBook ? `<button class="btn soft m-vocab" disabled>${ic('i-check')}已在生词本</button>` : `<button class="btn primary" data-wp-add>${ic('i-abc')}加入生词本</button>`}</div>`;
@@ -264,7 +269,7 @@
   let lp = null, swallow = 0;
   document.addEventListener('pointerdown', (e) => {
     if (pop && !pop.hidden && !e.target.closest('.wpop')) hidePop();
-    if (e.pointerType === 'mouse' || !e.target.closest || !e.target.closest(AREA) || St().tapWord) return;
+    if (e.pointerType === 'mouse' || !e.target.closest || !e.target.closest(AREA) || e.target.closest(TAP) || St().tapWord) return;
     const x = e.clientX, y = e.clientY;
     lp = { x, y, id: e.pointerId, t: setTimeout(() => { lp = null; if (pick(x, y)) { swallow = Date.now(); if (navigator.vibrate) try { navigator.vibrate(10); } catch {} } }, 300) };
   }, true);
@@ -277,7 +282,7 @@
   document.addEventListener('click', (e) => {
     if (!e.target.closest) return;
     if (Date.now() - swallow < 700 && e.target.closest(AREA)) { e.preventDefault(); e.stopPropagation(); return; }
-    if (!St().tapWord || !e.target.closest(AREA) || e.target.closest('button')) return;
+    if (!(St().tapWord || e.target.closest(TAP)) || !e.target.closest(AREA) || e.target.closest('button')) return;
     if (pick(e.clientX, e.clientY)) { e.preventDefault(); e.stopPropagation(); }
   }, true);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hidePop(); });

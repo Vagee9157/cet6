@@ -2020,3 +2020,23 @@ html.rt-hold #practice-box :is(.passage,.script){-webkit-user-select:none;user-s
 .flash.flipped .face.back,.flash:not(.flipped) .face.front{pointer-events:auto}
 .snd-toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translate(-50%,20px);max-width:min(92vw,520px);padding:12px 16px;border-radius:14px;background:var(--ink);color:var(--bg);font-size:14px;line-height:1.5;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:100}
 .snd-toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* ===== 多义项：按词性分行，熟词生义加标签；例句单击查词 ===== */
+.wpop{z-index:70}
+.senses{list-style:none;margin:8px 0 12px;padding:0;display:flex;flex-direction:column;gap:5px;text-align:left}
+.senses li{display:flex;gap:8px;align-items:baseline;line-height:1.5}
+.senses .pos{flex:none;min-width:2.6em;font-size:12.5px;color:var(--ink-dim);font-style:italic}
+.senses .sc{font-size:16px;font-weight:600;color:var(--ink)}
+.senses li.rare .sc{color:var(--ink)}
+.senses .rt{font-style:normal;font-size:11px;font-weight:700;margin-left:6px;padding:1px 6px;border-radius:999px;background:#fff1d6;color:#a35a00;vertical-align:1px;white-space:nowrap}
+.face.back .senses .sc{font-size:18px}
+.wp-d .senses{margin:4px 0 2px}
+.wp-d .senses .sc{font-size:14px;font-weight:500}
+.vg-card .senses .sc{font-size:16px}
+.vw .cn{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.wtap{cursor:pointer}
+@media (hover:hover){.wtap:hover{text-decoration:underline dotted var(--ink-mute);text-underline-offset:3px}}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .senses .rt{background:#4a3410;color:#ffcf85}}
+:root[data-theme="dark"] .senses .rt{background:#4a3410;color:#ffcf85}
+.ex-tip{margin:10px 0 -22px;font-size:11.5px;color:var(--ink-mute)}
+.wp-gl{font-size:14px;line-height:1.6}

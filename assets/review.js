@@ -165,8 +165,8 @@
       const mine = q.kind === 'mc' ? (q.pick != null && q.pick !== q.a ? `你选：${esc(q.opts[q.pick])}` : '') : q.input ? `你写：${esc(q.input)}` : '';
       const ex = (c.exOf(w) || []).slice(0, 2);
       el.innerHTML = `<div class="vq-res ${ok ? 'ok' : 'bad'}" role="status"><b>${ok ? `${ic('i-check')}答对了，升一级` : `${ic('i-x')}${q.pick == null && !q.input ? '记为不认识' : '答错了，记为不认识'}`}</b><span>${mine}</span><span class="nx">${ok ? `下次 ${esc(c.vdueDay(id) || '')} 再查` : '阶段清零，明天再来'}</span></div>
-        <div class="card rv-wcard m-vocab"><div class="bk-hd"><span class="bw">${esc(w.w)}</span><span class="pos">${esc(w.p)}</span><button class="spk sm" data-say="${esc(w.w)}" aria-label="朗读">${ic('i-vol')}</button></div><div class="cn">${esc(w.c)}</div>
-          <ol class="exs">${ex.map(([en, zh]) => `<li><div class="ex">${c.hlWord(esc(en), w.w)}</div>${zh ? `<div class="zh">${esc(zh)}</div>` : ''}</li>`).join('')}</ol></div>
+        <div class="card rv-wcard m-vocab"><div class="bk-hd"><span class="bw">${esc(w.w)}</span><button class="spk sm" data-say="${esc(w.w)}" aria-label="朗读">${ic('i-vol')}</button></div>${c.sensesHTML ? c.sensesHTML(w) : `<div class="cn">${esc(w.c)}</div>`}
+          <ol class="exs">${ex.map(([en, zh]) => `<li><div class="ex wtap">${c.hlWord(esc(en), w.w)}</div>${zh ? `<div class="zh">${esc(zh)}</div>` : ''}</li>`).join('')}</ol></div>
         <div class="vq-next"><button class="btn primary" data-rvwnext>下一项${ic('i-chev-r')}</button>${ok ? '<button class="btn ghost" data-rvwfuzzy>蒙对的，记模糊</button>' : ''}</div>`;
     };
     el.onclick = (e) => {
