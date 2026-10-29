@@ -60,7 +60,7 @@
     if (/Premium|高级|優質/i.test(v.name)) s += 60;
     else if (/Natural|Neural|Online/i.test(v.name)) s += 55;
     else if (/Enhanced|增强|強化/i.test(v.name)) s += 45;
-    else if (/^Google/i.test(v.name)) s += 35;
+    else if (/^Google/i.test(v.name)) s += 2;   // Chrome 的 Google 声音走网络，偶尔不出声，排在本机声音后面
     if (/Ava|Zoe|Evan|Nathan|Allison|Samantha|Susan|Tom|Aria|Jenny|Guy|Emma|Brian|Andrew|Michelle/i.test(v.name)) s += 5;
     if (v.localService) s += 1;
     return s;
@@ -127,6 +127,16 @@
       if (e && (e.error === 'interrupted' || e.error === 'canceled')) return;
       if (!warned) { warned = true; toast('没念出来：请确认设备没静音、音量已打开；iPad 可在「设置 › 辅助功能 › 朗读内容 › 声音」里下载英语语音。'); }
     };
+    // 看门狗：1.5 秒还没开口（选中的声音不可用、网络声音失败等），换系统默认声音再念一次
+    let started = false; u.onstart = () => { started = true; };
+    const retry = setTimeout(() => {
+      if (started || keep !== u) return;
+      try { SS.cancel(); } catch (e) { /* ignore */ }
+      const u2 = new SpeechSynthesisUtterance(text); u2.lang = 'en-US'; u2.rate = u.rate; keep = u2;
+      u2.onend = () => { if (keep === u2) keep = null; }; u2.onerror = u.onerror;
+      setTimeout(() => SS.speak(u2), 60);
+    }, 1500);
+    u.addEventListener('end', () => clearTimeout(retry));
     try { if (SS.paused) SS.resume(); } catch (e) { /* ignore */ }
     if (SS.speaking || SS.pending) { SS.cancel(); setTimeout(() => SS.speak(u), 80); }
     else SS.speak(u);
