@@ -23,6 +23,16 @@
   const sensesOf = (w) => (typeof VOCAB_SENSES !== 'undefined' && VOCAB_SENSES[w.w]) || [[w.p, w.c]];
   const posAll = (w) => [...new Set(sensesOf(w).map((x) => x[0]))].join(' ');
   const sensesHTML = (w) => `<ul class="senses">${sensesOf(w).map(([p, c, r]) => `<li${r ? ' class="rare"' : ''}><span class="pos">${esc(p)}</span><span class="sc">${esc(c)}${r ? '<em class="rt">熟词生义</em>' : ''}</span></li>`).join('')}</ul>`;
+  // 词形与记忆：VOCAB_MORPH（data-vocab-morph.js）{i 变形, f [[词性, 派生词, 中文]], r [[词素, 含义]], m 记忆提示}；点派生词朗读
+  const morphOf = (w) => (typeof VOCAB_MORPH !== 'undefined' && VOCAB_MORPH[w.w]) || null;
+  const morphHTML = (w) => {
+    const m = morphOf(w); if (!m) return ''; const out = [];
+    if (m.r && m.r.length) out.push(`<div class="mo-row"><span class="mo-l">词根词缀</span><div class="mo-v"><div class="mo-root">${m.r.map(([a, b]) => `<span class="mp"><b>${esc(a)}</b><i>${esc(b)}</i></span>`).join('<span class="mo-plus">+</span>')}</div>${m.m ? `<div class="mo-m">${esc(m.m)}</div>` : ''}</div></div>`);
+    else if (m.m) out.push(`<div class="mo-row"><span class="mo-l">记忆</span><div class="mo-v"><div class="mo-m">${esc(m.m)}</div></div></div>`);
+    if (m.f && m.f.length) out.push(`<div class="mo-row"><span class="mo-l">词族</span><div class="mo-v mo-f">${m.f.map(([p, x, c]) => `<button class="mo-w" data-say="${esc(x)}" title="点一下朗读"><span class="pos">${esc(p)}</span><b>${esc(x)}</b><span class="c">${esc(c)}</span></button>`).join('')}</div></div>`);
+    if (m.i) out.push(`<div class="mo-row"><span class="mo-l">变形</span><div class="mo-v mo-i">${esc(m.i)}</div></div>`);
+    return out.length ? `<div class="morph">${out.join('')}</div>` : '';
+  };
   const sensesLine = (w) => sensesOf(w).map(([p, c, r]) => p + ' ' + c + (r ? '（生义）' : '')).join('　');
   // 高亮目标词：易混词按 " / " 拆开逐个高亮；短语去掉开头的 be，逐词匹配、词间允许夹 1–2 个词（take sth into account）；
   // 动词首词按规则变形 + 不规则变形表（came / ran / laid …）匹配；单词先精确匹配词形，找不到再退回词干
@@ -91,6 +101,22 @@
     let r = 0, t = 0; Object.values(S.sets).forEach((s) => { r += s.r; t += s.t; });
     return { known, unknown, seen, setsDone, m, acc: t ? Math.round(r / t * 100) : null };
   }
+  // 「我的 · 朗读声音」：列出本机英语声音（按自然度排序），点一个就选中并试听；没有自然声音时按设备给下载指引
+  const voiceCardHTML = () => {
+    const SD = window.CET6Sound; if (!SD || !SD.voices) return '<p class="lead" style="margin:0">这个浏览器不支持朗读。</p>';
+    const vs = SD.voices().slice(0, 10), cur = SD.pickVoice(), best = vs[0];
+    const ua = navigator.userAgent, ios = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1), mac = !ios && /Macintosh/.test(ua), edge = /Edg\//.test(ua), win = /Windows/.test(ua), android = /Android/.test(ua);
+    const tip = ios ? '在 iPad / iPhone 的「设置 › 辅助功能 › 朗读内容 › 声音 › 英语」里，下载 <b>Ava</b>、<b>Zoe</b> 或 <b>Evan</b> 的「高级」版本（几百 MB，建议连 Wi-Fi），下载完回来刷新页面，在下面选它。'
+      : mac ? '在 Mac 的「系统设置 › 辅助功能 › 朗读内容 › 系统声音 › 管理声音」里，下载英语的 <b>Ava（高级）</b> 或 <b>Zoe（高级）</b>，然后刷新页面在下面选它；也可以用 Edge 浏览器打开本站，自带 Natural 声音。'
+      : win && !edge ? '用 <b>Edge 浏览器</b>打开本站，可以直接用微软的 Aria / Jenny / Guy 等 Natural（神经网络）声音，最接近真人。'
+      : android ? '在手机「设置 › 无障碍 › 文字转语音」里把首选引擎设为 Google，并下载「英语（美国）」的高品质语音包。' : '换用 Edge 浏览器或系统自带的高级英语声音会更自然。';
+    const good = best && SD.natural(best);
+    return `<p class="lead" style="margin:0 0 10px">单词卡的单词和例句配了录好的神经网络语音（和听读同一种，接近真人）；其他朗读（点词查到的生词、词族里的派生词等）用设备自带的声音。${good ? '下面标「自然」的是神经网络 / 高级声音，听起来接近真人，已经默认选上最好的那个。' : `这台设备目前只有标准声音，听起来会比较机械。${tip}`}点一个声音会立刻试听。</p>
+      <div class="vc-list">${vs.length ? vs.map((v) => `<button class="vc ${cur && v.voiceURI === cur.voiceURI ? 'on' : ''}" data-voice="${esc(v.voiceURI)}"><b>${esc(v.name)}</b><span class="vc-l">${esc(v.lang)}</span>${SD.natural(v) ? '<span class="vc-t">自然</span>' : ''}</button>`).join('') : '<span class="lead">声音列表还在加载，稍等或刷新一下。</span>'}</div>
+      ${good ? `<p class="vnew-sug" style="margin:10px 0 0">想要更自然：${tip}</p>` : ''}`;
+  };
+  document.addEventListener('cet6-voices', () => { const el = document.getElementById('voiceCard'); if (el) el.innerHTML = voiceCardHTML(); });
+
   function speak(text, rate) {
     // iPad / iPhone 稳定出声的处理都在 assets/sound.js（首触解锁、避开 cancel 后立即念被吞、念不出给提示）
     if (window.CET6Sound) return window.CET6Sound.speak(text, rate || S.rate || 1);
@@ -458,7 +484,7 @@
         ${w && quizing ? quizHTML(w) : w ? `${vqz ? quizHTML(w) : ''}
         <div class="flash ${flipped ? 'flipped' : ''}" id="flash"><div class="inner">
           <div class="face front"><button class="spk" data-say="${esc(w.w)}" aria-label="朗读">${ic('i-vol')}</button><div class="w">${esc(w.w)}</div><span class="pos">${esc(posAll(w))}</span></div>
-          <div class="face back"><div class="bk-hd"><span class="bw">${esc(w.w)}</span></div>${sensesHTML(w)}<ol class="exs">${exOf(w).map(([en, zh]) => `<li><button class="spk sm" data-say="${esc(en)}" aria-label="朗读例句">${ic('i-vol')}</button><div class="ex wtap">${hlWord(esc(en), w.w)}</div><div class="zh">${esc(zh)}</div></li>`).join('')}</ol><div class="ex-tip">点例句里的单词可以查释义</div></div>
+          <div class="face back"><div class="bk-hd"><span class="bw">${esc(w.w)}</span></div>${sensesHTML(w)}${morphHTML(w)}<ol class="exs">${exOf(w).map(([en, zh]) => `<li><button class="spk sm" data-say="${esc(en)}" aria-label="朗读例句">${ic('i-vol')}</button><div class="ex wtap">${hlWord(esc(en), w.w)}</div><div class="zh">${esc(zh)}</div></li>`).join('')}</ol><div class="ex-tip">点例句里的单词可以查释义</div></div>
         </div></div>
         ${vqz ? quizNext() : `<div class="flash-acts"><button class="btn no" data-mark="0">${ic('i-x')}不认识</button><button class="btn so" data-mark="1">模糊</button><button class="btn ok" data-mark="2">${ic('i-check')}认识</button></div>`}`
         : empty}
@@ -1273,6 +1299,8 @@
       ${unknownWords.length ? `<div class="me-vtags">${vShow.map((w) => `<div class="mv"><b>${esc(w.w)}</b><span>${esc(w.c)}</span></div>`).join('')}</div>
         ${unknownWords.length > VN ? `<div class="reveal" style="margin-top:10px"><button class="btn ghost" data-vall>${meVocabAll ? '收起' : `展开全部 ${unknownWords.length} 个`}</button></div>` : ''}` : myWordsH ? '' : `<div class="empty">${ic('i-party')}还没有生词。去"单词"页刷闪卡，点"不认识"的会收进来。</div>`}
       ${myWordsH}
+      <div class="sec-h" id="voiceSec"><span class="ico m-listen">${ic('i-vol')}</span><h2>朗读声音</h2></div>
+      <div class="card" id="voiceCard" style="margin-bottom:12px">${voiceCardHTML()}</div>
       <div class="sec-h"><span class="ico m-vocab">${ic('i-redo')}</span><h2>数据与备份</h2></div>
       <div class="card" style="margin-bottom:12px">
         <p class="lead" style="margin:0 0 10px" id="storageLine">正在读取存储状态…</p>
@@ -1299,6 +1327,7 @@
       } catch { alert('不是本站的备份文件。'); }
     };
     $('#me-box').onclick = (e) => {
+      const vc = e.target.closest('[data-voice]'); if (vc) { S.voice = vc.dataset.voice; save(); speak('We ended up staying home because of the heavy rain.'); $('#voiceCard').innerHTML = voiceCardHTML(); return; }
       if (e.target.closest('[data-export]')) {
         const blob = new Blob([JSON.stringify({ app: 'cet6', at: Date.now(), state: S })], { type: 'application/json' });
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `cet6-backup-${today()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); return;
@@ -1339,7 +1368,7 @@
     else if (S.vocab[id] === 0) { S.vocab[id] = 1; }
     save();
   };
-  Object.assign(window.CET6, { VOCAB, ALLWORDS, exOf, sensesOf, sensesHTML, sensesLine, posAll, hlWord, speak, dailyPlan, isWrong, wordOf, shuffle, gameMark, renderVocab });
+  Object.assign(window.CET6, { VOCAB, ALLWORDS, exOf, sensesOf, sensesHTML, morphOf, morphHTML, sensesLine, posAll, hlWord, speak, dailyPlan, isWrong, wordOf, shuffle, gameMark, renderVocab });
   /* ---------- 给今日复习流程（assets/review.js）用的接口 ---------- */
   // vreview：复习判定题作答（与单词页判定题同一套规则：答对 = 认识升一级，答错 = 不认识、阶段清零）；vfuzzy：「蒙对的，记模糊」
   Object.assign(window.CET6, {

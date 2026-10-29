@@ -346,12 +346,12 @@
     </div>`;
   }
   function openCard(id) {
-    const { esc, ic, ALLWORDS, exOf, hlWord, sensesHTML, S } = C(), w = ALLWORDS.find((x) => x.id === id); if (!w) return;
+    const { esc, ic, ALLWORDS, exOf, hlWord, sensesHTML, morphHTML, S } = C(), w = ALLWORDS.find((x) => x.id === id); if (!w) return;
     closeCard();
     const st = S.vocab[id], stT = st === 0 ? '不认识' : st === 1 ? '模糊' : st === 2 ? '认识' : '未标记';
     const el = document.createElement('div'); el.className = 'vg-pop'; el.id = 'vgPop';
     el.innerHTML = `<div class="vg-card card" role="dialog" aria-modal="true" aria-label="${esc(w.w)}"><button class="vg-x" data-vg-close aria-label="关闭">${ic('i-x')}</button>
-      <div class="hd"><b>${esc(w.w)}</b>${sayBtn(w.w)}</div>${sensesHTML(w)}<div class="st">${esc(w.g)} · ${stT}</div>
+      <div class="hd"><b>${esc(w.w)}</b>${sayBtn(w.w)}</div>${sensesHTML(w)}${morphHTML(w)}<div class="st">${esc(w.g)} · ${stT}</div>
       <ol>${exOf(w).map(([en, zh]) => `<li>${sayBtn(en, '朗读例句')}<div><div class="en wtap">${hlWord(esc(en), w.w)}</div>${zh ? `<div class="zh">${esc(zh)}</div>` : ''}</div></li>`).join('')}</ol></div>`;
     el.addEventListener('click', (e) => { if (e.target === el || e.target.closest('[data-vg-close]')) return closeCard(); const sp = e.target.closest('[data-say]'); if (sp) C().speak(sp.dataset.say, 0.9); });
     document.body.appendChild(el); popId = id; $('[data-vg-close]', el).focus({ preventScroll: true });

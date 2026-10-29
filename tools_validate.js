@@ -1,7 +1,7 @@
 // 题库自检：node tools_validate.js
 const fs=require('fs'),vm=require('vm');
-const files=['assets/data-outline.js','assets/data-vocab.js','assets/data-practice.js','assets/data-listening-2.js','assets/data-reading-2.js','assets/data-writing-2.js','assets/data-vocab-2.js','assets/data-listening-3.js','assets/data-reading-3.js','assets/data-reading-4.js','assets/data-writing-3.js','assets/data-writing-4.js','assets/data-vocab-3.js','assets/data-real.js','assets/data-vocab-ex.js','assets/data-vocab-4.js','assets/data-vocab-5.js','assets/data-vocab-senses.js'];
-const src=files.map(f=>fs.readFileSync(f,'utf8')).join('\n')+'\n;({VOCAB,LISTENING,READING,WRITING,TRANSLATION,CHAPTERS,REAL,VOCAB_EX,VOCAB_SENSES})';
+const files=['assets/data-outline.js','assets/data-vocab.js','assets/data-practice.js','assets/data-listening-2.js','assets/data-reading-2.js','assets/data-writing-2.js','assets/data-vocab-2.js','assets/data-listening-3.js','assets/data-reading-3.js','assets/data-reading-4.js','assets/data-writing-3.js','assets/data-writing-4.js','assets/data-vocab-3.js','assets/data-real.js','assets/data-vocab-ex.js','assets/data-vocab-4.js','assets/data-vocab-5.js','assets/data-vocab-senses.js','assets/data-vocab-morph.js'];
+const src=files.map(f=>fs.readFileSync(f,'utf8')).join('\n')+'\n;({VOCAB,LISTENING,READING,WRITING,TRANSLATION,CHAPTERS,REAL,VOCAB_EX,VOCAB_SENSES,VOCAB_MORPH})';
 const R=vm.runInContext(src,vm.createContext({window:{},console}));
 const errs=[];const e=(m)=>errs.push(m);
 const wc=(t)=>t.trim().split(/\s+/).length;
@@ -18,5 +18,7 @@ R.REAL.forEach(s=>{const w='真人 '+s.id;uid(s.id,w);chkQ(s.questions,w,4);if(!
 R.VOCAB.forEach(g=>g.words.forEach(([w,,,ex])=>{const x=R.VOCAB_EX[w];if(!x||x.length<2||x.length>3)e(`例句 ${w}: 应有 2–3 句`);else{if(x[0][0]!==ex)e(`例句 ${w}: 第 1 句与原例句不一致`);x.forEach(([en,zh],i)=>{if(!en||!zh)e(`例句 ${w} #${i+1}: 缺英文或中文`)})}}));
 // 多义项：每个词都要有，[词性, 释义, 熟词生义?1]
 const POS=new Set(['n.','v.','adj.','adv.','prep.','conj.','pron.','phr.','num.','int.']);R.VOCAB.forEach(g=>g.words.forEach(([w])=>{const x=R.VOCAB_SENSES[w];if(!Array.isArray(x)||!x.length)return e(`义项 ${w}: 缺`);x.forEach(gr=>{if(!gr[0].split('/').every(x=>POS.has(x))||typeof gr[1]!=='string'||!gr[1].trim()||(gr.length===3&&gr[2]!==1)||gr.length>3)e(`义项 ${w}: 格式 ${JSON.stringify(gr)}`)})}));
+// 词形与记忆：每个词都要有 {f, r, m}，i 可选
+R.VOCAB.forEach(g=>g.words.forEach(([w])=>{const m=R.VOCAB_MORPH[w];if(!m)return e(`词形 ${w}: 缺`);if(!Array.isArray(m.f)||!Array.isArray(m.r)||typeof m.m!=='string'||(m.i!=null&&typeof m.i!=='string'))return e(`词形 ${w}: 字段类型`);m.f.forEach(x=>{if(!Array.isArray(x)||x.length!==3||!x.every(y=>typeof y==='string'&&y.trim()))e(`词形 ${w}: 词族项 ${JSON.stringify(x)}`)});m.r.forEach(x=>{if(!Array.isArray(x)||x.length!==2||!x.every(y=>typeof y==='string'&&y.trim()))e(`词形 ${w}: 词素 ${JSON.stringify(x)}`)})}));
 const L=R.LISTENING;console.log(`听力 ${L.length}（对话 ${L.filter(s=>s.type==='conv').length} / 篇章 ${L.filter(s=>s.type==='passage').length} / 讲座 ${L.filter(s=>s.type==='lecture').length}）  阅读 选词 ${R.READING.cloze.length} / 匹配 ${R.READING.match.length} / 仔细 ${R.READING.mc.length}  写作 ${R.WRITING.length}  翻译 ${R.TRANSLATION.length}  词汇 ${words.size}（例句 ${Object.keys(R.VOCAB_EX).length} 词）  真人听力 ${R.REAL.length}（常速 ${R.REAL.filter(r=>r.org).length}）`);
 if(errs.length){console.log('问题',errs.length);errs.forEach(x=>console.log(' -',x));process.exit(1)}else console.log('全部通过');

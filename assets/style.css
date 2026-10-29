@@ -2040,3 +2040,33 @@ html.rt-hold #practice-box :is(.passage,.script){-webkit-user-select:none;user-s
 :root[data-theme="dark"] .senses .rt{background:#4a3410;color:#ffcf85}
 .ex-tip{margin:10px 0 -22px;font-size:11.5px;color:var(--ink-mute)}
 .wp-gl{font-size:14px;line-height:1.6}
+
+/* ===== 词根词缀 / 词族 / 变形 ===== */
+.morph{width:100%;margin:0 0 12px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--paper) 80%,transparent);border:1px dashed var(--line);text-align:left;display:flex;flex-direction:column;gap:8px}
+.mo-row{display:flex;gap:10px;align-items:flex-start}
+.mo-l{flex:none;width:4.2em;font-size:11.5px;font-weight:700;color:var(--ink-dim);padding-top:3px}
+.mo-v{flex:1;min-width:0}
+.mo-root{display:flex;flex-wrap:wrap;align-items:center;gap:4px}
+.mp{display:inline-flex;flex-direction:column;align-items:center;padding:3px 8px;border-radius:8px;background:var(--vocab-soft)}
+.mp b{font-family:var(--serif,inherit);font-size:15px;color:var(--vocab)}
+.mp i{font-style:normal;font-size:11px;color:var(--ink-soft)}
+.mo-plus{color:var(--ink-mute);font-weight:700}
+.mo-m{margin-top:5px;font-size:13px;color:var(--ink-soft);line-height:1.55}
+.mo-f{display:flex;flex-wrap:wrap;gap:6px}
+.mo-w{display:inline-flex;align-items:baseline;gap:5px;padding:4px 9px;border-radius:999px;background:var(--paper-2);border:1px solid var(--line);font-size:13px;cursor:pointer;color:var(--ink)}
+.mo-w:hover{border-color:var(--vocab)}
+.mo-w .pos{font-size:11px;color:var(--ink-dim);font-style:italic}
+.mo-w b{font-weight:700}
+.mo-w .c{color:var(--ink-soft);font-size:12px}
+.mo-i{font-size:13px;color:var(--ink-soft);font-family:var(--serif,inherit)}
+.vg-card .morph,.rv-wcard .morph{margin-top:4px}
+.mo-w .pos{background:none;padding:0;margin:0;border:0}
+
+/* ===== 朗读声音 ===== */
+.vc-list{display:flex;flex-wrap:wrap;gap:8px}
+.vc{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper-2);color:var(--ink);font-size:13px;cursor:pointer}
+.vc.on{border-color:var(--vocab);background:var(--vocab-soft);box-shadow:inset 0 0 0 1px var(--vocab)}
+.vc-l{font-size:11px;color:var(--ink-mute)}
+.vc-t{font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;background:#dff5e6;color:#15803d}
+:root[data-theme="dark"] .vc-t{background:#15321f;color:#86efac}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .vc-t{background:#15321f;color:#86efac}}

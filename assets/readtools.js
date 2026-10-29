@@ -222,7 +222,10 @@
     return id ? C().wordOf(id) : null;
   }
   // 单词库以外的词：例句小词典 VOCAB_GLOSS（data-vocab-gloss.js，按词形查）
-  const glossOf = (w) => { if (typeof VOCAB_GLOSS === 'undefined') return ''; const k = w.toLowerCase().replace(/’/g, "'"); const tries = [k, k.replace(/'s$/, ''), k.replace(/s$/, ''), k.replace(/es$/, ''), k.replace(/ies$/, 'y'), k.replace(/ed$/, ''), k.replace(/d$/, ''), k.replace(/ing$/, ''), k.replace(/ing$/, 'e')]; for (const t of tries) if (VOCAB_GLOSS[t]) return t === k ? VOCAB_GLOSS[t] : `${t}（原形）  ${VOCAB_GLOSS[t]}`; return ''; };
+  // 词族反查：派生词（consistently）→「consistent 的词族  adv. 一贯地」
+  let FAM = null;
+  const famOf = (k) => { if (typeof VOCAB_MORPH === 'undefined') return ''; if (!FAM) { FAM = {}; for (const [base, m] of Object.entries(VOCAB_MORPH)) for (const [p, x, c] of m.f || []) { const xk = x.toLowerCase(); if (!FAM[xk]) FAM[xk] = `${base} 的词族  ${p} ${c}`; } } return FAM[k] || ''; };
+  const glossOf = (w) => { const fam = famOf(w.toLowerCase().replace(/’/g, "'")); if (fam) return fam; if (typeof VOCAB_GLOSS === 'undefined') return ''; const k = w.toLowerCase().replace(/’/g, "'"); const tries = [k, k.replace(/'s$/, ''), k.replace(/s$/, ''), k.replace(/es$/, ''), k.replace(/ies$/, 'y'), k.replace(/ed$/, ''), k.replace(/d$/, ''), k.replace(/ing$/, ''), k.replace(/ing$/, 'e')]; for (const t of tries) if (VOCAB_GLOSS[t]) return t === k ? VOCAB_GLOSS[t] : `${t}（原形）  ${VOCAB_GLOSS[t]}`; return ''; };
   const curSetId = () => (C().curSet ? C().curSet() : '');
   let pop = null, popW = null;
   function hidePop() { if (pop) pop.hidden = true; popW = null; }

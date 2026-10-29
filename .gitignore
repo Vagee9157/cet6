@@ -7,3 +7,4 @@ tools/tts
 tools/tts86
 tools/models/
 tools/asr/
+tools/.vocab-audio-*.json
