@@ -134,7 +134,10 @@
       try { SS.cancel(); } catch (e) { /* ignore */ }
       const u2 = new SpeechSynthesisUtterance(text); u2.lang = 'en-US'; u2.rate = u.rate; keep = u2;
       u2.onend = () => { if (keep === u2) keep = null; }; u2.onerror = u.onerror;
+      let ok2 = false; u2.onstart = () => { ok2 = true; };
       setTimeout(() => SS.speak(u2), 60);
+      // 默认声音也不开口：浏览器的朗读引擎卡死了（Chrome 偶发，整个浏览器都念不出来），只能重开浏览器
+      setTimeout(() => { if (!ok2 && keep === u2) { try { SS.cancel(); } catch (e) { /* ignore */ } toast('浏览器的朗读功能卡住了：请完全退出浏览器（Mac 按 ⌘Q）再打开。已配录音的单词和例句不受影响。'); } }, 1800);
     }, 1500);
     u.addEventListener('end', () => clearTimeout(retry));
     try { if (SS.paused) SS.resume(); } catch (e) { /* ignore */ }
