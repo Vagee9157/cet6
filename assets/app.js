@@ -685,10 +685,12 @@
     ],
   };
   const rate = (id) => { const r = S.sets[id]; return r ? r.r / r.t : 1; };
+  // avoid：不想抽到的 id（上一篇 + 最近点「换一篇」跳过的几篇），候选不够时才放宽
   function randomFrom(pool, avoid) {
+    const av = new Set([].concat(avoid || []));
     const fresh = pool.filter((s) => !S.sets[s.id]);
-    if (fresh.length) { const c = fresh.filter((s) => s.id !== avoid); const a = c.length ? c : fresh; return { s: a[Math.floor(Math.random() * a.length)], redo: false, left: fresh.length }; }
-    const worst = pool.slice().sort((a, b) => rate(a.id) - rate(b.id)).slice(0, Math.max(3, Math.ceil(pool.length / 4))).filter((s) => s.id !== avoid);
+    if (fresh.length) { const c = fresh.filter((s) => !av.has(s.id)); const a = c.length ? c : fresh; return { s: a[Math.floor(Math.random() * a.length)], redo: false, left: fresh.length }; }
+    const worst = pool.slice().sort((a, b) => rate(a.id) - rate(b.id)).slice(0, Math.max(3, Math.ceil(pool.length / 4))).filter((s) => !av.has(s.id));
     return worst.length ? { s: worst[Math.floor(Math.random() * worst.length)], redo: true, left: 0 } : null;
   }
   function rpickHTML(area) {
@@ -701,8 +703,17 @@
   }
   function rpickGo(area) {
     const opts = RPICK[area], k = S.rpick[area] || opts[0].k, o = opts.find((x) => x.k === k) || opts[0];
-    const r = randomFrom(o.pool(), S.rpick[area + 'Last']); if (!r) return;
+    const r = randomFrom(o.pool(), [S.rpick[area + 'Last'], ...(S.rpick[area + 'Skip'] || [])]); if (!r) return;
     S.rpick[area + 'Last'] = r.s.id; save(); openSet(r.s.id);
+    if (cur) { cur.rand = area; const hd = $('#practice-box .prac-head'); if (hd && !hd.querySelector('[data-rpnext]')) hd.querySelector('h2').insertAdjacentHTML('afterend', rpNextBtn()); }
+  }
+  // 随机抽到的这篇不想做：「换一篇」按同样的类型再抽一篇，这篇记进跳过名单（最近 8 篇）一段时间内不再抽到；已经答了的题照常存草稿
+  const rpNextBtn = () => `<button class="btn soft rp-next" data-rpnext>${ic('i-redo')}${cur && cur.done ? '再来一篇' : '换一篇'}</button>`;
+  function rpickNext() {
+    if (!cur || !cur.rand) return; const area = cur.rand, id = cur.set.id;
+    if (!cur.done) { stashDraft(); const sk = (S.rpick[area + 'Skip'] || []).filter((x) => x !== id); sk.unshift(id); S.rpick[area + 'Skip'] = sk.slice(0, 8); }
+    stopAudio(); clearInterval(timerId); cur = null; save(); window.scrollTo(0, 0);
+    rpickGo(area);
   }
   let miniIO = null;
   function renderPracticeHome(sub, keepY) {
@@ -896,7 +907,7 @@
     const total = kind === 'cloze' ? set.answers.length : kind === 'match' ? set.items.length : set.questions.length;
     const answered = Object.keys(ans).length;
     const RT = window.CET6RT, tlim = RT ? RT.limitOf(cur) : 0;
-    const back = `<div class="prac-head"><button class="btn ghost" data-back>${ic('i-chev-l')}返回</button><h2>${esc(set.title)}</h2>${kind === 'listen' || cur.back ? '' : `<span class="timer${tlim ? ' cd' : ''}" id="timer"><small>${tlim ? '剩余' : '已用'}</small><b id="timerVal">00:00</b>${tlim ? `<small>/ 限时 ${tlim / 60} 分钟</small>` : set.minutes ? `<small>/ 建议 ${set.minutes} 分钟</small>` : ''}</span>`}</div>${RT ? RT.toolsHTML(cur) : ''}`;
+    const back = `<div class="prac-head"><button class="btn ghost" data-back>${ic('i-chev-l')}返回</button><h2>${esc(set.title)}</h2>${cur.rand ? rpNextBtn() : ''}${kind === 'listen' || cur.back ? '' : `<span class="timer${tlim ? ' cd' : ''}" id="timer"><small>${tlim ? '剩余' : '已用'}</small><b id="timerVal">00:00</b>${tlim ? `<small>/ 限时 ${tlim / 60} 分钟</small>` : set.minutes ? `<small>/ 建议 ${set.minutes} 分钟</small>` : ''}</span>`}</div>${RT ? RT.toolsHTML(cur) : ''}`;
     const K = ['A', 'B', 'C', 'D'], DR = window.CET6Drills;
     // 交卷后：手机上原文收进 <details>，先看到对错；选词填空的对错就在原文里，不收
     const fold = done && isPhone() && kind !== 'cloze';
@@ -955,6 +966,7 @@
       if (RT && RT.click(e, cur)) return;
       if (DR && DR.preClick(e, cur)) return;
       const rpb = e.target.closest('[data-ramp]'); if (rpb) { S.rampOff = rpb.dataset.ramp === 'off'; save(); const m0 = AUD(set.id); cur.ramp = DR.rampOf(set.id, baseRate(m0), !!m0.slow); cur.rampManual = false; applyRate(m0); return renderSet(); }
+      if (e.target.closest('[data-rpnext]')) return rpickNext();
       if (e.target.closest('[data-back]')) { if (cur.back) { const b = cur.back; cur = null; return b(); } stashDraft(); return renderPracticeHome(null, true); }
       if (e.target.closest('[data-redo]')) return openSet(set.id, true);
       const nx = e.target.closest('[data-next]'); if (nx) return openSet(nx.dataset.next);
