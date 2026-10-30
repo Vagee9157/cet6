@@ -36,6 +36,7 @@ assets/data-*-2.js        扩展题库（追加到同名数组）
 assets/data-pastpapers.js 近十年真题索引 PAST（元信息）
 assets/data-real.js      真人听力 REAL（慢速 VOA + 常速 NASA/NOAA，含逐段时间 segs）
 assets/data-vocab-ex.js  单词例句 VOCAB_EX（每词 3 句 + 中文）
+assets/data-vocab-ex-4.js 第 4、5 批词的例句（首屏后由 app.js 的 loadExtras 按序补加载，同批还有 senses / morph / audio / gloss）
 assets/data-vocab-senses.js 单词多义项 VOCAB_SENSES（[词性, 释义, 熟词生义?1]）
 assets/data-vocab-gloss.js  例句点词小词典 VOCAB_GLOSS（单词库以外的词形 → 简短释义）
 assets/data-vocab-5.js   熟词生义 125 词

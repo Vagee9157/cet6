@@ -13,7 +13,7 @@ HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
 OUT = os.path.join(ROOT, 'assets/wa'); os.makedirs(OUT, exist_ok=True)
 SR = 24000
 k = Kokoro(os.path.join(HERE, 'kokoro-v1.0.onnx'), os.path.join(HERE, 'voices-v1.0.bin'))
-files = ['data-vocab.js', 'data-vocab-2.js', 'data-vocab-3.js', 'data-vocab-ex.js', 'data-vocab-4.js', 'data-vocab-5.js']
+files = ['data-vocab.js', 'data-vocab-2.js', 'data-vocab-3.js', 'data-vocab-ex.js', 'data-vocab-4.js', 'data-vocab-5.js', 'data-vocab-ex-4.js']
 js = "const fs=require('fs');eval(%s.map(f=>fs.readFileSync('%s/assets/'+f,'utf8')).join('\\n')+';console.log(JSON.stringify({V:VOCAB,E:VOCAB_EX}))')" % (json.dumps(files), ROOT)
 D = json.loads(subprocess.check_output(['node', '-e', js]))
 VOICES = ['af_heart']   # 统一用 Kokoro 最自然的美音女声（托福式美音）

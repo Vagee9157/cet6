@@ -92,6 +92,7 @@
     }
     return CLIPS[norm(text)] || null;
   }
+  document.addEventListener('cet6-extras', () => { CLIPS = null; });
   function playClip(c, text, rate) {
     const [src, [a, b]] = c;
     clearTimeout(clipT);

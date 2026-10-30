@@ -1392,5 +1392,22 @@
   if (wtK) openWTItem(wtK, wtM[1]);
   else if (exM && window.CET6Exam) { window.CET6Exam.preset(+exM[1]); show('exam'); }
   else if (!(setM && goSet(setM[1]))) show(VIEWS.includes(start) ? start : 'home');
-  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  // 首屏后再加载的单词扩展数据（例句、多义项、点词词典、词根词缀、录音索引，约占全部数据的一半）：
+  // 先把页面画出来，空闲时按顺序补上，补完发 cet6-extras 事件让当前页刷新；缺这些数据时各处都有退路（单条释义 / 原例句 / 设备朗读）
+  const EXTRAS = ['data-vocab-ex.js', 'data-vocab-ex-4.js', 'data-vocab-senses.js', 'data-vocab-morph.js', 'data-vocab-audio.js', 'data-vocab-gloss.js'];
+  const VER = ((document.querySelector('script[src*="assets/app.js"]') || {}).src || '').split('?')[1] || '';
+  let extrasP = null;
+  const loadExtras = () => extrasP || (extrasP = EXTRAS.reduce((p, f) => p.then(() => new Promise((res) => {
+    const sc = document.createElement('script'); sc.src = `assets/${f}${VER ? '?' + VER : ''}`; sc.onload = sc.onerror = res; document.head.appendChild(sc);
+  })), Promise.resolve()).then(() => {
+    window.CET6.extras = true;
+    document.dispatchEvent(new Event('cet6-extras'));
+    const r = (location.hash || '').slice(1);
+    if (r === 'vocab' || r.startsWith('vocab')) renderVocab();
+  }));
+  window.CET6.loadExtras = loadExtras;
+  const idle = window.requestIdleCallback || ((f) => setTimeout(f, 200));
+  idle(() => loadExtras(), { timeout: 1200 });
+  // 离线缓存（sw.js 预缓存全部数据）等扩展数据补完再注册，不和首屏抢带宽
+  if ('serviceWorker' in navigator && location.protocol === 'https:') loadExtras().then(() => setTimeout(() => navigator.serviceWorker.register('sw.js').catch(() => {}), 1500));
 })();
