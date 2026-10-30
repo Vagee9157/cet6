@@ -1,6 +1,7 @@
 """用 Kokoro（Apache-2.0）给单词库每个词生成真人感朗读：单词 + 3 个例句合成一个文件，记录各段起止时间。
 环境同 gen_audio.py（tools/tts、tools/tts86、kokoro-v1.0.onnx、voices-v1.0.bin）。
 用法：tools/tts/bin/python tools/gen_vocab_audio.py [--force] [--part=i/n] [单词 ...]
+  --was-male 只重做之前用男声（am_michael）的那一半
   --merge 不生成，只把各分份结果合并进 data-vocab-audio.js
   --part=i/n 只做第 i 份（并行跑多个进程），各份进度写 tools/.vocab-audio-i.json；不带 --part 时合并所有分份结果写 data-vocab-audio.js
 产出：assets/wa/<slug>.m4a，assets/data-vocab-audio.js（VOCAB_AUDIO[单词] = [文件, [[起, 止] × 段]]）"""
@@ -15,7 +16,7 @@ k = Kokoro(os.path.join(HERE, 'kokoro-v1.0.onnx'), os.path.join(HERE, 'voices-v1
 files = ['data-vocab.js', 'data-vocab-2.js', 'data-vocab-3.js', 'data-vocab-ex.js', 'data-vocab-4.js', 'data-vocab-5.js']
 js = "const fs=require('fs');eval(%s.map(f=>fs.readFileSync('%s/assets/'+f,'utf8')).join('\\n')+';console.log(JSON.stringify({V:VOCAB,E:VOCAB_EX}))')" % (json.dumps(files), ROOT)
 D = json.loads(subprocess.check_output(['node', '-e', js]))
-VOICES = ['af_heart', 'am_michael']   # 美音女声 / 男声，按词交替
+VOICES = ['af_heart']   # 统一用 Kokoro 最自然的美音女声（托福式美音）
 GAP = 0.7                              # 段间静音，播放时停表有余量
 
 def spoken(w):   # 词条 → 朗读文本
@@ -37,6 +38,7 @@ for g in D['V']:
         if w[0] in seen: continue
         seen.add(w[0]); words.append(w[0])
 todo = [] if '--merge' in sys.argv else [w for w in words if (not only or w in only) and (force or w not in man or not os.path.exists(os.path.join(OUT, man[w][0].split('/')[-1])))]
+if '--was-male' in sys.argv: todo = [w for i, w in enumerate(words) if i % 2 == 1]   # 之前按词交替时用男声的那一半
 if part: pi, pn = map(int, part.split('/')); todo = [w for i, w in enumerate(todo) if i % pn == pi - 1]
 mine = {}
 print('待生成', len(todo), '/', len(words), flush=True)
@@ -52,7 +54,7 @@ for bi in range(0, len(todo), B):
     for w in batch: texts += [spoken(w) + '.'] + [en for en, _ in D['E'].get(w, [])]
     ph = dict(zip(texts, phonemize(texts)))
     for w in batch:
-        v = VOICES[words.index(w) % 2]
+        v = VOICES[words.index(w) % len(VOICES)]
         parts = [(spoken(w) + '.', 0.82)] + [(en, 0.95) for en, _ in D['E'].get(w, [])]
         chunks, segs, t = [np.zeros(int(SR * 0.15), dtype=np.float32)], [], 0.15
         for text, sp in parts:
