@@ -2077,3 +2077,4 @@ html.rt-hold #practice-box :is(.passage,.script){-webkit-user-select:none;user-s
 .snd-prog-bar i{display:block;height:100%;width:0;border-radius:2px;background:var(--bg);transition:width .15s}
 .snd-prog.ind .snd-prog-bar i{animation:sndInd 1.1s ease-in-out infinite alternate}
 @keyframes sndInd{from{opacity:.35}to{opacity:1}}
+.upd-bar{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);padding:11px 18px;border:0;border-radius:14px;background:var(--ink);color:var(--bg);font:inherit;font-size:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);z-index:61;cursor:pointer}

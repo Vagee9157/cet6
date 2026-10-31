@@ -1422,6 +1422,24 @@
   window.CET6.loadExtras = loadExtras;
   const idle = window.requestIdleCallback || ((f) => setTimeout(f, 200));
   idle(() => loadExtras(), { timeout: 1200 });
+  // 发布新版后自动换上：新 sw.js 装好接管页面（controllerchange）→ 没在听音频 / 做模考就直接刷新，否则弹条让用户自己点
+  function watchUpdate(reg) {
+    const had = !!navigator.serviceWorker.controller;
+    let done = false;
+    const busy = () => { try { return !AU.paused || /^#?exam/.test(location.hash); } catch (e) { return false; } };
+    const banner = () => {
+      if (document.getElementById('updBar')) return;
+      const b = document.createElement('button'); b.id = 'updBar'; b.className = 'upd-bar'; b.textContent = '已有新版本，点这里刷新';
+      b.onclick = () => location.reload(); document.body.appendChild(b);
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!had || done) return; done = true;
+      if (busy()) { banner(); const t = setInterval(() => { if (!busy()) { clearInterval(t); location.reload(); } }, 5000); } else location.reload();
+    });
+    // 页面一直开着时，回到前台再查一次有没有新版
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+    reg.update().catch(() => {});
+  }
   // 离线缓存（sw.js 预缓存全部数据）等扩展数据补完再注册，不和首屏抢带宽
-  if ('serviceWorker' in navigator && location.protocol === 'https:') loadExtras().then(() => setTimeout(() => navigator.serviceWorker.register('sw.js').catch(() => {}), 1500));
+  if ('serviceWorker' in navigator && location.protocol === 'https:') loadExtras().then(() => setTimeout(() => navigator.serviceWorker.register('sw.js').then(watchUpdate).catch(() => {}), 1500));
 })();
