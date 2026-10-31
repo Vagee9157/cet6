@@ -570,11 +570,12 @@
   const segAt = (m, t) => { let idx = -1; m.segs.forEach((sg, i) => { if (t >= sg[0] - 0.05 && t < sg[1] + 0.25) idx = i; }); return idx; };
   async function loadAudio(id) {
     if (auId === id) return; AU.pause(); auId = id; auLoop = -1; auIdx = -1;
+    try { AU.currentTime = 0; } catch (e) { /* 换篇从头开始，别带上一篇的进度 */ }
     if (auUrl) { URL.revokeObjectURL(auUrl); auUrl = null; }
     const m = AUD(id);
     // 整个文件取下来再播：离线缓存能存住，拖动进度也不受网络影响
     // 用户在整段载完前就点了播放（auToggle 已直接用原地址开播），就别再换 src 打断
-    try { const r = await fetch(m.src); if (!r.ok) throw 0; auUrl = URL.createObjectURL(await r.blob()); if (auId === id && (AU.paused || !AU.getAttribute('src'))) { const t = AU.currentTime; AU.src = auUrl; if (t) try { AU.currentTime = t; } catch (e) { /* ignore */ } } }
+    try { const bl = window.CET6Sound && window.CET6Sound.fetchBlob ? await window.CET6Sound.fetchBlob(m.src, { label: '听力音频加载中' }) : await (await fetch(m.src)).blob(); auUrl = URL.createObjectURL(bl); if (auId === id && (AU.paused || !AU.getAttribute('src'))) { const t = AU.getAttribute('src') === m.src ? AU.currentTime : 0; AU.src = auUrl; if (t) try { AU.currentTime = t; } catch (e) { /* ignore */ } } }
     catch { if (auId === id) AU.src = m.src; }
     applyRate(m);
   }
@@ -613,7 +614,7 @@
   function auToggle() { if (AU.paused && cur && !cur.done && window.CET6Drills && window.CET6Drills.preGate(cur, AU.currentTime, auToggle)) return; if (AU.paused) { if (!AU.getAttribute('src') && auId && AUD(auId)) AU.src = AUD(auId).src; if (AU.currentTime >= auEnd() - 0.6) AU.currentTime = 0; AU.play().catch(() => {}); } else AU.pause(); }
   function auSeek(t) { const m = auMeta(); if (!m) return; AU.currentTime = Math.max(0, Math.min(auEnd() - 0.1, t)); if (auLoop >= 0) { const i = segAt(m, AU.currentTime); if (i >= 0) auLoop = i; } syncPlayer(); }
   // 精听控制：−5s / +5s / 单句循环（真人和录音播放器共用）
-  const fineHTML = () => `<div class="ctl au-fine"><button class="chip" data-skip="-5" aria-label="后退 5 秒">−5s</button><button class="chip" data-skip="5" aria-label="前进 5 秒">+5s</button><button class="chip" data-loop aria-pressed="${auLoop >= 0}">${ic('i-redo')}单句循环</button><span class="kbd-tip">键盘：空格 播放/暂停，← → 跳 5 秒</span></div>`;
+  const fineHTML = () => `<div class="ctl au-fine"><button class="chip" data-restart aria-label="从头重新播放">${ic('i-flip')}重新开始</button><button class="chip" data-skip="-5" aria-label="后退 5 秒">−5s</button><button class="chip" data-skip="5" aria-label="前进 5 秒">+5s</button><button class="chip" data-loop aria-pressed="${auLoop >= 0}">${ic('i-redo')}单句循环</button><span class="kbd-tip">键盘：空格 播放/暂停，← → 跳 5 秒</span></div>`;
   const miniHTML = () => `<div class="mini-au" id="miniAu" hidden><button class="play" id="miniBtn" data-au aria-label="播放 / 暂停">${ic(AU.paused ? 'i-play' : 'i-pause')}</button><div class="mtx"><span id="miniTxt">0:00</span><div class="seek" data-seek><i id="miniBar"></i></div></div><button class="chip" data-skip="-5" aria-label="后退 5 秒">−5s</button><button class="chip" data-skip="5" aria-label="前进 5 秒">+5s</button></div>`;
   function playerHTML(set) {
     const m = AUD(set.id);
@@ -976,6 +977,7 @@
       const lp = e.target.closest('[data-para]'); if (lp) return locatePara(lp.dataset.para);
       if (e.target.closest('[data-au]')) { auToggle(); return; }
       const sk = e.target.closest('[data-seek]'); if (sk) { const r = sk.getBoundingClientRect(); auSeek(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * auEnd()); return; }
+      if (e.target.closest('[data-restart]')) { auSeek(0); if (AU.paused) auToggle(); return; }
       const sp = e.target.closest('[data-skip]'); if (sp) { auSeek(AU.currentTime + +sp.dataset.skip); return; }
       if (e.target.closest('[data-loop]')) { const m = auMeta(); if (!m) return; auLoop = auLoop >= 0 ? -1 : (auIdx >= 0 ? auIdx : Math.max(0, m.segs.findIndex((g) => g[2] !== 'Q'))); document.querySelectorAll('[data-loop]').forEach((b) => b.setAttribute('aria-pressed', auLoop >= 0)); syncPlayer(); return; }
       const rr = e.target.closest('[data-rrate]'); if (rr) { const v = +rr.dataset.rrate; const mm = auMeta(); if (mm && !mm.slow) S.normRate = v; else S.realRate = v; cur.rampManual = true; AU.defaultPlaybackRate = AU.playbackRate = v; save(); updRateSrc(); document.querySelectorAll('[data-rrate]').forEach((b) => b.setAttribute('aria-pressed', +b.dataset.rrate === v)); return; }

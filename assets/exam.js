@@ -154,7 +154,7 @@
     const n = ++axLoadN; AX.pause();
     if (axUrl) { URL.revokeObjectURL(axUrl); axUrl = null; }
     let src = m.src;
-    try { const r = await fetch(m.src); if (!r.ok) throw 0; const u = URL.createObjectURL(await r.blob()); if (n !== axLoadN) { URL.revokeObjectURL(u); return false; } axUrl = src = u; } catch {}
+    try { const bl = window.CET6Sound && window.CET6Sound.fetchBlob ? await window.CET6Sound.fetchBlob(m.src, { label: '听力音频加载中' }) : await (await fetch(m.src)).blob(); const u = URL.createObjectURL(bl); if (n !== axLoadN) { URL.revokeObjectURL(u); return false; } axUrl = src = u; } catch {}
     if (n !== axLoadN) return false;
     AX.src = src; AX.playbackRate = 1;
     if (t > 0.5) await new Promise((res) => { AX.addEventListener('loadedmetadata', () => { try { AX.currentTime = t; } catch {} res(); }, { once: true }); setTimeout(res, 4000); });

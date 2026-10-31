@@ -148,5 +148,41 @@
   }
   function stop() { clearTimeout(clipT); try { CLIP.pause(); } catch (e) { /* ignore */ } try { if (SS && (SS.speaking || SS.pending)) SS.cancel(); } catch (e) { /* ignore */ } }
 
-  window.CET6Sound = { speak, stop, register, unlock, toast, voices, pickVoice, natural, score, clipOf, _clip: CLIP };
+  // 带进度条的音频下载：整段取下来返回 Blob，超过 300ms 还没完才显示进度条（命中缓存时不闪）
+  // opts.label 显示在进度条上；失败 / 取消（opts.signal）抛错，由调用方退回原地址直接播
+  let progEl = null, progShown = 0;
+  function progress(on, pct, label) {
+    if (!progEl) {
+      progEl = document.createElement('div'); progEl.className = 'snd-prog'; progEl.setAttribute('role', 'status');
+      progEl.innerHTML = '<div class="snd-prog-t"></div><div class="snd-prog-bar"><i></i></div>'; document.body.appendChild(progEl);
+    }
+    if (on) {
+      progEl.firstChild.textContent = label + (pct >= 0 ? ` ${Math.round(pct * 100)}%` : '');
+      progEl.lastChild.firstChild.style.width = pct >= 0 ? `${Math.round(pct * 100)}%` : '100%';
+      progEl.classList.toggle('ind', pct < 0);
+    }
+    progEl.classList.toggle('on', !!on);
+  }
+  async function fetchBlob(src, opts = {}) {
+    const label = opts.label || '音频加载中';
+    const tid = ++progShown;
+    const timer = setTimeout(() => { if (progShown === tid) progress(true, -1, label); }, 300);
+    try {
+      const r = await fetch(src, { signal: opts.signal });
+      if (!r.ok) throw new Error('http ' + r.status);
+      const total = +r.headers.get('content-length') || 0;
+      if (!r.body || !r.body.getReader) return await r.blob();
+      const rd = r.body.getReader(), parts = []; let got = 0;
+      for (;;) {
+        const { done, value } = await rd.read(); if (done) break;
+        parts.push(value); got += value.length;
+        if (progShown === tid && progEl && progEl.classList.contains('on')) progress(true, total ? got / total : -1, label);
+      }
+      return new Blob(parts, { type: r.headers.get('content-type') || 'audio/mp4' });
+    } finally {
+      clearTimeout(timer); if (progShown === tid) progress(false);
+    }
+  }
+
+  window.CET6Sound = { fetchBlob, speak, stop, register, unlock, toast, voices, pickVoice, natural, score, clipOf, _clip: CLIP };
 })();
